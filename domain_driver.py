@@ -1,64 +1,98 @@
-import torch
-import numpy as np
-import sys
+import torch  # Used for tensor operations
+import numpy as np  # For numerical operations, especially those not directly supported by PyTorch
+import sys  # System-specific parameters and functions
 
-from scipy.sparse import kron, diags
-from scipy.sparse import eye as speye
-import scipy.sparse
-import scipy.sparse.linalg as spla
-from time import time
-torch.set_default_dtype(torch.double)
-from scipy.sparse import hstack as sp_hstack
+# Importing necessary components for sparse matrix operations
+from scipy.sparse import kron, diags, block_diag, eye as speye, hstack as sp_hstack
+import scipy.sparse.linalg as spla  # For sparse linear algebra operations
+from time import time  # For timing operations
+torch.set_default_dtype(torch.double)  # Setting default tensor type to double for precision
+
+# Import custom modules for handling multidomain discretization and partial differential operators
 import hps_multidomain_disc
 import pdo
-from functools import reduce
-import scipy.sparse.linalg as sla
+from functools import reduce  # For performing cumulative operations
+import scipy.sparse.linalg as sla  # For sparse linear algebra operations, alternative variable
 
-from fd_disc import *
+from fd_disc import *  # Importing all from the finite difference discretization module
 
+# Attempting to import the PETSc library for parallel computation, handling failure gracefully
 try:
     from petsc4py import PETSc
     petsc_available = True
-except:
+except ImportError:
     petsc_available = False
     print("petsc not available")
 
-def to_torch_csr(A,device=torch.device('cpu')):
+def to_torch_csr(A, device=torch.device('cpu')):
+    """
+    Converts a SciPy sparse matrix to a PyTorch sparse CSR tensor.
+    
+    Parameters:
+    - A: SciPy sparse matrix.
+    - device: The torch device where the tensor will be allocated.
+    
+    Returns:
+    - A PyTorch sparse CSR tensor representation of A.
+    """
     A.sort_indices()
-    A = torch.sparse_csr_tensor(A.indptr,A.indices,A.data,\
-                                        size=(A.shape[0],A.shape[1]),device=device)
-    return A
+    return torch.sparse_csr_tensor(A.indptr, A.indices, A.data, size=(A.shape[0], A.shape[1]), device=device)
 
-# find the divisor of n that is nearest to x
-# if there are two options, pick the larger divisor
-def get_nearest_div(n,x):
-    factors =  list(reduce(list.__add__, 
-                ([i, int(n/i)] for i in range(1, int(n**0.5) + 1) if n % i == 0)))
+def get_nearest_div(n, x):
+    """
+    Finds the divisor of n that is nearest to x. In case of a tie, chooses the larger divisor.
+    
+    Parameters:
+    - n: The number to find divisors of.
+    - x: The target value to approximate through divisors of n.
+    
+    Returns:
+    - The divisor of n nearest to x.
+    """
+    factors = list(reduce(list.__add__, ([i, n//i] for i in range(1, int(n**0.5) + 1) if n % i == 0)))
     factors = torch.tensor(factors)
-    nearest_div = n; dist = np.abs(nearest_div-x)
+    nearest_div, dist = n, np.abs(n - x)
     for f in factors:
-        dist_f = np.abs(f-x)
-        if (dist_f < dist):
-            nearest_div = f; dist = dist_f
-        elif (dist_f == dist):
-            nearest_div = np.max([f,nearest_div])
+        dist_f = np.abs(f - x)
+        if dist_f < dist or (dist_f == dist and f > nearest_div):
+            nearest_div, dist = f, dist_f
     return nearest_div.item()
 
-def apply_sparse_lowmem(A,I,J,v,transpose=False):
-    vec_full = torch.zeros(A.shape[0],v.shape[-1])
-    if (not transpose):
-        vec_full[J] = v
-        vec_full = A @ vec_full
-        return torch.tensor(vec_full[I])
-    else:
-        vec_full[J] = v
-        vec_full = A.T @ vec_full
-        return torch.tensor(vec_full[I])
-
-class Domain_Driver:
+def apply_sparse_lowmem(A, I, J, v, transpose=False):
+    """
+    Applies a sparse matrix to a vector or batch of vectors with minimal memory usage,
+    using only specified indices for non-zero entries.
     
-    def __init__(self,box_geom,pdo_op,kh,h,p=0, \
-                 buf_constant=0.5,periodic_bc=False):
+    Parameters:
+    - A: The sparse matrix.
+    - I: Indices to extract from the resulting vector after applying A.
+    - J: Indices of non-zero entries in the input vector(s) v.
+    - v: The vector(s) to be multiplied.
+    - transpose: If True, apply the transpose of A instead.
+    
+    Returns:
+    - The resulting vector after applying A (or A^T if transpose=True) to v, extracting indices I.
+    """
+    vec_full = torch.zeros(A.shape[0], v.shape[-1])
+    vec_full[J] = v
+    vec_full = A.T @ vec_full if transpose else A @ vec_full
+    return torch.tensor(vec_full[I])
+
+# Domain_Driver class for setting up and solving the discretized PDE
+class Domain_Driver:
+    def __init__(self, box_geom, pdo_op, kh, h, p=0, buf_constant=0.5, periodic_bc=False):
+        """
+        Initializes the domain and discretization for solving a PDE.
+        
+        Parameters:
+        - box_geom: Geometry of the computational domain.
+        - pdo_op: The partial differential operator to be solved.
+        - kh: Wave number or parameter in the differential equation.
+        - h: Grid spacing for finite difference or characteristic length for HPS.
+        - p: Polynomial degree for HPS discretization (ignored for FD).
+        - buf_constant: Buffer size constant for dividing the domain in HPS.
+        - periodic_bc: Boolean indicating if periodic boundary conditions are applied.
+        """
         self.kh = kh;
         self.periodic_bc = periodic_bc
         if (periodic_bc):

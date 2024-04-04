@@ -1,23 +1,47 @@
-import torch
-torch.set_default_dtype(torch.double)
-import hps_subdomain_disc as hps_disc
-import hps_parallel_leaf_ops as leaf_ops
-import numpy as np
-import scipy.sparse as sp
-from time import time
+import torch  # For tensor operations and GPU support
+import numpy as np  # Numerical operations, especially for non-tensor computations
+import scipy.sparse as sp  # Sparse matrix operations for efficient memory usage
+from time import time  # Tracking execution times
 
-def batched_meshgrid(b,npoints,I,J):
-    assert I.shape[0] == b; assert I.shape[1] == npoints
-    assert J.shape[0] == b; assert J.shape[1] == npoints
-    zz1 = torch.repeat_interleave(I,npoints).reshape(b,npoints,npoints)
-    zz2 = torch.repeat_interleave(J,npoints).reshape(b,-1,npoints)
-    zz2 = torch.transpose(zz2,-1,-2)
-    return zz1,zz2
+# Importing HPS discretization and parallel leaf operations modules
+import hps_leaf_disc as hps_disc  
+import hps_parallel_leaf_ops as leaf_ops  
 
+# Utility function to create batched meshgrid for tensor operations
+def batched_meshgrid(b, npoints, I, J):
+    """
+    Creates a batched version of the meshgrid function, useful for vectorized operations over batches.
+    
+    Parameters:
+    - b (int): Batch size.
+    - npoints (int): Number of points along each axis in the grid.
+    - I, J (torch.Tensor): Tensors representing the indices for meshgrid generation, both of shape (b, npoints).
+    
+    Returns:
+    - zz1, zz2 (torch.Tensor): Two tensors representing the meshgrid coordinates, each of shape (b, npoints, npoints).
+    """
+    # Ensures input shapes are as expected
+    assert I.shape[0] == b and I.shape[1] == npoints
+    assert J.shape[0] == b and J.shape[1] == npoints
+    # Generates the batched meshgrid
+    zz1 = torch.repeat_interleave(I, npoints).reshape(b, npoints, npoints)
+    zz2 = torch.repeat_interleave(J, npoints).reshape(b, -1, npoints)
+    zz2 = torch.transpose(zz2, -1, -2)  # Correcting the orientation
+    return zz1, zz2
+
+# HPS Multidomain class for handling multidomain discretizations and solutions
 class HPS_Multidomain:
     
-    def __init__(self,pdo,domain,a,p):
-
+    def __init__(self, pdo, domain, a, p):
+        """
+        Initializes the HPS multidomain solver with domain information and discretization parameters.
+        
+        Parameters:
+        - pdo: An object representing the partial differential operator.
+        - domain (torch.Tensor): The computational domain represented as a tensor.
+        - a (float): Characteristic length scale for the domain.
+        - p (int): Polynomial degree for spectral methods or discretization parameter.
+        """
         self.pdo    = pdo
         self.domain = domain
         self.p      = p
@@ -50,8 +74,18 @@ class HPS_Multidomain:
         
         self.xx_tot = self.grid_xx.flatten(start_dim=0,end_dim=-2)
     
-    def sparse_mat(self,device,verbose=False):
+    def sparse_mat(self, device, verbose=False):
+        """
+        Constructs a sparse matrix representation of the problem on the specified device.
         
+        Parameters:
+        - device (torch.device): The device (CPU or GPU) for computation.
+        - verbose (bool): Flag to enable detailed printouts for debugging or monitoring.
+        
+        Returns:
+        - sp_mat: Sparse matrix representation of the HPS operator.
+        - t_dict: Dictionary containing timing information for different parts of the matrix assembly process.
+        """
         tic = time()
         DtN_loc = self.get_DtNs(device,'build')
         toc_DtN = time() - tic;
@@ -107,8 +141,14 @@ class HPS_Multidomain:
         t_dict['toc_forloop'] = toc_forloop
         t_dict['toc_sparse'] = toc_csr_scipy
         return sp_mat,t_dict
-        
+    
     def get_grid(self):
+        """
+        Generates the computational grid based on the discretization parameters and domain geometry.
+        
+        Returns:
+        - xx (torch.Tensor): Tensor representing the grid points in the computational domain.
+        """
         zz = torch.tensor(self.H.zz.T)
 
         n = self.n
@@ -124,6 +164,12 @@ class HPS_Multidomain:
         return xx
     
     def get_unique_inds(self):
+        """
+        Identifies unique and duplicated indices for handling boundary conditions and overlaps between subdomains.
+        
+        Returns:
+        - I_unique, I_copy1, I_copy2 (torch.Tensor): Tensors representing unique and duplicated grid indices.
+        """
         size_face = self.p-2
         n0,n1 = self.n
 

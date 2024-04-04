@@ -1,35 +1,72 @@
-import torch
-torch.set_default_dtype(torch.double)
-import numpy as np
+import torch  # Used for tensor operations with GPU support
+import numpy as np  # For numerical operations, especially those related to array manipulation
 
-def get_nearest_div(n,div):
-    while (np.mod(n,div) > 0):
+torch.set_default_dtype(torch.double)  # Ensure all torch tensors are double precision for accuracy
+
+# Utility function to find the largest divisor of 'n' that is smaller or equal to 'div'
+def get_nearest_div(n, div):
+    """
+    Finds the largest divisor of n that is less than or equal to div.
+    
+    Parameters:
+    - n (int): The number to find the divisor for.
+    - div (int): The maximum allowed divisor.
+    
+    Returns:
+    - int: The largest divisor of n that does not exceed div.
+    """
+    while (np.mod(n, div) > 0):
         div -= 1
     return div
 
-def get_Aloc_2d(p,xxloc,Ds,pdo,box_start,box_end,device):
-    nboxes = box_end-box_start
-    Aloc = torch.zeros(nboxes,p**2,p**2,device=device)
-    xx_flat = xxloc[box_start:box_end].reshape(nboxes*p**2,2)
+# Function to assemble local blocks of the global matrix for a 2D domain
+def get_Aloc_2d(p, xxloc, Ds, pdo, box_start, box_end, device):
+    """
+    Assembles local blocks of the global matrix representing the differential operator in a 2D domain.
+    
+    Parameters:
+    - p (int): The polynomial degree for spectral methods or the discretization parameter for FD.
+    - xxloc (tensor): The locations of the grid points.
+    - Ds (list of tensors): The differential operators (e.g., derivatives) in matrix form.
+    - pdo (object): An object containing the functions for the coefficients of the PDE.
+    - box_start, box_end (int): Indices defining the range of boxes to process.
+    - device (torch.device): The computation device (CPU or GPU).
+    
+    Returns:
+    - Aloc (tensor): A tensor containing the assembled local blocks of the global matrix.
+    """
+    nboxes = box_end - box_start  # Number of boxes to process
+    Aloc = torch.zeros(nboxes, p**2, p**2, device=device)  # Initialize the tensor for local blocks
+    xx_flat = xxloc[box_start:box_end].reshape(nboxes*p**2, 2)  # Flatten the grid points for the given range
 
-    args = p,2,nboxes,xx_flat,Aloc
-
-    Aloc_acc(*args,pdo.c11,Ds[0],c=-1.)
-    Aloc_acc(*args,pdo.c22,Ds[1],c=-1.)
-    if (pdo.c12 is not None):
-        Aloc_acc(*args,pdo.c12,Ds[2],c=-2.)
-    if (pdo.c1 is not None):
-        Aloc_acc(*args,pdo.c1,Ds[3])
-    if (pdo.c2 is not None):
-        Aloc_acc(*args,pdo.c2,Ds[4])
-    if (pdo.c is not None):
-        I = torch.eye(p**2,device=device)
-        Aloc_acc(*args,pdo.c,I)
+    # Accumulate the contributions of each coefficient to the local blocks
+    Aloc_acc(p, 2, nboxes, xx_flat, Aloc, pdo.c11, Ds[0], c=-1.)
+    Aloc_acc(p, 2, nboxes, xx_flat, Aloc, pdo.c22, Ds[1], c=-1.)
+    if pdo.c12 is not None:
+        Aloc_acc(p, 2, nboxes, xx_flat, Aloc, pdo.c12, Ds[2], c=-2.)
+    if pdo.c1 is not None:
+        Aloc_acc(p, 2, nboxes, xx_flat, Aloc, pdo.c1, Ds[3])
+    if pdo.c2 is not None:
+        Aloc_acc(p, 2, nboxes, xx_flat, Aloc, pdo.c2, Ds[4])
+    if pdo.c is not None:
+        I = torch.eye(p**2, device=device)
+        Aloc_acc(p, 2, nboxes, xx_flat, Aloc, pdo.c, I)
     return Aloc
 
-
-def Aloc_acc(p,d,nboxes,xx_flat,Aloc,\
-             func,D,c=1.):
+# Helper function to accumulate the contribution of each coefficient function to the local blocks
+def Aloc_acc(p, d, nboxes, xx_flat, Aloc, func, D, c=1.):
+    """
+    Accumulates the contribution of a coefficient function to the local blocks of the global matrix.
+    
+    Parameters:
+    - p, d (int): The polynomial degree and the dimensionality of the problem, respectively.
+    - nboxes (int): The number of boxes to process.
+    - xx_flat (tensor): The flattened locations of the grid points for the given range.
+    - Aloc (tensor): The tensor for the local blocks being assembled.
+    - func (callable): The coefficient function to be applied.
+    - D (tensor): The differential operator matrix related to the coefficient function.
+    - c (float): A scaling factor for the coefficient function (default is 1).
+    """
     size_f    = p**d
     f_vals    = func(xx_flat).reshape(nboxes,size_f)
     f_vals    = f_vals[:,:,None]
