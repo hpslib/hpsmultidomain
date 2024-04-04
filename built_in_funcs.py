@@ -1,49 +1,111 @@
-import torch
-import numpy as np
-torch.set_default_dtype(torch.double)
-import pdo
+# Import necessary libraries
+import torch  # For tensor computations
+import numpy as np  # For numerical operations
+torch.set_default_dtype(torch.double)  # Set default tensor data type to double precision for higher numerical accuracy
+import pdo  # Import a custom library for dealing with Partial Differential Operators
 
-from scipy.special import hankel1
+from scipy.special import hankel1  # Import the Hankel function of the first kind for wave-related computations
 
-##################################### FUNCTIONS FOR DIRICHLET DATA AND BODY LOAD #############################
+# FUNCTIONS FOR DIRICHLET DATA AND BODY LOAD
 
-def parameter_map(xx,psi):
-    xx_tmp = xx.clone()
-    xx_tmp[:,1] = torch.div(xx_tmp[:,1],psi(xx_tmp[:,0]))
-    return xx_tmp
-
-def inv_parameter_map(xx,psi):
-    xx_tmp = xx.clone()
-    xx_tmp[:,1] = torch.mul(xx_tmp[:,1],psi(xx_tmp[:,0]))
-    return xx_tmp
-
-def parameter_map_pdo(psi,dpsi,ddpsi,bfield,kh):
+def parameter_map(xx, psi):
+    """
+    Applies a parameter mapping to the y-coordinates of a set of points based on a given function `psi`.
+    This can be used to transform the computational domain in simulations.
     
+    Parameters:
+    - xx: A tensor of shape (N, 2) representing N points in a 2D space.
+    - psi: A function that takes x-coordinates and returns a scaling factor for the y-coordinates.
+    
+    Returns:
+    - A tensor of shape (N, 2) with transformed y-coordinates.
+    """
+    xx_tmp = xx.clone()  # Clone the input tensor to avoid modifying it directly
+    xx_tmp[:, 1] = torch.div(xx_tmp[:, 1], psi(xx_tmp[:, 0]))  # Apply the transformation to y-coordinates
+    return xx_tmp
+
+def inv_parameter_map(xx, psi):
+    """
+    Applies an inverse parameter mapping to the y-coordinates of a set of points based on a given function `psi`.
+    This reverses the effect of `parameter_map`.
+    
+    Parameters:
+    - xx: A tensor of shape (N, 2) representing N points in a 2D space.
+    - psi: A function that takes x-coordinates and returns a scaling factor for the y-coordinates.
+    
+    Returns:
+    - A tensor of shape (N, 2) with transformed y-coordinates.
+    """
+    xx_tmp = xx.clone()  # Clone the input tensor to avoid modifying it directly
+    xx_tmp[:, 1] = torch.mul(xx_tmp[:, 1], psi(xx_tmp[:, 0]))  # Reverse the transformation applied to y-coordinates
+    return xx_tmp
+
+def parameter_map_pdo(psi, dpsi, ddpsi, bfield, kh):
+    """
+    Constructs a Partial Differential Operator (PDO) with coefficients that are adjusted based on a parameter mapping.
+    This is used to define the PDE in a transformed domain.
+    
+    Parameters:
+    - psi: The mapping function for y-coordinates.
+    - dpsi: The first derivative of `psi`.
+    - ddpsi: The second derivative of `psi`.
+    - bfield: A function defining the magnetic field within the domain.
+    - kh: A parameter related to the wave number or magnetic field strength.
+    
+    Returns:
+    - An instance of `PDO_2d` representing the PDE operator with mapped parameters.
+    """
     def c22(xx):
-        yy = parameter_map(xx,psi); yy0 = yy[:,0]; yy1 = yy[:,1]
-        return +( torch.mul( yy1**2, dpsi(yy0)**2 ) + psi(yy0)**2  )
+        # Coefficient function for the second derivative term with respect to y after transformation
+        yy = parameter_map(xx, psi)
+        return +(torch.mul(yy[:, 1]**2, dpsi(yy[:, 0])**2) + psi(yy[:, 0])**2)
+
     def c12(xx):
-        yy = parameter_map(xx,psi); yy0 = yy[:,0]; yy1 = yy[:,1]
-        return +torch.mul(dpsi(yy0), yy1)
+        # Coefficient function for the mixed derivative term after transformation
+        yy = parameter_map(xx, psi)
+        return +torch.mul(dpsi(yy[:, 0]), yy[:, 1])
+
     def c2(xx):
-        yy = parameter_map(xx,psi); yy0 = yy[:,0]; yy1 = yy[:,1]
-        return -torch.mul( yy1 , ddpsi(yy0))
+        # Coefficient function for the first derivative term with respect to y after transformation
+        yy = parameter_map(xx, psi)
+        return -torch.mul(yy[:, 1], ddpsi(yy[:, 0]))
+
     def c(xx):
-        return bfield(xx,kh)
-    op = pdo.PDO_2d(c11=pdo.const(+1),c22=c22,c12=c12,c2=c2,c=c)
+        # Coefficient function for the zeroth-order term, representing the magnetic field
+        return bfield(xx, kh)
+
+    op = pdo.PDO_2d(c11=pdo.const(+1), c22=c22, c12=c12, c2=c2, c=c)  # Construct the PDO with specified coefficients
     return op
+
+def uu_dir_func_mms(xx, Lx, Ly):
+    """
+    Defines a Dirichlet boundary condition using the Method of Manufactured Solutions (MMS).
     
-def uu_dir_func_mms(xx,Lx,Ly):
+    Parameters:
+    - xx: A tensor of shape (N, 2) representing N points in a 2D space.
+    - Lx, Ly: Parameters defining the wave characteristics in the x and y directions, respectively.
     
-    uu_exact  = torch.sin(Lx * xx[:,0]) * torch.exp(Ly* xx[:,1])
-    return uu_exact.unsqueeze(-1)
+    Returns:
+    - A tensor representing the boundary condition at each input point.
+    """
+    uu_exact = torch.sin(Lx * xx[:, 0]) * torch.exp(Ly * xx[:, 1])
+    return uu_exact.unsqueeze(-1)  # Add a singleton dimension to match expected shape
+
+def ff_body_func_mms(xx, Lx, Ly):
+    """
+    Defines a body load (source term) for the PDE using the Method of Manufactured Solutions (MMS).
     
-def ff_body_func_mms(xx,Lx,Ly):
+    Parameters:
+    - xx: A tensor of shape (N, 2) representing N points in a 2D space.
+    - Lx, Ly: Parameters defining the wave characteristics in the x and y directions, respectively.
     
-    uu_exact  = torch.sin(Lx * xx[:,0]) * torch.exp(Ly* xx[:,1])
-    ff_body   = (Lx**2 - Ly **2) * uu_exact 
-    
-    return ff_body.unsqueeze(-1)
+    Returns:
+    - A tensor representing the source term at each input point.
+    """
+    uu_exact = torch.sin(Lx * xx[:, 0]) * torch.exp(Ly * xx[:, 1])
+    ff_body = (Lx**2 - Ly**2) * uu_exact
+    return ff_body.unsqueeze(-1)  # Add a singleton dimension to match expected shape
+
 
 def uu_dir_pulse(xx,kh):
     
