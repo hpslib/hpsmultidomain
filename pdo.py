@@ -4,31 +4,45 @@ import numpy as np
 import warnings
 
 class PDO_2d:
-    def __init__(self, c11, c22, c12=None, \
-                 c1= None, c2 = None, c = None):
+    """
+    Represents a 2-dimensional Partial Differential Operator (PDO) with coefficients for the PDE terms.
+    
+    Parameters:
+    c11, c22, c12: Coefficients for the second-order partial derivatives.
+    c1, c2: Coefficients for the first-order derivatives.
+    c: Coefficient for the zeroth-order term (source term).
+    """
+    def __init__(self, c11, c22, c12=None, c1= None, c2 = None, c = None):
         self.c11, self.c22 = c11, c22
         self.c12 = c12
-        self.c1, self.c2    = c1, c2
+        self.c1, self.c2 = c1, c2
         self.c = c
 
-class PDO_3d:
-    def __init__(self, c11, c22, c33, c12=None, c13 = None, c23 = None, \
-                 c1= None, c2 = None, c3 = None, c = None):
-        self.c11, self.c22, self.c33 = c11, c22, c33
-        self.c12, self.c13, self.c23 = c12, c13, c23
-        self.c1, self.c2, self.c3    = c1, c2, c3
-        self.c = c
         
-# Input: n x d matrix of locations of n points in d dimensions
-# Output: n vector of function values
 def ones(xxloc):
-    tmp = torch.ones(xxloc.shape[0],device=xxloc.device)
-    return tmp
+    """
+    Returns a tensor of ones for a given set of locations. Used for creating constant coefficient functions.
+    
+    Parameters:
+    xxloc: n x d matrix of locations of n points in d dimensions.
+    
+    Returns:
+    A tensor of ones with shape n.
+    """
+    return torch.ones(xxloc.shape[0], device=xxloc.device)
 
-# Input: n x d matrix of locations of n points in d dimensions
-# Output: n vector of function values
 def const(c=1):
-    return lambda xxloc: c * torch.ones(xxloc.shape[0],device=xxloc.device)
+    """
+    Returns a function that generates a tensor of constants for a given set of locations.
+    
+    Parameters:
+    c: The constant value to use. Defaults to 1.
+    
+    Returns:
+    A function that takes `xxloc`, an n x d matrix of locations, and returns a tensor of constants c.
+    """
+    return lambda xxloc: c * torch.ones(xxloc.shape[0], device=xxloc.device)
+
 
 ################################################################################
 #################### parameter map for curved domains ##########################
@@ -123,15 +137,32 @@ def c12_func(parameter_map,y1_d1, y1_d2, y2_d1, y2_d2):
     return c12
 
 #####################################################################################
-# We solve variable-coefficient PDEs on curved domains Psi by solving
-# on a reference rectangle Omega.
-# parameter_map (z_func) : given point on Omega, maps to point on Psi
-
-# y_func is maps points on Psi to points on Omega
-# partial derivatives are taken with respect to y = (y_1,y_2)
 
 def pdo_param(kh, bfield, z1, z2, y1, y2, y1_d1=None, y1_d2=None, y2_d1=None, y2_d2=None,\
        y1_d1d1=None, y1_d2d2=None, y2_d1d1=None, y2_d2d2=None):
+
+    """
+    Configures a PDO for variable-coefficient PDEs on custom domains by specifying parameter maps
+    and their derivatives. This function sets up the PDO based on geometric transformations
+    from a reference domain to the target curved domain.
+
+    We solve variable-coefficient PDEs on curved domains Psi by solving
+    on a reference rectangle Omega.
+    parameter_map (z_func) : given point on Omega, maps to point on Psi
+    y_func is maps points on Psi to points on Omega
+    partial derivatives are taken with respect to y = (y_1,y_2)
+    
+    Parameters:
+    kh: Wave number or parameter related to the equation's physical properties.
+    bfield: Function defining the magnetic field or other spatially varying properties within the domain.
+    z1, z2: Functions defining the forward parameter map from the reference domain to the curved domain.
+    y1, y2: Functions defining the inverse parameter map from the curved domain to the reference domain.
+    y1_d1, y1_d2, y2_d1, y2_d2: First derivatives of the y mapping functions.
+    y1_d1d1, y1_d2d2, y2_d1d1, y2_d2d2: Second derivatives of the y mapping functions.
+    
+    Returns:
+    A configured PDO object along with the parameter map and inverse parameter map functions.
+    """
     
     
     def parameter_map(xx):
@@ -162,6 +193,18 @@ def pdo_param(kh, bfield, z1, z2, y1, y2, y1_d1=None, y1_d2=None, y2_d1=None, y2
 
 
 def get_param_helper(geom,bfield,kh):
+    """
+    Helper function for configuring PDO and parameter mappings based on the specified geometry.
+    Supports various predefined geometries like 'sinusoidal', 'annulus', and 'curvy_annulus'.
+    
+    Parameters:
+    geom: String specifying the geometry type.
+    bfield: Function defining the magnetic field or spatially varying properties within the domain.
+    kh: Wave number or parameter related to the equation's physical properties.
+    
+    Returns:
+    Configured PDO object, parameter map, and inverse parameter map functions for the specified geometry.
+    """
     
     if ((geom == 'sinusoidal') or (geom== 'curved')):
         
@@ -311,14 +354,20 @@ def get_param_helper(geom,bfield,kh):
 
 
 #####################################################################################
-# We solve variable-coefficient PDEs on curved domains Psi by solving
-# on a reference rectangle Omega.
-# parameter_map : given point on Omega, maps to point on Psi
-
-# y_func is maps points on Psi to points on Omega
-# partial derivatives are taken with respect to y = (y_1,y_2)
 
 def get_param_map_and_pdo(geom, bfield, kh):
+    """
+    Main function to obtain the PDO and parameter mappings for a given geometry and magnetic field configuration.
+    Directly supports simple geometries like 'square' and uses `get_param_helper` for more complex geometries.
+    
+    Parameters:
+    geom: String specifying the geometry type.
+    bfield: Function defining the magnetic field or spatially varying properties within the domain.
+    kh: Wave number or parameter related to the equation's physical properties.
+    
+    Returns:
+    Configured PDO object along with the parameter map and inverse parameter map functions for the specified geometry.
+    """
     
     if (geom == 'square'):
         # identity maps for parameter maps 

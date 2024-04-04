@@ -5,52 +5,100 @@ from time import time
 import numpy.polynomial.chebyshev as cheb_py
 import scipy.linalg
 
-Pdo_2d   = namedtuple('Pdo_2d',['c11','c22','c12', 'c1','c2','c'])
-Ds_2d    = namedtuple('Ds_2d', ['D11','D22','D12','D1','D2'])
-JJ_2d    = namedtuple('JJ_2d', ['Jl','Jr','Jd','Ju','Jx','Jc','Jxreorder'])
+# Define named tuples for storing partial differential operators (PDOs) and differential schemes (Ds)
+# for both 2D and 3D problems, along with indices (JJ) for domain decomposition.
+Pdo_2d = namedtuple('Pdo_2d', ['c11', 'c22', 'c12', 'c1', 'c2', 'c'])
+Ds_2d = namedtuple('Ds_2d', ['D11', 'D22', 'D12', 'D1', 'D2'])
+JJ_2d = namedtuple('JJ_2d', ['Jl', 'Jr', 'Jd', 'Ju', 'Jx', 'Jc', 'Jxreorder'])
 
-Pdo_3d   = namedtuple('Pdo_3d',['c11','c22','c33','c12','c13','c23','c1','c2','c3','c'])
-Ds_3d    = namedtuple('Ds_3d', ['D11','D22','D33','D12','D13','D23','D1','D2','D3'])
-JJ_3d    = namedtuple('JJ_3d', ['Jl','Jr','Jd','Ju','Jb','Jf','Jx','Jc','Jtot'])
+Pdo_3d = namedtuple('Pdo_3d', ['c11', 'c22', 'c33', 'c12', 'c13', 'c23', 'c1', 'c2', 'c3', 'c'])
+Ds_3d = namedtuple('Ds_3d', ['D11', 'D22', 'D33', 'D12', 'D13', 'D23', 'D1', 'D2', 'D3'])
+JJ_3d = namedtuple('JJ_3d', ['Jl', 'Jr', 'Jd', 'Ju', 'Jb', 'Jf', 'Jx', 'Jc', 'Jtot'])
 
 def cheb(p):
+    """
+    Computes the Chebyshev differentiation matrix and Chebyshev points for a given degree p.
+    
+    Parameters:
+    - p: The polynomial degree
+    
+    Returns:
+    - D: The Chebyshev differentiation matrix
+    - x: The Chebyshev points
+    """
     x = np.cos(np.pi * np.arange(p+1) / p)
     c = np.concatenate((np.array([2]), np.ones(p-1), np.array([2])))
-    c = np.multiply(c,np.power(np.ones(p+1) * -1, np.arange(p+1)))
-    X = x.repeat(p+1).reshape((-1,p+1))
+    c = np.multiply(c, np.power(-1, np.arange(p+1)))
+    X = np.tile(x, (p+1, 1))
     dX = X - X.T
-    # create the off diagonal entries of D
-    D = np.divide(np.outer(c,np.divide(np.ones(p+1),c)), dX + np.eye(p+1))
-    D = D - np.diag(np.sum(D,axis=1))
-    return D,x
+    D = np.divide(np.outer(c, 1/c), dX + np.eye(p+1))
+    D -= np.diag(np.sum(D, axis=1))
+    return D, x
 
-def diag_mult(diag,M):
-    return (diag * M.T).T
+def diag_mult(diag, M):
+    """
+    Performs multiplication of a diagonal matrix (represented by a vector) with a matrix.
+    
+    Parameters:
+    - diag: A vector representing the diagonal of a diagonal matrix
+    - M: A matrix to be multiplied
+    
+    Returns:
+    - The result of the diagonal matrix multiplied by M
+    """
+    return (diag[:, None] * M).T
 
 def get_loc_interp(x_cheb, x_cheb_nocorners, q):
-    Vpoly_cheb = cheb_py.chebvander(x_cheb,q)
-    Vpoly_nocorner = cheb_py.chebvander(x_cheb_nocorners,q)
+    """
+    Computes local interpolation matrices from Chebyshev points.
+    
+    Parameters:
+    - x_cheb: Chebyshev points including corner points
+    - x_cheb_nocorners: Chebyshev points excluding corner points
+    - q: The degree of the polynomial for interpolation
+    
+    Returns:
+    - Interp_loc: Local interpolation matrix
+    - err: Norm of the interpolation error
+    - cond: Condition number of the interpolation matrix
+    """
+    Vpoly_cheb = cheb_py.chebvander(x_cheb, q)
+    Vpoly_nocorner = cheb_py.chebvander(x_cheb_nocorners, q)
+    Interp_loc = np.linalg.lstsq(Vpoly_nocorner.T, Vpoly_cheb.T, rcond=None)[0].T
+    err = np.linalg.norm(Interp_loc @ Vpoly_nocorner - Vpoly_cheb)
+    cond = np.linalg.cond(Interp_loc)
+    return Interp_loc, err, cond
 
-    Interp_loc = np.linalg.lstsq(Vpoly_nocorner.T,Vpoly_cheb.T,rcond=None)[0].T
-    err  = np.linalg.norm(Interp_loc @ Vpoly_nocorner - Vpoly_cheb)
-    cond = np.linalg.cond(Interp_loc) 
-    return Interp_loc,err,cond
-
+# Class for discretization using the Hierarchical Poincaré-Steklov (HPS) scheme.
 class HPS_Disc:
-    def __init__(self,a,p,d):
-        self._discretize(a,p,d)
+    def __init__(self, a, p, d):
+        """
+        Initializes the HPS discretization class.
+        
+        Parameters:
+        - a: Half the size of the computational domain
+        - p: The polynomial degree for Chebyshev discretization
+        - d: Dimension of the problem (2 or 3)
+        """
+        self._discretize(a, p, d)
         self.a = a; self.p = p; self.d = d
         self._get_interp_mat()
-        
-    def _discretize(self,a,p,d):
-        if (d == 2):
-            self.zz,self.Ds,self.JJ,self.hmin = HPS_Disc.leaf_discretization_2d(a,p)
+    
+    def _discretize(self, a, p, d):
+        """
+        Discretizes the domain based on the dimension specified.
+        """
+        if d == 2:
+            self.zz, self.Ds, self.JJ, self.hmin = HPS_Disc.leaf_discretization_2d(a, p)
         else:
-            self.zz,self.Ds,self.JJ,self.hmin = HPS_Disc.leaf_discretization_3d(a,p)
-        self.Nx = HPS_Disc.get_diff_ops(self.Ds,self.JJ,d)
+            self.zz, self.Ds, self.JJ, self.hmin = HPS_Disc.leaf_discretization_3d(a, p)
+        self.Nx = HPS_Disc.get_diff_ops(self.Ds, self.JJ, d)
+    
         
-    ## Interpolation from data on Ix to Ix_reorder
     def _get_interp_mat(self):
+        """
+        Computes the interpolation matrix for reordering points from Ix to Ix_reorder.
+        """
         
         p = self.p; a = self.a
         
@@ -79,7 +127,7 @@ class HPS_Disc:
         print ("--Interp_mat required lstsqfit of q=%d, condition number %5.5f with error %5.5e and time to calculate %12.5f"\
                % (q,cond,err,toc))
         
-        
+    @staticmethod    
     def get_diff_ops(Ds,JJ,d):
         if (d == 2):
             Nl = Ds.D1[JJ.Jl]
@@ -102,7 +150,11 @@ class HPS_Disc:
     
 #################################### 2D discretization ##########################################
 
+    @staticmethod
     def leaf_discretization_2d(a,p):
+        """
+        Performs leaf-level discretization for a 2D domain.
+        """
         zz,Ds = HPS_Disc.cheb_2d(a,p)
         hmin  = zz[1,1] - zz[0,1]
 
@@ -134,6 +186,9 @@ class HPS_Disc:
         return zz,Ds,JJ,hmin
 
     def cheb_2d(a,p):
+        """
+        Generates a 2D Chebyshev grid and differentiation matrices.
+        """
         D,xvec = cheb(p-1)
         xvec = a * np.flip(xvec)
         D = (1/a) * D
@@ -150,65 +205,3 @@ class HPS_Disc:
         zz = np.vstack((zz1,zz2))
         Ds = Ds_2d(D1= D1, D2= D2, D11= D11, D22= D22, D12= D12)
         return zz, Ds 
-        
-        
-#################################### 3D discretization ##########################################
-    
-    def leaf_discretization_3d(a,p):
-        zz,Ds = HPS_Disc.cheb_3d(a,p)
-        hmin  = zz[2,1] - zz[2,0]
-
-        Jc0   = np.abs(zz[0,:]) < a - 0.5*hmin
-        Jc1   = np.abs(zz[1,:]) < a - 0.5*hmin
-        Jc2   = np.abs(zz[2,:]) < a - 0.5*hmin
-        Jl    = np.argwhere(np.logical_and(zz[0,:] < - a + 0.5 * hmin,
-                                           np.logical_and(Jc1,Jc2)))
-        Jl    = Jl.copy().reshape((p-2)**2,)
-        Jr    = np.argwhere(np.logical_and(zz[0,:] > + a - 0.5 * hmin,
-                                           np.logical_and(Jc1,Jc2)))
-        Jr    = Jr.copy().reshape((p-2)**2,)
-        Jd    = np.argwhere(np.logical_and(zz[1,:] < - a + 0.5 * hmin,
-                                           np.logical_and(Jc0,Jc2)))
-        Jd    = Jd.copy().reshape((p-2)**2,)
-        Ju    = np.argwhere(np.logical_and(zz[1,:] > + a - 0.5 * hmin,
-                                           np.logical_and(Jc0,Jc2)))
-        Ju    = Ju.copy().reshape((p-2)**2,)
-        Jb    = np.argwhere(np.logical_and(zz[2,:] < - a + 0.5 * hmin,
-                                           np.logical_and(Jc0,Jc1)))
-        Jb    = Jb.copy().reshape((p-2)**2,)
-        Jf    = np.argwhere(np.logical_and(zz[2,:] > + a - 0.5 * hmin,
-                                           np.logical_and(Jc0,Jc1)))
-        Jf    = Jf.copy().reshape((p-2)**2,)
-
-        Jc    = np.argwhere(np.logical_and(Jc0,
-                                           np.logical_and(Jc1,Jc2)))
-        Jc    = Jc.copy().reshape((p-2)**3,)
-        Jx    = np.concatenate((Jl,Jr,Jd,Ju,Jb,Jf))
-        Jtot  = np.concatenate((Jx,Jc))
-        JJ    = JJ_3d(Jl= Jl, Jr= Jr, Ju= Ju, Jd= Jd, Jb= Jb,
-                 Jf=Jf, Jx=Jx, Jc=Jc, Jtot=Jtot)
-        return zz,Ds,JJ,hmin
-
-    def cheb_3d(a,p):
-        D,xvec = cheb(p-1)
-        xvec = a * np.flip(xvec)
-        D = (1/a) * D
-        I = np.eye(p)
-        D1 = -np.kron(D,np.kron(I,I))
-        D2 = -np.kron(I,np.kron(D,I))
-        D3 = -np.kron(I,np.kron(I,D))
-        Dsq = D @ D
-        D11 = np.kron(Dsq,np.kron(I,I))
-        D22 = np.kron(I,np.kron(Dsq,I))
-        D33 = np.kron(I,np.kron(I,Dsq))
-        D12 = np.kron(D,np.kron(D,I))
-        D13 = np.kron(D,np.kron(I,D))
-        D23 = np.kron(I,np.kron(D,D))
-
-        zz1 = np.repeat(xvec,p*p)
-        zz2 = np.repeat(xvec,p*p).reshape(p*p,p).T.flatten()
-        zz3 = np.repeat(xvec,p*p).reshape(p,p*p).T.flatten()
-        zz = np.vstack((zz1,zz2,zz3))
-        Ds = Ds_3d(D1= D1, D2= D2, D3= D3, D11= D11, D22= D22, D33= D33,
-             D12= D12, D13= D13, D23= D23)
-        return zz, Ds
