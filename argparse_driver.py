@@ -166,9 +166,9 @@ else:
 
 ################################# BUILD OPERATOR #########################
 # Build operator based on specified parameters and solver information
-    
+
 build_info = dom.build(sparse_assembly=args.sparse_assembly,\
-                       solver_type = args.solver, verbose=True)
+                        solver_type = args.solver, verbose=True)
 build_info['N']    = N
 build_info['n']    = n
 build_info['disc'] = disc

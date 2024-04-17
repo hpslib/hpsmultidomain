@@ -53,6 +53,47 @@ def get_Aloc_2d(p, xxloc, Ds, pdo, box_start, box_end, device):
         Aloc_acc(p, 2, nboxes, xx_flat, Aloc, pdo.c, I)
     return Aloc
 
+# Function to assemble local blocks of the global matrix for a 3D domain
+def get_Aloc_3d(p, xxloc, Ds, pdo, box_start, box_end, device):
+    """
+    Assembles local blocks of the global matrix representing the differential operator in a 2D domain.
+    
+    Parameters:
+    - p (int): The polynomial degree for spectral methods or the discretization parameter for FD.
+    - xxloc (tensor): The locations of the grid points.
+    - Ds (list of tensors): The differential operators (e.g., derivatives) in matrix form.
+    - pdo (object): An object containing the functions for the coefficients of the PDE.
+    - box_start, box_end (int): Indices defining the range of boxes to process.
+    - device (torch.device): The computation device (CPU or GPU).
+    
+    Returns:
+    - Aloc (tensor): A tensor containing the assembled local blocks of the global matrix.
+    """
+    nboxes = box_end - box_start  # Number of boxes to process
+    Aloc = torch.zeros(nboxes, p**2, p**2, device=device)  # Initialize the tensor for local blocks
+    xx_flat = xxloc[box_start:box_end].reshape(nboxes*p**2, 2)  # Flatten the grid points for the given range
+
+    # Accumulate the contributions of each coefficient to the local blocks
+    Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c11, Ds[0], c=-1.)
+    Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c22, Ds[1], c=-1.)
+    Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c33, Ds[2], c=-1.)
+    if pdo.c12 is not None:
+        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c12, Ds[3], c=-2.)
+    if pdo.c13 is not None:
+        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c13, Ds[4], c=-2.)
+    if pdo.c23 is not None:
+        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c23, Ds[5], c=-2.)
+    if pdo.c1 is not None:
+        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c1, Ds[6])
+    if pdo.c2 is not None:
+        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c2, Ds[7])
+    if pdo.c3 is not None:
+        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c3, Ds[8])
+    if pdo.c is not None:
+        I = torch.eye(p**3, device=device)
+        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c, I)
+    return Aloc
+
 # Helper function to accumulate the contribution of each coefficient function to the local blocks
 def Aloc_acc(p, d, nboxes, xx_flat, Aloc, func, D, c=1.):
     """
@@ -80,7 +121,8 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Ds,Intmap,pdo,
         args = p,xxloc,Ds,pdo,box_start,box_end
         Aloc = get_Aloc_2d(*args,device)
     else:
-        return ValueError
+        args = p,xxloc,Ds,pdo,box_start,box_end
+        Aloc = get_Aloc_3d(*args,device)
     Acc = Aloc[:,Jc,:][:,:,Jc]
     nrhs = data.shape[-1]
 

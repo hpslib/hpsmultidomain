@@ -13,7 +13,7 @@ JJ_2d = namedtuple('JJ_2d', ['Jl', 'Jr', 'Jd', 'Ju', 'Jx', 'Jc', 'Jxreorder'])
 
 Pdo_3d = namedtuple('Pdo_3d', ['c11', 'c22', 'c33', 'c12', 'c13', 'c23', 'c1', 'c2', 'c3', 'c'])
 Ds_3d = namedtuple('Ds_3d', ['D11', 'D22', 'D33', 'D12', 'D13', 'D23', 'D1', 'D2', 'D3'])
-JJ_3d = namedtuple('JJ_3d', ['Jl', 'Jr', 'Jd', 'Ju', 'Jb', 'Jf', 'Jx', 'Jc', 'Jtot'])
+JJ_3d = namedtuple('JJ_3d', ['Jl', 'Jr', 'Jd', 'Ju', 'Jb', 'Jf', 'Jx', 'Jxreorder', 'Jc', 'Jtot'])
 
 def cheb(p):
     """
@@ -102,8 +102,8 @@ class HPS_Disc:
         
         p = self.p; a = self.a
         
-        x_cheb = self.zz[1,:p-1] + a
-        x_cheb_nocorners  = self.zz[1,1:p-1] + a
+        x_cheb = self.zz[-1,:p-1] + a
+        x_cheb_nocorners  = self.zz[-1,1:p-1] + a
         
         cond_min = 3.25; cond_max = 3.5; err_tol = 2e-8
         q = p+5; tic = time()
@@ -114,16 +114,28 @@ class HPS_Disc:
                 break
             else:
                 q += 10
-        toc = time() - tic;
+        toc = time() - tic
+
+        #print(Interp_loc)
+        #print(Interp_loc.shape)
+
+        # TODO: for 3d, we need to extend this from edge-to-edge to face-to-face. Given p, the final size should be
+        # 6*(p-2)^2 + 12*(p) - 8 X 6*(p-2)^2
         
+        # Expand the dimensions of Interp_loc once then repeat it four times
         Interp_mat_chebfleg = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc,0),4,axis=0))
+        #print(Interp_mat_chebfleg.shape)
+        # Reorder the columns
         perm = np.hstack((np.arange(p-2),\
                           np.arange(p-2)+3*(p-2),\
                           np.flip(np.arange(p-2)+1*(p-2),0),\
                           np.flip(np.arange(p-2)+2*(p-2),0)
                          ))
+        #print(perm)
         perm = np.argsort(perm)
+        #print(perm)
         self.Interp_mat = Interp_mat_chebfleg[:,perm]
+        #print(self.Interp_mat.shape)
         print ("--Interp_mat required lstsqfit of q=%d, condition number %5.5f with error %5.5e and time to calculate %12.5f"\
                % (q,cond,err,toc))
         
@@ -248,9 +260,12 @@ class HPS_Disc:
                                             np.logical_and(Jc1,Jc2)))
         Jc    = Jc.copy().reshape((p-2)**3,)
         Jx    = np.concatenate((Jl,Jr,Jd,Ju,Jb,Jf))
+
+        # TODO: figure out corners / switch to Legendre for this
+        Jxreorder = Jx
         Jtot  = np.concatenate((Jx,Jc))
         JJ    = JJ_3d(Jl= Jl, Jr= Jr, Ju= Ju, Jd= Jd, Jb= Jb,
-                  Jf=Jf, Jx=Jx, Jc=Jc, Jtot=Jtot)
+                  Jf=Jf, Jx=Jx, Jxreorder=Jxreorder, Jc=Jc, Jtot=Jtot)
         return zz,Ds,JJ,hmin
 
     ###

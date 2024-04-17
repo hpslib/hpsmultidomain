@@ -56,23 +56,38 @@ class HPS_Multidomain:
         self.H = hps_disc.HPS_Disc(a,p,d)
         
         Dtmp  = self.H.Ds
-        Ds    = torch.stack((torch.tensor(Dtmp.D11), torch.tensor(Dtmp.D22),\
+        Ds = 0
+        if d==2:
+            Ds = torch.stack((torch.tensor(Dtmp.D11), torch.tensor(Dtmp.D22),\
                               torch.tensor(Dtmp.D12),\
                               torch.tensor(Dtmp.D1), torch.tensor(Dtmp.D2)))
+        else:
+            Ds = torch.stack((torch.tensor(Dtmp.D11), torch.tensor(Dtmp.D22), torch.tensor(Dtmp.D33),\
+                              torch.tensor(Dtmp.D12), torch.tensor(Dtmp.D13), torch.tensor(Dtmp.D23),\
+                              torch.tensor(Dtmp.D1), torch.tensor(Dtmp.D2), torch.tensor(Dtmp.D3)))
         self.H.Ds = Ds 
         
         grid_xx = self.get_grid()
         self.grid_xx = grid_xx
         
-        Jx   = torch.tensor(self.H.JJ.Jx); Jc = torch.tensor(self.H.JJ.Jc)
+        Jx = torch.tensor(self.H.JJ.Jx)
+        Jc = torch.tensor(self.H.JJ.Jc)
 
         self.grid_ext = self.grid_xx[:,Jx,:].flatten(start_dim=0,end_dim=-2)
+        self.xx_ext = self.grid_ext.flatten(start_dim=0,end_dim=-2)
+        #print(Jx)
+        #print(self.grid_ext)
+        #print(self.grid_ext.shape)
         
-        self.I_unique, self.I_copy1, self.I_copy2 = \
-        self.get_unique_inds()
-        
-        xx_ext = self.grid_ext.flatten(start_dim=0,end_dim=-2)
-        self.xx_active = xx_ext[self.I_unique,:]
+        if d==2:
+            self.I_unique, self.I_copy1, self.I_copy2 = self.get_unique_inds()
+            self.xx_active = xx_ext[self.I_unique,:]
+            """print(self.I_unique)
+            print(self.I_copy1)
+            print(self.I_copy2)
+            print(self.I_unique.shape)
+            print(self.I_copy1.shape)
+            print(self.I_copy2.shape)"""
         
         self.xx_tot = self.grid_xx.flatten(start_dim=0,end_dim=-2)
     
@@ -157,15 +172,24 @@ class HPS_Multidomain:
         zz = torch.tensor(self.H.zz.T)
 
         n = self.n
-        xx = torch.zeros(self.nboxes,self.p**2, 2)
+        xx = torch.zeros(self.nboxes,self.p**self.d, self.d)
         for i in range(n[0]):
             for j in range(n[1]):
-                    box = i*n[1] + j
-
+                if self.d==2:
+                    box   = i*n[1] + j
                     zzloc = zz.clone()
                     zzloc[:,0] += self.a + 2*self.a*i + self.domain[0,0]
                     zzloc[:,1] += self.a + 2*self.a*j + self.domain[1,0]
                     xx[box,:,:] = zzloc
+                else:
+                    for k in range(n[2]):
+                        box   = i*n[1]*n[2] + j*n[2] + k
+                        zzloc = zz.clone()
+                        zzloc[:,0] += self.a + 2*self.a*i + self.domain[0,0]
+                        zzloc[:,1] += self.a + 2*self.a*j + self.domain[1,0]
+                        zzloc[:,2] += self.a + 2*self.a*k + self.domain[2,0]
+                        xx[box,:,:] = zzloc
+
         return xx
     
     def get_unique_inds(self):
@@ -175,76 +199,83 @@ class HPS_Multidomain:
         Returns:
         - I_unique, I_copy1, I_copy2 (torch.Tensor): Tensors representing unique and duplicated grid indices.
         """
-        size_face = self.p-2
-        n0,n1 = self.n
+        if self.d==2:
+            size_face = self.p-2
+            n0,n1 = self.n
 
-        box_ind = torch.arange(n0*n1*4*size_face).reshape(n0,n1,4*size_face)
+            box_ind = torch.arange(n0*n1*4*size_face).reshape(n0,n1,4*size_face)
 
-        inds_unique = size_face * (n0 * (2*n1+1) + n1)
-        inds_rep    = size_face * (n0 * (n1-1) + n1 * (n0-1))
+            inds_unique = size_face * (n0 * (2*n1+1) + n1)
+            inds_rep    = size_face * (n0 * (n1-1) + n1 * (n0-1))
 
-        I_unique   = torch.zeros(inds_unique).long()
-        I_copy1    = torch.zeros(inds_rep).long()
-        I_copy2    = torch.zeros(inds_rep).long()
+            I_unique   = torch.zeros(inds_unique).long()
+            I_copy1    = torch.zeros(inds_rep).long()
+            I_copy2    = torch.zeros(inds_rep).long()
 
-        offset_unique = 0; offset_copy = 0
-        L_inds_slab0 = box_ind[0,:,:size_face].flatten()
-        I_unique[offset_unique : offset_unique + n1 * size_face] = L_inds_slab0
-        offset_unique += n1 * size_face
+            offset_unique = 0; offset_copy = 0
+            L_inds_slab0 = box_ind[0,:,:size_face].flatten()
+            I_unique[offset_unique : offset_unique + n1 * size_face] = L_inds_slab0
+            offset_unique += n1 * size_face
 
-        for i in range(n0):
-            
-            if (i > 0):
-                # shared L,R face between current panel (L) and previous panel (R) 
-                l_faces_rep = box_ind[i,:,:size_face].flatten()
-                r_faces_rep = box_ind[i-1,:,size_face:2*size_face].flatten()
+            for i in range(n0):
+                
+                if (i > 0):
+                    # shared L,R face between current panel (L) and previous panel (R) 
+                    l_faces_rep = box_ind[i,:,:size_face].flatten()
+                    r_faces_rep = box_ind[i-1,:,size_face:2*size_face].flatten()
 
-                I_unique[offset_unique : offset_unique + (n1)*size_face] = l_faces_rep
-                offset_unique += (n1) * size_face
+                    I_unique[offset_unique : offset_unique + (n1)*size_face] = l_faces_rep
+                    offset_unique += (n1) * size_face
 
-                I_copy1[offset_copy : offset_copy + (n1)*size_face] = l_faces_rep
-                I_copy2[offset_copy : offset_copy + (n1)*size_face] = r_faces_rep
-                offset_copy += (n1) * size_face
+                    I_copy1[offset_copy : offset_copy + (n1)*size_face] = l_faces_rep
+                    I_copy2[offset_copy : offset_copy + (n1)*size_face] = r_faces_rep
+                    offset_copy += (n1) * size_face
 
-            # unique down face
-            d_face_uni = box_ind[i,0,2*size_face:3*size_face]
-            I_unique[offset_unique : offset_unique + size_face] = d_face_uni
-            offset_unique += size_face
+                # unique down face
+                d_face_uni = box_ind[i,0,2*size_face:3*size_face]
+                I_unique[offset_unique : offset_unique + size_face] = d_face_uni
+                offset_unique += size_face
 
-            # repeated up and down faces
-            u_faces_rep = box_ind[i,:n1-1,3*size_face:].flatten()
-            d_faces_rep = box_ind[i,1:,2*size_face:3*size_face].flatten()
+                # repeated up and down faces
+                u_faces_rep = box_ind[i,:n1-1,3*size_face:].flatten()
+                d_faces_rep = box_ind[i,1:,2*size_face:3*size_face].flatten()
 
-            I_unique[offset_unique : offset_unique + (n1-1)*size_face] = d_faces_rep
-            offset_unique += (n1-1) * size_face
+                I_unique[offset_unique : offset_unique + (n1-1)*size_face] = d_faces_rep
+                offset_unique += (n1-1) * size_face
 
-            I_copy1[offset_copy : offset_copy + (n1-1)*size_face] = d_faces_rep
-            I_copy2[offset_copy : offset_copy + (n1-1)*size_face] = u_faces_rep
-            offset_copy += (n1-1) * size_face
+                I_copy1[offset_copy : offset_copy + (n1-1)*size_face] = d_faces_rep
+                I_copy2[offset_copy : offset_copy + (n1-1)*size_face] = u_faces_rep
+                offset_copy += (n1-1) * size_face
 
-            # unique up face
-            u_face_uni = box_ind[i,n1-1,3*size_face:]
-            I_unique[offset_unique : offset_unique + size_face] = u_face_uni
-            offset_unique += size_face
+                # unique up face
+                u_face_uni = box_ind[i,n1-1,3*size_face:]
+                I_unique[offset_unique : offset_unique + size_face] = u_face_uni
+                offset_unique += size_face
 
-        R_inds_slablast = box_ind[n0-1,:,size_face:2*size_face].flatten()
-        I_unique[offset_unique : offset_unique + n1 * size_face] = R_inds_slablast
-        offset_unique += n1 * size_face
+            R_inds_slablast = box_ind[n0-1,:,size_face:2*size_face].flatten()
+            I_unique[offset_unique : offset_unique + n1 * size_face] = R_inds_slablast
+            offset_unique += n1 * size_face
+        else:
+            size_face = (self.p-2)**2
+            # Unique: bottom boundary of bottom layer of boxes, 
         return I_unique,I_copy1,I_copy2
     
     
     ########################################## DtN multidomain build and solve ###################################
         
     def get_DtNs(self,device,mode='build',data=0,ff_body_func=None):
-        a = self.a; p = self.p; nboxes = self.nboxes; d = 2
+        a = self.a; p = self.p; nboxes = self.nboxes; d = self.d
         pdo = self.pdo
         
         size_face = p-2
+        if d==3:
+            size_face = (p-2)**2
+
         if (mode == 'build'):
             DtNs = torch.zeros(nboxes,4*size_face,4*size_face)
             data = torch.zeros(nboxes,4*size_face,1)
         elif (mode == 'solve'):
-            DtNs = torch.zeros(nboxes,p**2,2*data.shape[-1])
+            DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1])
         elif (mode == 'reduce_body'):
             DtNs = torch.zeros(nboxes,4*size_face,1)
         
@@ -276,13 +307,21 @@ class HPS_Multidomain:
 
     # Input: uu_sol on I_unique
     def solve(self,device,uu_sol,ff_body_func=None):
-        # Torch.prod returns product of all elements in input tensor
-        nrhs = uu_sol.shape[-1]; size_ext = 4*(self.p-2); nboxes = torch.prod(self.n)
-        uu_sol = uu_sol.to(device)
+        nrhs     = uu_sol.shape[-1] # almost always 1, guessing this if for solving multiple rhs in parallel
+
+        size_ext = 4*(self.p-2)
+        if self.d==3:
+            size_ext = 6*(self.p-2)**2
+
+        nboxes   = torch.prod(self.n)
+        uu_sol   = uu_sol.to(device)
         
         uu_sol_bnd = torch.zeros(nboxes*size_ext,nrhs,device=device)
-        uu_sol_bnd[self.I_unique] = uu_sol
-        uu_sol_bnd[self.I_copy2]  = uu_sol_bnd[self.I_copy1]
+        if self.d==2:
+            uu_sol_bnd[self.I_unique] = uu_sol
+            uu_sol_bnd[self.I_copy2]  = uu_sol_bnd[self.I_copy1]
+        else: # For 3D we don't identify unique and copy bdries of boxes yet, we just set all the box boundaries to true solution:
+            uu_sol_bnd = uu_sol
         
         uu_sol_bnd = uu_sol_bnd.reshape(nboxes,size_ext,nrhs)
         

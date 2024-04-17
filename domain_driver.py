@@ -114,59 +114,59 @@ class Domain_Driver:
             self.ntot = self.fd.XX.shape[0]
         else:
             # interpret h as parameter a
-            self.hps_disc(box_geom,h,p,d,pdo_op)
-            self.hps_panel_split()
             self.disc='hps'
-            self.ntot = self.hps.xx_active.shape[0]
+            self.hps_disc(box_geom,h,p,d,pdo_op)
+            if d==2:
+                self.hps_panel_split()
+                self.ntot = self.hps.xx_active.shape[0]
+            #print(self.ntot)
 
-        # TEMPORARY, FOR SANITY CHECKING 3D:
-        if d==3:
-            return
+        if d==2:
+            # local inds for each slab
+            I_L = self.I_L; I_R = self.I_R; I_U = self.I_U; I_D = self.I_D
+            I_C = self.I_C; Npan = self.Npan
 
-        # local inds for each slab
-        I_L = self.I_L; I_R = self.I_R; I_U = self.I_U; I_D = self.I_D
-        I_C = self.I_C; Npan = self.Npan
+            # all internal nodes for slab
+            I_slabC = self.inds_pans[:,I_C].flatten(); slab_Cshape = I_C.shape[0]
+            #print(I_C.shape)
+            
+            # interfaces between slabs
+            if (periodic_bc):
+                I_slabX = torch.cat((self.inds_pans[:,I_L].flatten(),self.inds_pans[Npan-1,I_R])); 
+            else:
+                I_slabX = self.inds_pans[1:,I_L].flatten()
+            slab_Xshape = I_L.shape[0]
+            self.I_slabX = I_slabX
+            I_Ctot   = torch.hstack((I_slabC,I_slabX))
+            
+            if (periodic_bc):
+                slab_bnd_size = self.I_L.shape[0]; slab_int_size = self.I_C.shape[0]
+                slab_interior_offset = slab_int_size * self.Npan
+                self.I_Ctot_unique = torch.arange(slab_interior_offset + slab_bnd_size * (self.Npan))
+                self.I_Ctot_copy1  = torch.arange(slab_bnd_size) + slab_interior_offset
+                self.I_Ctot_copy2  = torch.arange(slab_bnd_size) + slab_interior_offset + slab_bnd_size * self.Npan
 
-        # all internal nodes for slab
-        I_slabC = self.inds_pans[:,I_C].flatten(); slab_Cshape = I_C.shape[0]
-        print(I_C.shape)
-        
-        # interfaces between slabs
-        if (periodic_bc):
-            I_slabX = torch.cat((self.inds_pans[:,I_L].flatten(),self.inds_pans[Npan-1,I_R])); 
-        else:
-            I_slabX = self.inds_pans[1:,I_L].flatten()
-        slab_Xshape = I_L.shape[0]
-        self.I_slabX = I_slabX
-        I_Ctot   = torch.hstack((I_slabC,I_slabX))
-        
-        if (periodic_bc):
-            slab_bnd_size = self.I_L.shape[0]; slab_int_size = self.I_C.shape[0]
-            slab_interior_offset = slab_int_size * self.Npan
-            self.I_Ctot_unique = torch.arange(slab_interior_offset + slab_bnd_size * (self.Npan))
-            self.I_Ctot_copy1  = torch.arange(slab_bnd_size) + slab_interior_offset
-            self.I_Ctot_copy2  = torch.arange(slab_bnd_size) + slab_interior_offset + slab_bnd_size * self.Npan
+            # dirichlet data for entire domain
+            I_Ldir = self.inds_pans[0,I_L]
+            I_Rdir = self.inds_pans[Npan-1,I_R]
+            if (self.disc == 'hps'):
+                I_Ddir = self.inds_pans[:,I_D].flatten()
+                I_Udir = self.inds_pans[:,I_U].flatten()
+            elif (self.disc == 'fd'):
+                I_Ddir = torch.hstack((self.inds_pans[0,I_D],\
+                                    self.inds_pans[1:, I_D[1:]].flatten()))
+                I_Udir = torch.hstack((self.inds_pans[0,I_U],\
+                            self.inds_pans[1:, I_U[1:]].flatten()))
+            
+            self.I_slabX = I_slabX; self.I_slabC = I_slabC
+            self.I_Ctot  = I_Ctot
+            if (periodic_bc):
+                self.I_Xtot  = torch.hstack((I_Ddir,I_Udir))
+            else:
+                self.I_Xtot  = torch.hstack((I_Ldir,I_Rdir,I_Ddir,I_Udir))
 
-        # dirichlet data for entire domain
-        I_Ldir = self.inds_pans[0,I_L]
-        I_Rdir = self.inds_pans[Npan-1,I_R]
-        if (self.disc == 'hps'):
-            I_Ddir = self.inds_pans[:,I_D].flatten()
-            I_Udir = self.inds_pans[:,I_U].flatten()
-        elif (self.disc == 'fd'):
-            I_Ddir = torch.hstack((self.inds_pans[0,I_D],\
-                                   self.inds_pans[1:, I_D[1:]].flatten()))
-            I_Udir = torch.hstack((self.inds_pans[0,I_U],\
-                           self.inds_pans[1:, I_U[1:]].flatten()))
-        
-        self.I_slabX = I_slabX; self.I_slabC = I_slabC
-        self.I_Ctot  = I_Ctot
-        print(I_Ctot)
-        print(I_Ctot.shape)
-        if (periodic_bc):
-            self.I_Xtot  = torch.hstack((I_Ddir,I_Udir))
-        else:
-            self.I_Xtot  = torch.hstack((I_Ldir,I_Rdir,I_Ddir,I_Udir))
+        # For 3D, we eventually need I_Xtot and I_Ctot, but can solve those later when we figure out our sparse matrix
+
             
             
     ############################### HPS discretization and panel split #####################
@@ -175,13 +175,20 @@ class Domain_Driver:
         HPS_multi = hps_multidomain_disc.HPS_Multidomain(pdo_op,box_geom,a,p,d)
 
         # find buf
-        size_face = HPS_multi.p-2; n0,n1 = HPS_multi.n
-        # n0, n1 # of boxes in each direction:
-        n0 = n0.item(); n1 = n1.item()
+        size_face = HPS_multi.p-2
+        if d==3:
+            size_face = size_face**2
+        # n0, n1, n2 are # of boxes in each direction:
+        n0 = HPS_multi.n[0].item()
+        n1 = HPS_multi.n[1].item()
+        n2 = 1
+        if d==3:
+            n2 = HPS_multi.n[2].item()
         # maximal # of boxes in direction:
         npan_max = torch.max(HPS_multi.n).item()
         # maximal # of p along one direction of faces (no corners):
-        n_tmp = (npan_max) * size_face - 1; n_tmp = n_tmp
+        n_tmp = (npan_max) * size_face - 1
+        n_tmp = n_tmp
         
         # set constant to 0.5,1.0 works on ladyzhen
         # determines the # of points per process/nodes
@@ -191,9 +198,14 @@ class Domain_Driver:
 
         Npan = int(n0/buf)
         print("HPS discretization a=%5.2e,p=%d"%(a,p))
-        print("\t--params(n0,n1,buf) (%d,%d,%d)"%(n0,n1,buf))
+        if d==2:
+            print("\t--params(n0,n1,buf) (%d,%d,%d)"%(n0,n1,buf))
+        else:
+            print("\t--params(n0,n1,n2,buf) (%d,%d,%d,%d)"%(n0,n1,n2,buf))
 
+        # Number of faces per panel:
         nfaces_pan  = (2*n1+1)*buf + n1
+        # Indices per panel:
         inds_pans   = torch.zeros(Npan,nfaces_pan*size_face).long()
 
         for j in range(Npan):
@@ -201,14 +213,15 @@ class Domain_Driver:
             inds_pans[j] = torch.arange(nfaces_pan*size_face) + npan_offset*size_face
 
         self.Npan      = Npan        # Number of panels (based on 1st axis)
-        self.Npan_loc  = n1          # Boxes along 2nd axis
-        self.buf_pans  = buf         # Number of boxes per panel
+        self.Npan_loc  = n1          # Boxes along 2nd axis, # of boxes in panel (?)
+        self.buf_pans  = buf         # Number of boxes per panel along 1st axis
         self.inds_pans = inds_pans   # 2D array, number of panels * total box faces in panel
         
-        self.elim_nblocks = buf-1;      
-        self.elim_bs = size_face
-        self.rem_nblocks  = self.Npan_loc-1; 
-        self.rem_bs  = buf*size_face
+        self.elim_nblocks = buf-1              # Block boundaries to be eliminated in each panel
+        self.elim_bs = size_face               # Size of bdries to be eliminated
+        self.rem_nblocks  = self.Npan_loc-1    # 
+        self.rem_bs  = buf*size_face           #
+
         self.hps = HPS_multi
         
     def hps_panel_split(self):
@@ -342,6 +355,7 @@ class Domain_Driver:
             offset += inds.shape[0]    
         self.I_C = I_reorder
     
+    # ONLY NEEDED FOR SPARSE SOLVE
     def build_superLU(self,verbose):
         info_dict = dict()
         try:
@@ -369,6 +383,7 @@ class Domain_Driver:
             print("SuperLU had an error.")
         return info_dict
     
+    # ONLY NEEDED FOR SPARSE SOLVE
     def build_petsc(self,solvertype,verbose):
         info_dict = dict()
         tmp = self.A_CC.tocsr()
@@ -397,6 +412,7 @@ class Domain_Driver:
         self.petsc_LU = ksp
         return info_dict
     
+    # ONLY NEEDED FOR SPARSE SOLVE
     def build_blackboxsolver(self,solvertype,verbose):
         info_dict = dict()
         
@@ -421,55 +437,61 @@ class Domain_Driver:
         else:
             info_dict = self.build_petsc(solvertype,verbose)
         return info_dict
-        
+
+    # MOSTLY NEEDED FOR SPARSE SOLVE
     def build(self,sparse_assembly,
               solver_type,verbose=True):
         
         self.sparse_assembly = sparse_assembly
         self.solver_type     = solver_type
         ########## sparse assembly ##########
-        if (self.disc == 'fd'):
-            tic = time()
-            self.A = self.fd.assemble_sparse();
-            toc_assembly_tot = time() - tic;
-        elif (self.disc == 'hps'):
-            if (sparse_assembly == 'reduced_cpu'):
-                device = torch.device('cpu')
-                tic = time()
-                self.A,assembly_time_dict    = self.hps.sparse_mat(device,verbose)
-                toc_assembly_tot = time() - tic;
-            elif (sparse_assembly == 'reduced_gpu'):
-                device = torch.device('cuda')
-                tic = time()
-                self.A,assembly_time_dict    = self.hps.sparse_mat(device,verbose)
-                toc_assembly_tot = time() - tic;
-                
-        csr_stor  = self.A.data.nbytes
-        csr_stor += self.A.indices.nbytes + self.A.indptr.nbytes
-        csr_stor /= 1e9
-        if (verbose):
-            print("SPARSE ASSEMBLY")
-            print("\t--time for (sparse assembly) (%5.2f) s"\
-                  % (toc_assembly_tot))
-            print("\t--memory for (A sparse) (%5.2f) GB"\
-              % (csr_stor))
-        
-        assert self.ntot == self.A.shape[0]
+        if self.d==2:
+            if (self.disc == 'fd'):
+                    tic = time()
+                    self.A = self.fd.assemble_sparse();
+                    toc_assembly_tot = time() - tic;
+            elif (self.disc == 'hps'):
+                if (sparse_assembly == 'reduced_cpu'):
+                    device = torch.device('cpu')
+                    tic = time()
+                    self.A,assembly_time_dict    = self.hps.sparse_mat(device,verbose)
+                    toc_assembly_tot = time() - tic;
+                elif (sparse_assembly == 'reduced_gpu'):
+                    device = torch.device('cuda')
+                    tic = time()
+                    self.A,assembly_time_dict    = self.hps.sparse_mat(device,verbose)
+                    toc_assembly_tot = time() - tic;
+                    
+            csr_stor  = self.A.data.nbytes
+            csr_stor += self.A.indices.nbytes + self.A.indptr.nbytes
+            csr_stor /= 1e9
+            if (verbose):
+                print("SPARSE ASSEMBLY")
+                print("\t--time for (sparse assembly) (%5.2f) s"\
+                    % (toc_assembly_tot))
+                print("\t--memory for (A sparse) (%5.2f) GB"\
+                % (csr_stor))
+            
+            assert self.ntot == self.A.shape[0]
         ########## sparse slab operations ##########
         info_dict = dict()
-        if (solver_type == 'slabLU'):
-            raise ValueError("not included in this version")
-        else:
-            info_dict = self.build_blackboxsolver(solver_type,verbose)
-            if ('toc_build_blackbox' in info_dict):
-                info_dict['toc_build_blackbox'] += toc_assembly_tot
+        if self.d==2:
+            if (solver_type == 'slabLU'):
+                raise ValueError("not included in this version")
+            else:
+                info_dict = self.build_blackboxsolver(solver_type,verbose)
+                if ('toc_build_blackbox' in info_dict):
+                    info_dict['toc_build_blackbox'] += toc_assembly_tot
 
-        if (self.disc == 'fd'):
-            info_dict['toc_assembly'] = toc_assembly_tot
+            if (self.disc == 'fd'):
+                info_dict['toc_assembly'] = toc_assembly_tot
+            else:
+                info_dict['toc_assembly'] = assembly_time_dict['toc_DtN']
         else:
-            info_dict['toc_assembly'] = assembly_time_dict['toc_DtN']
+            info_dict['toc_assembly'] = 0
         return info_dict
                 
+    # ONLY NEEDED FOR SPARSE SOLVE
     def get_rhs(self,uu_dir_func,ff_body_func=None,sum_body_load=True):
         I_slabX = self.I_slabX; I_slabC = self.I_slabC
         I_Ctot  = self.I_Ctot;  I_Xtot  = self.I_Xtot; 
@@ -509,6 +531,7 @@ class Domain_Driver:
         
         return ff_body
     
+    # ONLY NEEDED FOR SPARSE SOLVE
     def solve_residual_calc(self,sol,ff_body):
         if (not self.periodic_bc):
             res = apply_sparse_lowmem(self.A,self.I_Ctot,self.I_Ctot,sol) - ff_body
@@ -524,6 +547,7 @@ class Domain_Driver:
                                        self.I_Ctot[self.I_Ctot_copy2], sol[self.I_Ctot_copy1])
         return res
     
+    # ONLY NEEDED FOR SPARSE SOLVE
     def solve_helper_blackbox(self,uu_dir_func,ff_body_func=None):
         
         tic = time()
@@ -547,7 +571,12 @@ class Domain_Driver:
         
         
     def solve(self,uu_dir_func,ff_body_func=None,known_sol=False):
-        
+        """
+        print(self.I_Ctot)
+        print(self.I_Ctot.shape)
+        print(self.I_Xtot)
+        print(self.I_Xtot.shape)
+        """
         if self.d==2:
             if (self.solver_type == 'slabLU'):
                 raise ValueError("not included in this version")
@@ -556,27 +585,30 @@ class Domain_Driver:
 
             # self.A is black box matrix:
             sol_tot = torch.zeros(self.A.shape[0],1)
-            print(self.A.shape[0])
             # Here we set the solution on box boundaries not exterior to whole to sol
             if (not self.periodic_bc):
                 sol_tot[self.I_Ctot] = sol
             else:            
                 sol_tot[self.I_Ctot[self.I_Ctot_unique]] = sol
                 sol_tot[self.I_Ctot[self.I_Ctot_copy2]]  = sol[self.I_Ctot_copy1]
-            del sol
-        else:
-            rel_error = 0
-            toc_solve = 0
+            # Here we set the true exterior to the given data:
             if (self.disc == 'fd'):
-                sol_tot[self.I_Ctot] = uu_dir_func(self.fd.XX[self.I_Ctot])
+                sol_tot[self.I_Xtot] = uu_dir_func(self.fd.XX[self.I_Xtot])
             elif(self.disc == 'hps'):
-                sol_tot[self.I_Ctot] = uu_dir_func(self.hps.xx_active[self.I_Ctot])
-        
-        # Here we set the true exterior to the given data:
-        if (self.disc == 'fd'):
-            sol_tot[self.I_Xtot] = uu_dir_func(self.fd.XX[self.I_Xtot])
-        elif(self.disc == 'hps'):
-            sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
+                sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
+            del sol
+        else: # 3D
+            if (self.disc == 'fd'):
+                raise ValueError("fd in 3D not enabled")
+            elif(self.disc == 'hps'):
+                # This shape is total # of points on box edges in the domain, should be
+                # (p-2)^2 * ((n0+1) + (n1+1) + (n2+1))
+                #sol_tot   = torch.zeros((self.p-2)**2 * 3*(self.hps.n+1),1)
+                size_ext = 6*(self.hps.p-2)**2
+                sol_tot   = torch.zeros(self.hps.nboxes*size_ext,1)
+                rel_err   = 0
+                toc_solve = 0
+                sol_tot[:] = uu_dir_func(self.hps.xx_ext)
         
         resloc_hps = np.float64('nan')
         if ((self.disc == 'hps') and (self.sparse_assembly.startswith('reduced'))):
