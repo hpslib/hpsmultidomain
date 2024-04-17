@@ -94,6 +94,7 @@ class Domain_Driver:
         - buf_constant: Buffer size constant for dividing the domain in HPS.
         - periodic_bc: Boolean indicating if periodic boundary conditions are applied.
         """
+        self.d = d
         self.kh = kh
         self.periodic_bc = periodic_bc
         if (periodic_bc):
@@ -128,6 +129,7 @@ class Domain_Driver:
 
         # all internal nodes for slab
         I_slabC = self.inds_pans[:,I_C].flatten(); slab_Cshape = I_C.shape[0]
+        print(I_C.shape)
         
         # interfaces between slabs
         if (periodic_bc):
@@ -159,6 +161,8 @@ class Domain_Driver:
         
         self.I_slabX = I_slabX; self.I_slabC = I_slabC
         self.I_Ctot  = I_Ctot
+        print(I_Ctot)
+        print(I_Ctot.shape)
         if (periodic_bc):
             self.I_Xtot  = torch.hstack((I_Ddir,I_Udir))
         else:
@@ -185,9 +189,7 @@ class Domain_Driver:
         buf = np.max([int(buf_points/size_face)+1,2])
         buf = get_nearest_div(n0,buf)
 
-        # Number of boxes per panel
         Npan = int(n0/buf)
-        print(Npan)
         print("HPS discretization a=%5.2e,p=%d"%(a,p))
         print("\t--params(n0,n1,buf) (%d,%d,%d)"%(n0,n1,buf))
 
@@ -198,10 +200,10 @@ class Domain_Driver:
             npan_offset  = (2*n1+1)*buf * j
             inds_pans[j] = torch.arange(nfaces_pan*size_face) + npan_offset*size_face
 
-        self.Npan      = Npan
-        self.Npan_loc  = n1
-        self.buf_pans  = buf
-        self.inds_pans = inds_pans
+        self.Npan      = Npan        # Number of panels (based on 1st axis)
+        self.Npan_loc  = n1          # Boxes along 2nd axis
+        self.buf_pans  = buf         # Number of boxes per panel
+        self.inds_pans = inds_pans   # 2D array, number of panels * total box faces in panel
         
         self.elim_nblocks = buf-1;      
         self.elim_bs = size_face
@@ -546,25 +548,35 @@ class Domain_Driver:
         
     def solve(self,uu_dir_func,ff_body_func=None,known_sol=False):
         
-        if (self.solver_type == 'slabLU'):
-            raise ValueError("not included in this version")
+        if self.d==2:
+            if (self.solver_type == 'slabLU'):
+                raise ValueError("not included in this version")
+            else:
+                sol,rel_err,toc_solve = self.solve_helper_blackbox(uu_dir_func,ff_body_func)
+
+            # self.A is black box matrix:
+            sol_tot = torch.zeros(self.A.shape[0],1)
+            print(self.A.shape[0])
+            # Here we set the solution on box boundaries not exterior to whole to sol
+            if (not self.periodic_bc):
+                sol_tot[self.I_Ctot] = sol
+            else:            
+                sol_tot[self.I_Ctot[self.I_Ctot_unique]] = sol
+                sol_tot[self.I_Ctot[self.I_Ctot_copy2]]  = sol[self.I_Ctot_copy1]
+            del sol
         else:
-            sol,rel_err,toc_solve = self.solve_helper_blackbox(uu_dir_func,ff_body_func)
+            rel_error = 0
+            toc_solve = 0
+            if (self.disc == 'fd'):
+                sol_tot[self.I_Ctot] = uu_dir_func(self.fd.XX[self.I_Ctot])
+            elif(self.disc == 'hps'):
+                sol_tot[self.I_Ctot] = uu_dir_func(self.hps.xx_active[self.I_Ctot])
         
-        sol_tot = torch.zeros(self.A.shape[0],1)
-        
-        if (not self.periodic_bc):
-            sol_tot[self.I_Ctot] = sol
-        else:            
-            sol_tot[self.I_Ctot[self.I_Ctot_unique]] = sol
-            sol_tot[self.I_Ctot[self.I_Ctot_copy2]]  = sol[self.I_Ctot_copy1]
-        
-        
+        # Here we set the true exterior to the given data:
         if (self.disc == 'fd'):
             sol_tot[self.I_Xtot] = uu_dir_func(self.fd.XX[self.I_Xtot])
         elif(self.disc == 'hps'):
             sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
-        del sol
         
         resloc_hps = np.float64('nan')
         if ((self.disc == 'hps') and (self.sparse_assembly.startswith('reduced'))):
