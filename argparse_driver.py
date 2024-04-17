@@ -71,6 +71,8 @@ if ((args.pde == 'poisson') and (args.domain == 'square')):
     
     # laplace operator
     op = pdo.PDO_2d(pdo.ones,pdo.ones)
+    if d==3:
+        op = pdo.PDO_3d(pdo.ones,pdo.ones,pdo.ones)
     kh = 0
     curved_domain = False
 
@@ -114,7 +116,9 @@ elif ( (args.pde).startswith('bfield')):
         def c(xx):
             return bfield(xx,kh)
         # var coeff Helmholtz operator
-        op = pdo.PDO_2d(pdo.ones,pdo.ones,c=c) 
+        op = pdo.PDO_2d(pdo.ones,pdo.ones,c=c)
+        if d==3:
+            op = pdo.PDO_3d(pdo.ones,pdo.ones,c=c)
         
     elif (args.domain == 'curved'):
         

@@ -70,8 +70,8 @@ def get_Aloc_3d(p, xxloc, Ds, pdo, box_start, box_end, device):
     - Aloc (tensor): A tensor containing the assembled local blocks of the global matrix.
     """
     nboxes = box_end - box_start  # Number of boxes to process
-    Aloc = torch.zeros(nboxes, p**2, p**2, device=device)  # Initialize the tensor for local blocks
-    xx_flat = xxloc[box_start:box_end].reshape(nboxes*p**2, 2)  # Flatten the grid points for the given range
+    Aloc = torch.zeros(nboxes, p**3, p**3, device=device)  # Initialize the tensor for local blocks
+    xx_flat = xxloc[box_start:box_end].reshape(nboxes*p**3, 3)  # Flatten the grid points for the given range
 
     # Accumulate the contributions of each coefficient to the local blocks
     Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c11, Ds[0], c=-1.)
@@ -158,9 +158,11 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Ds,Intmap,pdo,
             f_body = tmp.reshape(box_end-box_start,p**2,nrhs)[:,Jc]
         
        
-        uu_sol = torch.zeros(box_end-box_start,p**2,2*nrhs,device=device)
+        uu_sol = torch.zeros(box_end-box_start,p**d,2*nrhs,device=device)
         
-        uu_sol[:,Jxreo,:nrhs] = Intmap.unsqueeze(0) @ data[box_start:box_end]
+        if d==2:
+            uu_sol[:,Jxreo,:nrhs] = Intmap.unsqueeze(0) @ data[box_start:box_end]
+
         if (pdo.c12 is None):
             uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc][...,Jx] @ data[box_start:box_end])
         else:
@@ -192,13 +194,13 @@ def get_DtN_chunksize(p,device):
 def get_DtNs_helper(p,d,xxloc,Nx,Jx,Jc,Jxreo,Ds,Intmap,pdo,\
                     box_start,box_end,chunk_init,device,mode,data,ff_body_func):
     nboxes = box_end - box_start
-    size_face = p-2
+    size_face = (p-2)**(d-1)
     if (mode == 'build'):
-        DtNs = torch.zeros(nboxes,4*size_face,4*size_face,device=device)
+        DtNs = torch.zeros(nboxes,2*d*size_face,2*d*size_face,device=device)
     elif (mode == 'solve'):
-        DtNs = torch.zeros(nboxes,p**2,2*data.shape[-1],device=device)
+        DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1],device=device) # Maybe need to change this? From d*data to something else
     elif (mode == 'reduce_body'):
-        DtNs = torch.zeros(nboxes,4*size_face,1,device=device)
+        DtNs = torch.zeros(nboxes,2*d*size_face,1,device=device)
         
     chunk_size = chunk_init
     args = p,d,xxloc,Nx,Jx,Jc,Jxreo,Ds,Intmap,pdo

@@ -18,6 +18,22 @@ class PDO_2d:
         self.c1, self.c2 = c1, c2
         self.c = c
 
+class PDO_3d:
+    """
+    Represents a 3-dimensional Partial Differential Operator (PDO) with coefficients for the PDE terms.
+    
+    Parameters:
+    c11, c22, c33, c12, c13, c23: Coefficients for the second-order partial derivatives.
+    c1, c2, c3: Coefficients for the first-order derivatives.
+    c: Coefficient for the zeroth-order term (source term).
+    """
+    def __init__(self, c11, c22, c33, c12=None, c13=None, c23=None, c1=None, c2=None, c3=None, c = None):
+        self.c11, self.c22, self.c33 = c11, c22, c33
+        self.c12, self.c13, self.c23 = c12, c13, c23
+        self.c1, self.c2, self.c3 = c1, c2, c3
+        self.c = c
+
+
         
 def ones(xxloc):
     """

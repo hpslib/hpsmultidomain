@@ -81,7 +81,7 @@ class HPS_Multidomain:
         
         if d==2:
             self.I_unique, self.I_copy1, self.I_copy2 = self.get_unique_inds()
-            self.xx_active = xx_ext[self.I_unique,:]
+            self.xx_active = self.xx_ext[self.I_unique,:]
             """print(self.I_unique)
             print(self.I_copy1)
             print(self.I_copy2)
@@ -267,17 +267,15 @@ class HPS_Multidomain:
         a = self.a; p = self.p; nboxes = self.nboxes; d = self.d
         pdo = self.pdo
         
-        size_face = p-2
-        if d==3:
-            size_face = (p-2)**2
+        size_face = (p-2)**(d-1)
 
         if (mode == 'build'):
-            DtNs = torch.zeros(nboxes,4*size_face,4*size_face)
-            data = torch.zeros(nboxes,4*size_face,1)
+            DtNs = torch.zeros(nboxes,2*d*size_face,4*size_face)
+            data = torch.zeros(nboxes,2*d*size_face,1)
         elif (mode == 'solve'):
-            DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1])
+            DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1]) # Maybe need to change this? From d*data to something else
         elif (mode == 'reduce_body'):
-            DtNs = torch.zeros(nboxes,4*size_face,1)
+            DtNs = torch.zeros(nboxes,2*d*size_face,1)
         
         xxloc = self.grid_xx.to(device)
         Nxtot = torch.tensor(self.H.Nx).to(device)
