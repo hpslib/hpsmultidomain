@@ -32,7 +32,7 @@ def batched_meshgrid(b, npoints, I, J):
 # HPS Multidomain class for handling multidomain discretizations and solutions
 class HPS_Multidomain:
     
-    def __init__(self, pdo, domain, a, p):
+    def __init__(self, pdo, domain, a, p, d):
         """
         Initializes the HPS multidomain solver with domain information and discretization parameters.
         
@@ -41,17 +41,19 @@ class HPS_Multidomain:
         - domain (torch.Tensor): The computational domain represented as a tensor.
         - a (float): Characteristic length scale for the domain.
         - p (int): Polynomial degree for spectral methods or discretization parameter.
+        - d (int): Spatial dimension of the problem and corresponding discretization
         """
         self.pdo    = pdo
         self.domain = domain
         self.p      = p
         self.a      = a
+        self.d      = d
         
         n = (self.domain[:,1] - self.domain[:,0]) / (2*self.a)
         n = torch.round(n).int()
         nboxes = torch.prod(n)
         self.n = n; self.nboxes = nboxes
-        self.H = hps_disc.HPS_Disc(a,p,d=2)
+        self.H = hps_disc.HPS_Disc(a,p,d)
         
         Dtmp  = self.H.Ds
         Ds    = torch.stack((torch.tensor(Dtmp.D11), torch.tensor(Dtmp.D22),\
@@ -98,7 +100,9 @@ class HPS_Multidomain:
         toc_alloc = time() - tic;
         
         tic = time()
+        # Go through range of n
         for Npan_ind in range(n0):
+            # This increases in each level
             npan_offset = (2*n1+1)*Npan_ind
             
             for box_j in range(n1):
@@ -118,6 +122,7 @@ class HPS_Multidomain:
         tic = time()
         row_data,col_data = batched_meshgrid(n0*n1,size_ext,Iext_box,Iext_box)
         
+        # LOOK HERE:
         data = DtN_loc.flatten()
         row_data = row_data.flatten()
         col_data = col_data.flatten()
@@ -271,7 +276,7 @@ class HPS_Multidomain:
 
     # Input: uu_sol on I_unique
     def solve(self,device,uu_sol,ff_body_func=None):
-        
+        # Torch.prod returns product of all elements in input tensor
         nrhs = uu_sol.shape[-1]; size_ext = 4*(self.p-2); nboxes = torch.prod(self.n)
         uu_sol = uu_sol.to(device)
         

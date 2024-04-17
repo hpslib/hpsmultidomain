@@ -15,12 +15,14 @@ parser = argparse.ArgumentParser("Call direct solver for 2D domain.")
 parser.add_argument('--disc', type=str, required=True)  # Discretization method
 parser.add_argument('--p',type=int,required=False)  # Polynomial order for certain methods
 parser.add_argument('--n', type=int, required=True)  # Number of discretization points
+parser.add_argument('--d', type=int, required=False, default=2)  # Spatial dimension of problem
 
 # Arguments defining the PDE problem
 parser.add_argument('--pde', type=str, required=True)  # Type of PDE
 parser.add_argument('--domain', type=str, required=True)  # Domain shape
 parser.add_argument('--box_xlim', type=float, required=False, default=1.0)  # Domain x limits
 parser.add_argument('--box_ylim', type=float, required=False, default=1.0)  # Domain y limits
+parser.add_argument('--box_zlim', type=float, required=False, default=1.0)  # Domain z limits
 
 # Boundary condition and problem specifics
 parser.add_argument('--bc', type=str, required=True)  # Boundary condition
@@ -39,8 +41,10 @@ parser.add_argument('--periodic_bc', action='store_true')  # Flag for periodic b
 args = parser.parse_args()  # Parse arguments from command line
 
 # Extract and setup basic parameters from parsed arguments
-n = args.n; disc = args.disc
+n = args.n; disc = args.disc; d = args.d
 box_geom = torch.tensor([[0,args.box_xlim],[0,args.box_ylim]])  # Domain geometry tensor
+if d==3:
+    box_geom = torch.tensor([[0,args.box_xlim],[0,args.box_ylim],[0,args.box_zlim]])
 
 # Print configuration based on whether ppw is set
 if (args.ppw is not None):
@@ -155,7 +159,7 @@ elif (disc=='hps'):
     p = args.p
     npan = n / (p-2); a = 1/(2*npan)
     dom = Domain_Driver(box_geom,op,\
-                        kh,a,p=p,buf_constant=args.buf_constant,periodic_bc = args.periodic_bc)
+                        kh,a,p=p,d=d,buf_constant=args.buf_constant,periodic_bc = args.periodic_bc)
     N = (p-2) * (p*dom.hps.n[0]*dom.hps.n[1] + dom.hps.n[0] + dom.hps.n[1])
 else:
     raise ValueError

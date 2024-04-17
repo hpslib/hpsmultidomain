@@ -144,7 +144,7 @@ class HPS_Disc:
             Nb = Ds.D3[JJ.Jb][:,JJ.Jtot]
             Nf = Ds.D3[JJ.Jf][:,JJ.Jtot]
 
-            Nxtot = np.concatenate((-Nl,+Nr,-Nd,+Nu,-Nb,+Nf))
+            Nx = np.concatenate((-Nl,+Nr,-Nd,+Nu,-Nb,+Nf))
         return Nx
     
     
@@ -158,6 +158,8 @@ class HPS_Disc:
         zz,Ds = HPS_Disc.cheb_2d(a,p)
         hmin  = zz[1,1] - zz[0,1]
 
+        # Jl, Jr, Jd, Ju are RLDU as expected, with no corners
+        # Jc is interior, Jx is all boundaries without corners
         Jc0   = np.abs(zz[0,:]) < a - 0.5*hmin
         Jc1   = np.abs(zz[1,:]) < a - 0.5*hmin
         Jl    = np.argwhere(np.logical_and(zz[0,:] < - a + 0.5 * hmin,Jc1))
@@ -172,6 +174,7 @@ class HPS_Disc:
         Jc    = Jc.copy().reshape((p-2)**2,)
         Jx    = np.concatenate((Jl,Jr,Jd,Ju))
         
+        # This gets values not in Jc, Jx (i.e. corners)
         Jcorner = np.setdiff1d(np.arange(p**2),np.hstack((Jc,Jx)))
         
         Jl_corner = np.hstack((Jcorner[0],   Jl))
@@ -205,3 +208,80 @@ class HPS_Disc:
         zz = np.vstack((zz1,zz2))
         Ds = Ds_2d(D1= D1, D2= D2, D11= D11, D22= D22, D12= D12)
         return zz, Ds 
+
+#################################### 2D discretization ##########################################
+
+    @staticmethod
+    def leaf_discretization_3d(a,p):
+        """
+        Performs leaf-level discretization for a 3D domain.
+        """
+        zz,Ds = HPS_Disc.cheb_3d(a,p)
+        hmin = zz[2,1] - zz[2,0]
+
+        # Jl, Jr, Jd, Ju are RLDU as expected, with no corners
+        # Jc is interior, Jx is all boundaries without corners
+        # Jb, Jf are back and front
+        Jc0   = np.abs(zz[0,:]) < a - 0.5*hmin
+        Jc1   = np.abs(zz[1,:]) < a - 0.5*hmin
+        Jc2   = np.abs(zz[2,:]) < a - 0.5*hmin
+        Jl    = np.argwhere(np.logical_and(zz[0,:] < - a + 0.5 * hmin,
+                                            np.logical_and(Jc1,Jc2)))
+        Jl    = Jl.copy().reshape((p-2)**2,)
+        Jr    = np.argwhere(np.logical_and(zz[0,:] > + a - 0.5 * hmin,
+                                            np.logical_and(Jc1,Jc2)))
+        Jr    = Jr.copy().reshape((p-2)**2,)
+        Jd    = np.argwhere(np.logical_and(zz[1,:] < - a + 0.5 * hmin,
+                                            np.logical_and(Jc0,Jc2)))
+        Jd    = Jd.copy().reshape((p-2)**2,)
+        Ju    = np.argwhere(np.logical_and(zz[1,:] > + a - 0.5 * hmin,
+                                            np.logical_and(Jc0,Jc2)))
+        Ju    = Ju.copy().reshape((p-2)**2,)
+        Jb    = np.argwhere(np.logical_and(zz[2,:] < - a + 0.5 * hmin,
+                                            np.logical_and(Jc0,Jc1)))
+        Jb    = Jb.copy().reshape((p-2)**2,)
+        Jf    = np.argwhere(np.logical_and(zz[2,:] > + a - 0.5 * hmin,
+                                            np.logical_and(Jc0,Jc1)))
+        Jf    = Jf.copy().reshape((p-2)**2,)
+
+        Jc    = np.argwhere(np.logical_and(Jc0,
+                                            np.logical_and(Jc1,Jc2)))
+        Jc    = Jc.copy().reshape((p-2)**3,)
+        Jx    = np.concatenate((Jl,Jr,Jd,Ju,Jb,Jf))
+        Jtot  = np.concatenate((Jx,Jc))
+        JJ    = JJ_3d(Jl= Jl, Jr= Jr, Ju= Ju, Jd= Jd, Jb= Jb,
+                  Jf=Jf, Jx=Jx, Jc=Jc, Jtot=Jtot)
+        return zz,Ds,JJ,hmin
+
+    ###
+    # Given polynomial order p and element size a,
+    # Returns chebyshev collocation points on [-a,a]^3 and corresponding differentiation operators.
+    ###
+    def cheb_3d(a,p):
+        D,xvec = cheb(p-1) # should this be p? We need p+1 points for a degree p polynomial
+        xvec = a * np.flip(xvec)
+
+        # TODO: get the proper components D1, D2, D3, D11, D22, D33, D12, D13, D23
+        # Note that Kronecker product is associative
+        # Could replace some of these with np.eye(p**2)
+        D = (1/a) * D
+        I = np.eye(p)
+        D1 = -np.kron(D, np.kron(I, I))
+        D2 = -np.kron(I, np.kron(D, I))
+        D3 = -np.kron(I, np.kron(I, D))
+        Dsq = D @ D
+        D11 = np.kron(Dsq, np.kron(I, I))
+        D22 = np.kron(I, np.kron(Dsq, I))
+        D33 = np.kron(I, np.kron(I, Dsq))
+
+        D12 = np.kron(D, np.kron(D, I))
+        D13 = np.kron(D, np.kron(I, D))
+        D23 = np.kron(I, np.kron(D, D))
+
+        zz1 = np.repeat(xvec,p**2)
+        zz2 = np.repeat(xvec,p**2).reshape(-1,p).T.flatten()
+        zz3 = np.repeat(xvec,p**2).reshape(-1,p**2).T.flatten()
+        zz = np.vstack((zz1,zz2,zz3))
+        Ds = Ds_3d(D1=D1, D2=D2, D3=D3, D11=D11, D22=D22, D33=D33, D12=D12, D13=D13, D23=D23)
+
+        return zz, Ds

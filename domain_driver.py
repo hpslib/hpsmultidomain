@@ -80,7 +80,7 @@ def apply_sparse_lowmem(A, I, J, v, transpose=False):
 
 # Domain_Driver class for setting up and solving the discretized PDE
 class Domain_Driver:
-    def __init__(self, box_geom, pdo_op, kh, h, p=0, buf_constant=0.5, periodic_bc=False):
+    def __init__(self, box_geom, pdo_op, kh, h, p=0, d=2, buf_constant=0.5, periodic_bc=False):
         """
         Initializes the domain and discretization for solving a PDE.
         
@@ -90,16 +90,21 @@ class Domain_Driver:
         - kh: Wave number or parameter in the differential equation.
         - h: Grid spacing for finite difference or characteristic length for HPS.
         - p: Polynomial degree for HPS discretization (ignored for FD).
+        - d: dimension of domain for HPS (ignored for FD)
         - buf_constant: Buffer size constant for dividing the domain in HPS.
         - periodic_bc: Boolean indicating if periodic boundary conditions are applied.
         """
-        self.kh = kh;
+        self.kh = kh
         self.periodic_bc = periodic_bc
         if (periodic_bc):
             assert p > 0
         
         ## buffer size is chosen as buf_constant * n^{2/3}
         self.buf_constant = buf_constant
+
+        # TEMPORARY, FOR SANITY CHECKING 3D:
+        #if d==3:
+        #    return
         
         if (p==0):
             self.fd_disc(box_geom,h,pdo_op)
@@ -108,10 +113,14 @@ class Domain_Driver:
             self.ntot = self.fd.XX.shape[0]
         else:
             # interpret h as parameter a
-            self.hps_disc(box_geom,h,p,pdo_op)
+            self.hps_disc(box_geom,h,p,d,pdo_op)
             self.hps_panel_split()
             self.disc='hps'
             self.ntot = self.hps.xx_active.shape[0]
+
+        # TEMPORARY, FOR SANITY CHECKING 3D:
+        if d==3:
+            return
 
         # local inds for each slab
         I_L = self.I_L; I_R = self.I_R; I_U = self.I_U; I_D = self.I_D
@@ -140,8 +149,8 @@ class Domain_Driver:
         I_Ldir = self.inds_pans[0,I_L]
         I_Rdir = self.inds_pans[Npan-1,I_R]
         if (self.disc == 'hps'):
-            I_Ddir = self.inds_pans[:,I_D].flatten();
-            I_Udir = self.inds_pans[:,I_U].flatten();
+            I_Ddir = self.inds_pans[:,I_D].flatten()
+            I_Udir = self.inds_pans[:,I_U].flatten()
         elif (self.disc == 'fd'):
             I_Ddir = torch.hstack((self.inds_pans[0,I_D],\
                                    self.inds_pans[1:, I_D[1:]].flatten()))
@@ -149,31 +158,36 @@ class Domain_Driver:
                            self.inds_pans[1:, I_U[1:]].flatten()))
         
         self.I_slabX = I_slabX; self.I_slabC = I_slabC
-        self.I_Ctot  = I_Ctot;
+        self.I_Ctot  = I_Ctot
         if (periodic_bc):
             self.I_Xtot  = torch.hstack((I_Ddir,I_Udir))
         else:
             self.I_Xtot  = torch.hstack((I_Ldir,I_Rdir,I_Ddir,I_Udir))
             
             
-    ############################### HPS discretiation and panel split #####################
-    def hps_disc(self,box_geom,a,p,pdo_op):
+    ############################### HPS discretization and panel split #####################
+    def hps_disc(self,box_geom,a,p,d,pdo_op):
 
-        HPS_multi = hps_multidomain_disc.HPS_Multidomain(pdo_op,box_geom,a,p)
+        HPS_multi = hps_multidomain_disc.HPS_Multidomain(pdo_op,box_geom,a,p,d)
 
         # find buf
         size_face = HPS_multi.p-2; n0,n1 = HPS_multi.n
+        # n0, n1 # of boxes in each direction:
         n0 = n0.item(); n1 = n1.item()
+        # maximal # of boxes in direction:
         npan_max = torch.max(HPS_multi.n).item()
+        # maximal # of p along one direction of faces (no corners):
         n_tmp = (npan_max) * size_face - 1; n_tmp = n_tmp
         
         # set constant to 0.5,1.0 works on ladyzhen
+        # determines the # of points per process/nodes
         buf_points = int(n_tmp**(2/3)*self.buf_constant); buf_points = np.min([400,buf_points])
-            
-        buf = np.max([int(buf_points/size_face)+1,2]); 
-        buf = get_nearest_div(n0,buf);
+        buf = np.max([int(buf_points/size_face)+1,2])
+        buf = get_nearest_div(n0,buf)
 
-        Npan = int(n0/buf); 
+        # Number of boxes per panel
+        Npan = int(n0/buf)
+        print(Npan)
         print("HPS discretization a=%5.2e,p=%d"%(a,p))
         print("\t--params(n0,n1,buf) (%d,%d,%d)"%(n0,n1,buf))
 
@@ -184,8 +198,8 @@ class Domain_Driver:
             npan_offset  = (2*n1+1)*buf * j
             inds_pans[j] = torch.arange(nfaces_pan*size_face) + npan_offset*size_face
 
-        self.Npan      = Npan;
-        self.Npan_loc  = n1;
+        self.Npan      = Npan
+        self.Npan_loc  = n1
         self.buf_pans  = buf
         self.inds_pans = inds_pans
         
