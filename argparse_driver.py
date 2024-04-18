@@ -202,9 +202,9 @@ if (args.bc == 'free_space'):
     ff_body = None; known_sol = True
     
     if (not curved_domain):
-        uu_dir = lambda xx: uu_dir_func_greens(xx,kh)
+        uu_dir = lambda xx: uu_dir_func_greens(d, xx,kh)
     else:
-        uu_dir = lambda xx: uu_dir_func_greens(param_map(xx),kh)
+        uu_dir = lambda xx: uu_dir_func_greens(d, param_map(xx),kh)
         
 elif (args.bc == 'pulse'):
     ff_body = None; known_sol = False
@@ -229,7 +229,7 @@ elif (args.bc == 'log_dist'):
         assert kh == 0
         assert (not curved_domain)
 
-        uu_dir  = lambda xx: uu_dir_func_greens(xx,kh)
+        uu_dir  = lambda xx: uu_dir_func_greens(d, xx,kh)
         ff_body = None
         known_sol = True
     else:
@@ -256,7 +256,7 @@ elif (args.solver == 'superLU'):
 else:
 
     uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
-    uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
+    #uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
 
     print("\t--Builtin solver %s solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\
           %(args.solver,res,true_res,resloc_hps,toc_solve))

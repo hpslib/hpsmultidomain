@@ -162,9 +162,16 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Ds,Intmap,pdo,
         
         if d==2:
             uu_sol[:,Jxreo,:nrhs] = Intmap.unsqueeze(0) @ data[box_start:box_end]
+        else:
+            uu_sol[:,Jxreo,:nrhs] = data[box_start:box_end]
 
         if (pdo.c12 is None):
+            #print(nrhs)
+            #print((f_body - Aloc[:,Jc][...,Jx] @ data[box_start:box_end]).shape)
+            #print(Acc.shape)
+            #print(Jc.shape)
             uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc][...,Jx] @ data[box_start:box_end])
+            #print(uu_sol)#[:,Jc,:nrhs])
         else:
             uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc][...,Jxreo] @ uu_sol[:,Jxreo,:nrhs])
             
@@ -198,7 +205,7 @@ def get_DtNs_helper(p,d,xxloc,Nx,Jx,Jc,Jxreo,Ds,Intmap,pdo,\
     if (mode == 'build'):
         DtNs = torch.zeros(nboxes,2*d*size_face,2*d*size_face,device=device)
     elif (mode == 'solve'):
-        DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1],device=device) # Maybe need to change this? From d*data to something else
+        DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1],device=device)
     elif (mode == 'reduce_body'):
         DtNs = torch.zeros(nboxes,2*d*size_face,1,device=device)
         

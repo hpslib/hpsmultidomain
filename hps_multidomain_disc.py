@@ -270,10 +270,10 @@ class HPS_Multidomain:
         size_face = (p-2)**(d-1)
 
         if (mode == 'build'):
-            DtNs = torch.zeros(nboxes,2*d*size_face,4*size_face)
+            DtNs = torch.zeros(nboxes,2*d*size_face,2*d*size_face)
             data = torch.zeros(nboxes,2*d*size_face,1)
         elif (mode == 'solve'):
-            DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1]) # Maybe need to change this? From d*data to something else
+            DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1])
         elif (mode == 'reduce_body'):
             DtNs = torch.zeros(nboxes,2*d*size_face,1)
         
@@ -291,16 +291,20 @@ class HPS_Multidomain:
         
         # reserve at most 1GB memory for stored DtNs at a time
         f = 0.8e9 # 0.8 GB in bytes
-        chunk_max = int(f / ((4*size_face)**2 * 8))
+        chunk_max = int(f / ((2*d*size_face)**2 * 8))
         chunk_size = leaf_ops.get_nearest_div(nboxes,chunk_max)
         
         assert np.mod(nboxes,chunk_size) == 0
         Aloc_chunkinit = np.min([50,int(nboxes/4)])
         for j in range(int(nboxes / chunk_size)):
+            #print("Indices: " + str(j*chunk_size) + " to " + str((j+1)*chunk_size))
             DtNs[j*chunk_size:(j+1)*chunk_size],Aloc_chunklist = \
             leaf_ops.get_DtNs_helper(*args,j*chunk_size,(j+1)*chunk_size, Aloc_chunkinit,device,\
                                     mode,data,ff_body_func)
             Aloc_chunkinit = int(Aloc_chunklist[-2])
+        #print("DtNs interior = " + str(DtNs[:,Jc]))
+        #print("DtNs exterior = " + str(DtNs[:,Jx]))
+        #print("Whole DtN = " + str(DtNs))
         return DtNs
 
     # Input: uu_sol on I_unique
@@ -319,13 +323,15 @@ class HPS_Multidomain:
             uu_sol_bnd[self.I_unique] = uu_sol
             uu_sol_bnd[self.I_copy2]  = uu_sol_bnd[self.I_copy1]
         else: # For 3D we don't identify unique and copy bdries of boxes yet, we just set all the box boundaries to true solution:
-            uu_sol_bnd = uu_sol
+            uu_sol_bnd[:] = uu_sol
         
         uu_sol_bnd = uu_sol_bnd.reshape(nboxes,size_ext,nrhs)
-        
+        #print(uu_sol_bnd)
         uu_sol_tot = self.get_DtNs(device,mode='solve',data=uu_sol_bnd,ff_body_func=ff_body_func)
+        print(uu_sol_tot)
         
         uu_sol_flat = uu_sol_tot[...,:nrhs].flatten(start_dim=0,end_dim=-2)
+        print("Flattened diff is " + str(torch.linalg.norm(uu_sol_flat[self.p**3:2*self.p**3] - uu_sol_tot[1,:,:nrhs])))
         resvec_blocks = torch.linalg.norm(uu_sol_tot[...,nrhs:])
         res_lochps = torch.max(resvec_blocks).item()
         return uu_sol_flat, res_lochps

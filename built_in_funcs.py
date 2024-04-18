@@ -118,17 +118,26 @@ def uu_dir_pulse(xx,kh):
     uu_dir[inds_left] = c * torch.exp( - width * (xx[inds_left,1] - 0.5)**2).unsqueeze(-1)
     return uu_dir
 
-def uu_dir_func_greens(xx,kh,center=torch.tensor([-0.1,+0.5])):
+def uu_dir_func_greens(d,xx,kh,center=torch.tensor([-0.1,+0.,+0.2])):
     
-    dd0 = xx[:,0] - center[0];
-    dd1 = xx[:,1] - center[1]; 
+    dd0 = xx[:,0] - center[0]
+    dd1 = xx[:,1] - center[1]
     ddsq = np.multiply(dd0,dd0) + np.multiply(dd1,dd1)
+    if d==3:
+        dd2 = xx[:,2] - center[2]
+        ddsq += np.multiply(dd2,dd2)
     if (kh == 0):
-        uu_exact = (1/np.pi) * np.log(ddsq);
+        if d==2:
+            uu_exact = (1/np.pi) * np.log(ddsq)
+        else:
+            uu_exact = (1 / (4*np.pi)) * (1 / np.sqrt(ddsq))
     else:
-        dist_x = np.sqrt(ddsq)
-        uu_exact = (1j/4) * hankel1(0,kh*dist_x);
-        uu_exact = np.real(uu_exact)
+        if d==2:
+            dist_x = np.sqrt(ddsq)
+            uu_exact = (1j/4) * hankel1(0,kh*dist_x)
+            uu_exact = np.real(uu_exact)
+        else:
+            print("Oops, need to add 3d for kh != 0.")
     return uu_exact.unsqueeze(-1)
 
 def ff_body_pulse(xx,kh):
