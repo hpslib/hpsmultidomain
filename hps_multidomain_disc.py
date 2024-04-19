@@ -223,6 +223,7 @@ class HPS_Multidomain:
                     # shared L,R face between current panel (L) and previous panel (R) 
                     l_faces_rep = box_ind[i,:,:size_face].flatten()
                     r_faces_rep = box_ind[i-1,:,size_face:2*size_face].flatten()
+                    # can use a check here with self.xx to verify these indices line up
 
                     I_unique[offset_unique : offset_unique + (n1)*size_face] = l_faces_rep
                     offset_unique += (n1) * size_face
