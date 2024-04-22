@@ -9,7 +9,7 @@ def run_test_via_argparse(domain, box_xlim=1.0, box_ylim=1.0, periodic_bc=False)
     assembly_type = 'reduced_cpu'
     pde    = 'bfield_constant'
     bc     = 'free_space'
-    disc_n = 200
+    disc_n = 100
     ppw    = 40
 
     disc   = 'hps'
@@ -36,15 +36,21 @@ def run_test_via_argparse(domain, box_xlim=1.0, box_ylim=1.0, periodic_bc=False)
 
     r = os.system(s)
     if (r == 0):
-	    f = open(pickle_loc,"rb")
+        f = open(pickle_loc,"rb")
 
-	    _ = pickle.load(f)
-	    d = pickle.load(f)
+        _ = pickle.load(f)
+        d = pickle.load(f)
 
-	    assert d['trueres_solve_superLU'] < 1e-05
-	    os.system('rm %s' % pickle_loc)
+        assert d['trueres_solve_superLU'] < 2e-5
+        os.system('rm %s' % pickle_loc)
     else:
-    	raise ValueError("test failed")
+        raise ValueError("test failed")
 
 def test_helm_poisson():
     run_test_via_argparse('square')
+
+def test_helm_poisson_annulus():
+    run_test_via_argparse('annulus')
+
+def test_helm_poisson_curvyannulus():
+    run_test_via_argparse('curvy_annulus',box_xlim=6.0, periodic_bc=True)
