@@ -552,7 +552,7 @@ class Domain_Driver:
             sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
         del sol
         
-        resloc_hps = np.float64('nan')
+        resloc_hps = torch.tensor([float('nan')])
         if ((self.disc == 'hps') and (self.sparse_assembly.startswith('reduced'))):
             if (self.sparse_assembly == 'reduced_gpu'):
                 device=torch.device('cuda')
@@ -572,5 +572,6 @@ class Domain_Driver:
             uu_true = uu_dir_func(XX.clone())
             true_err = torch.linalg.norm(sol_tot-uu_true) / torch.linalg.norm(uu_true)
             del uu_true
+            true_err = true_err.item()
 
         return sol_tot,rel_err,true_err,resloc_hps,toc_solve
