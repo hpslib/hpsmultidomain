@@ -82,7 +82,7 @@ def apply_sparse_lowmem(A, I, J, v, transpose=False):
 
 # Domain_Driver class for setting up and solving the discretized PDE
 class Domain_Driver:
-  def __init__(self, box_geom, pdo_op, kh, a, p=12, d=2, periodic_bc=False):
+    def __init__(self, box_geom, pdo_op, kh, a, p=12, d=2, periodic_bc=False):
         """
         Initializes the domain and discretization for solving a PDE.
         
@@ -103,11 +103,13 @@ class Domain_Driver:
         self.hps_disc(box_geom,a,p,d,pdo_op,periodic_bc)
             
             
-    ############################### HPS discretiation and panel split #####################
+    ############################### HPS discretization and panel split #####################
     def hps_disc(self,box_geom,a,p,d,pdo_op,periodic_bc):
 
         HPS_multi = hps_multidomain_disc.HPS_Multidomain(pdo_op,box_geom,a,p,d)
         size_face = (HPS_multi.p-2)**(d-1)
+
+        self.hps = HPS_multi
         
         n0 = HPS_multi.n[0].item()
         n1 = HPS_multi.n[1].item()
@@ -115,31 +117,31 @@ class Domain_Driver:
         if d==3:
             n2 = HPS_multi.n[2].item()
 
-        self.hps = HPS_multi
-        self.XX  = self.hps.xx_active
-        
-        self.ntot = self.XX.shape[0]
-        
-        I_Ldir = torch.where(self.XX[:,0] < self.box_geom[0,0] + 0.5 * self.hps.hmin)[0]
-        I_Rdir = torch.where(self.XX[:,0] > self.box_geom[0,1] - 0.5 * self.hps.hmin)[0]
-        I_Ddir = torch.where(self.XX[:,1] < self.box_geom[1,0] + 0.5 * self.hps.hmin)[0]
-        I_Udir = torch.where(self.XX[:,1] > self.box_geom[1,1] - 0.5 * self.hps.hmin)[0]
-        
-        if (periodic_bc):
-            self.I_Xtot  = torch.hstack((I_Ddir,I_Udir))
-        else:
-            self.I_Xtot  = torch.hstack((I_Ldir,I_Rdir,I_Ddir,I_Udir))
-        
-        self.I_Ctot = torch.sort(torch_setdiff1d( torch.arange(self.ntot), self.I_Xtot))[0]
+        if d==2:
+            self.XX  = self.hps.xx_active
+            
+            self.ntot = self.XX.shape[0]
+            
+            I_Ldir = torch.where(self.XX[:,0] < self.box_geom[0,0] + 0.5 * self.hps.hmin)[0]
+            I_Rdir = torch.where(self.XX[:,0] > self.box_geom[0,1] - 0.5 * self.hps.hmin)[0]
+            I_Ddir = torch.where(self.XX[:,1] < self.box_geom[1,0] + 0.5 * self.hps.hmin)[0]
+            I_Udir = torch.where(self.XX[:,1] > self.box_geom[1,1] - 0.5 * self.hps.hmin)[0]
+            
+            if (periodic_bc):
+                self.I_Xtot  = torch.hstack((I_Ddir,I_Udir))
+            else:
+                self.I_Xtot  = torch.hstack((I_Ldir,I_Rdir,I_Ddir,I_Udir))
+            
+            self.I_Ctot = torch.sort(torch_setdiff1d( torch.arange(self.ntot), self.I_Xtot))[0]
 
-        if (periodic_bc):
-            
-            tot_C      = self.I_Ctot.shape[0];  n_LR = I_Rdir.shape[0]
-            tot_unique = tot_C - n_LR
-            
-            self.I_Ctot_unique = torch.arange(tot_unique)
-            self.I_Ctot_copy1  = torch.arange(n_LR)
-            self.I_Ctot_copy2  = torch.arange(tot_unique, tot_C)
+            if (periodic_bc):
+                
+                tot_C      = self.I_Ctot.shape[0];  n_LR = I_Rdir.shape[0]
+                tot_unique = tot_C - n_LR
+                
+                self.I_Ctot_unique = torch.arange(tot_unique)
+                self.I_Ctot_copy1  = torch.arange(n_LR)
+                self.I_Ctot_copy2  = torch.arange(tot_unique, tot_C)
     
     # ONLY NEEDED FOR SPARSE SOLVE
     def build_superLU(self,verbose):
