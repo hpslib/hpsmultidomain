@@ -32,7 +32,6 @@ parser.add_argument('--sparse_assembly',type=str,required=False, default='reduce
 parser.add_argument('--pickle',type=str,required=False)  # File path for pickling results
 parser.add_argument('--store_sol',action='store_true')  # Flag to store solution
 parser.add_argument('--disable_cuda',action='store_true')  # Flag to disable CUDA
-parser.add_argument('--buf_constant',type=float,required=False)  # Buffer constant for domain padding
 parser.add_argument('--periodic_bc', action='store_true')  # Flag for periodic boundary conditions
 
 args = parser.parse_args()  # Parse arguments from command line
@@ -138,12 +137,10 @@ else:
 
 if (args.p is None):
     raise ValueError('HPS selected but p not provided')
-if (args.buf_constant is None):
-    args.buf_constant = 1.0
 p = args.p
 npan = n / (p-2); a = 1/(2*npan)
 dom = Domain_Driver(box_geom,op,\
-                    kh,a,p=p,buf_constant=args.buf_constant,periodic_bc = args.periodic_bc)
+                    kh,a,p=p,periodic_bc = args.periodic_bc)
 N = (p-2) * (p*dom.hps.n[0]*dom.hps.n[1] + dom.hps.n[0] + dom.hps.n[1])
 
 ################################# BUILD OPERATOR #########################
@@ -153,7 +150,7 @@ build_info = dom.build(sparse_assembly=args.sparse_assembly,\
                        solver_type = args.solver, verbose=True)
 build_info['N']    = N
 build_info['n']    = n
-build_info['buf']  = dom.buf_pans * (p-2)
+
 build_info['pde']  = args.pde
 build_info['bc']   = args.bc
 build_info['domain'] = args.domain

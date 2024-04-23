@@ -51,7 +51,8 @@ class HPS_Multidomain:
         n = torch.round(n).int()
         nboxes = torch.prod(n)
         self.n = n; self.nboxes = nboxes
-        self.H = hps_disc.HPS_Disc(a,p,d=2)
+        self.H    = hps_disc.HPS_Disc(a,p,d=2)
+        self.hmin = self.H.hmin 
         
         Dtmp  = self.H.Ds
         Ds    = torch.stack((torch.tensor(Dtmp.D11), torch.tensor(Dtmp.D22),\

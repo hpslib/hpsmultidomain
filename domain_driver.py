@@ -14,8 +14,6 @@ import pdo
 from functools import reduce  # For performing cumulative operations
 import scipy.sparse.linalg as sla  # For sparse linear algebra operations, alternative variable
 
-from fd_disc import *  # Importing all from the finite difference discretization module
-
 # Attempting to import the PETSc library for parallel computation, handling failure gracefully
 try:
     from petsc4py import PETSc
@@ -23,6 +21,10 @@ try:
 except ImportError:
     petsc_available = False
     print("petsc not available")
+    
+def torch_setdiff1d(vec1,vec2):
+    device = vec1.device
+    return torch.tensor(np.setdiff1d(vec1.numpy(), vec2.numpy()),dtype=int,device=device)
 
 def to_torch_csr(A, device=torch.device('cpu')):
     """
@@ -80,7 +82,7 @@ def apply_sparse_lowmem(A, I, J, v, transpose=False):
 
 # Domain_Driver class for setting up and solving the discretized PDE
 class Domain_Driver:
-    def __init__(self, box_geom, pdo_op, kh, a, p=12, buf_constant=0.5, periodic_bc=False):
+    def __init__(self, box_geom, pdo_op, kh, a, p=12, periodic_bc=False):
         """
         Initializes the domain and discretization for solving a PDE.
         
@@ -90,136 +92,50 @@ class Domain_Driver:
         - kh: Wave number or parameter in the differential equation.
         - a: Characteristic length for HPS.
         - p: Polynomial degree for HPS discretization (ignored for FD).
-        - buf_constant: Buffer size constant for dividing the domain in HPS.
         - periodic_bc: Boolean indicating if periodic boundary conditions are applied.
         """
         self.kh = kh;
         self.periodic_bc = periodic_bc
-        if (periodic_bc):
-            assert p > 0
+        self.box_geom    = box_geom
+        assert p > 0
         
-        ## buffer size is chosen as buf_constant * n^{2/3}
-        self.buf_constant = buf_constant
-        
-        # interpret h as parameter a
-        self.hps_disc(box_geom,a,p,pdo_op)
-        self.hps_panel_split()
-        self.ntot = self.hps.xx_active.shape[0]
-
-        # local inds for each slab
-        I_L = self.I_L; I_R = self.I_R; I_U = self.I_U; I_D = self.I_D
-        I_C = self.I_C; Npan = self.Npan
-
-        # all internal nodes for slab
-        I_slabC = self.inds_pans[:,I_C].flatten(); slab_Cshape = I_C.shape[0]
-        
-        # interfaces between slabs
-        if (periodic_bc):
-            I_slabX = torch.cat((self.inds_pans[:,I_L].flatten(),self.inds_pans[Npan-1,I_R])); 
-        else:
-            I_slabX = self.inds_pans[1:,I_L].flatten()
-        slab_Xshape = I_L.shape[0]
-        self.I_slabX = I_slabX
-        I_Ctot   = torch.hstack((I_slabC,I_slabX))
-        
-        if (periodic_bc):
-            slab_bnd_size = self.I_L.shape[0]; slab_int_size = self.I_C.shape[0]
-            slab_interior_offset = slab_int_size * self.Npan
-            self.I_Ctot_unique = torch.arange(slab_interior_offset + slab_bnd_size * (self.Npan))
-            self.I_Ctot_copy1  = torch.arange(slab_bnd_size) + slab_interior_offset
-            self.I_Ctot_copy2  = torch.arange(slab_bnd_size) + slab_interior_offset + slab_bnd_size * self.Npan
-
-        # dirichlet data for entire domain
-        I_Ldir = self.inds_pans[0,I_L]
-        I_Rdir = self.inds_pans[Npan-1,I_R]
-        I_Ddir = self.inds_pans[:,I_D].flatten();
-        I_Udir = self.inds_pans[:,I_U].flatten();
-        
-        self.I_slabX = I_slabX; self.I_slabC = I_slabC
-        self.I_Ctot  = I_Ctot;
-        if (periodic_bc):
-            self.I_Xtot  = torch.hstack((I_Ddir,I_Udir))
-        else:
-            self.I_Xtot  = torch.hstack((I_Ldir,I_Rdir,I_Ddir,I_Udir))
+        self.hps_disc(box_geom,a,p,pdo_op,periodic_bc)
             
             
     ############################### HPS discretiation and panel split #####################
-    def hps_disc(self,box_geom,a,p,pdo_op):
+    def hps_disc(self,box_geom,a,p,pdo_op,periodic_bc):
 
         HPS_multi = hps_multidomain_disc.HPS_Multidomain(pdo_op,box_geom,a,p)
 
         # find buf
         size_face = HPS_multi.p-2; n0,n1 = HPS_multi.n
         n0 = n0.item(); n1 = n1.item()
-        npan_max = torch.max(HPS_multi.n).item()
-        n_tmp = (npan_max) * size_face - 1; n_tmp = n_tmp
-        
-        # set constant to 0.5,1.0 works on ladyzhen
-        buf_points = int(n_tmp**(2/3)*self.buf_constant); buf_points = np.min([400,buf_points])
-            
-        buf = np.max([int(buf_points/size_face)+1,2]); 
-        buf = get_nearest_div(n0,buf);
 
-        Npan = int(n0/buf); 
-        print("HPS discretization a=%5.2e,p=%d"%(a,p))
-        print("\t--params(n0,n1,buf) (%d,%d,%d)"%(n0,n1,buf))
-
-        nfaces_pan  = (2*n1+1)*buf + n1
-        inds_pans   = torch.zeros(Npan,nfaces_pan*size_face).long()
-
-        for j in range(Npan):
-            npan_offset  = (2*n1+1)*buf * j
-            inds_pans[j] = torch.arange(nfaces_pan*size_face) + npan_offset*size_face
-
-        self.Npan      = Npan;
-        self.Npan_loc  = n1;
-        self.buf_pans  = buf
-        self.inds_pans = inds_pans
-        
-        self.elim_nblocks = buf-1;      
-        self.elim_bs = size_face
-        self.rem_nblocks  = self.Npan_loc-1; 
-        self.rem_bs  = buf*size_face
         self.hps = HPS_multi
+        self.XX  = self.hps.xx_active
         
-    def hps_panel_split(self):
+        self.ntot = self.XX.shape[0]
         
-        size_face = self.hps.p-2; n0,n1 = self.hps.n; buf = self.buf_pans
-        Npan_loc  = self.Npan_loc
+        I_Ldir = torch.where(self.XX[:,0] < self.box_geom[0,0] + 0.5 * self.hps.hmin)[0]
+        I_Rdir = torch.where(self.XX[:,0] > self.box_geom[0,1] - 0.5 * self.hps.hmin)[0]
+        I_Ddir = torch.where(self.XX[:,1] < self.box_geom[1,0] + 0.5 * self.hps.hmin)[0]
+        I_Udir = torch.where(self.XX[:,1] > self.box_geom[1,1] - 0.5 * self.hps.hmin)[0]
         
-        elim_nblocks = self.elim_nblocks;      elim_bs = self.elim_bs
-        rem_nblocks  = self.rem_nblocks;       rem_bs  = self.rem_bs
+        if (periodic_bc):
+            self.I_Xtot  = torch.hstack((I_Ddir,I_Udir))
+        else:
+            self.I_Xtot  = torch.hstack((I_Ldir,I_Rdir,I_Ddir,I_Udir))
         
-        self.I_L = torch.arange(n1*size_face)
-        self.I_R = torch.arange(n1*size_face) + (2*n1+1)*buf*size_face
+        self.I_Ctot = torch.sort(torch_setdiff1d( torch.arange(self.ntot), self.I_Xtot))[0]
 
-        I_elim = torch.zeros(Npan_loc,elim_nblocks,elim_bs).long()
-        I_rem  = torch.zeros(rem_nblocks,buf,size_face).long()
-
-        I_D    = torch.zeros(buf,size_face).long()
-        I_U    = torch.zeros(buf,size_face).long()
-
-        for b in range(buf):
-
-            buf_offset = (2*n1+1)*b
-
-            # exterior down index
-            I_D[b] = torch.arange(size_face) + (buf_offset+n1)*size_face
-            # exterior up index
-            I_U[b] = torch.arange(size_face) + (buf_offset+2*n1)*size_face
-            # rem index
-            for box_j in range(1,n1):
-                I_rem[box_j-1,b] = torch.arange(size_face) + (buf_offset+n1+box_j) * size_face
-            if (b > 0):
-                for box_j in range(n1):
-                    I_elim[box_j,b-1] = torch.arange(size_face) + (buf_offset+box_j) * size_face
-
-        I_rem  = I_rem.flatten(start_dim=1,end_dim=-1)
-        I_elim = I_elim.flatten(start_dim=1,end_dim=-1)
-        self.I_D = I_D.flatten()
-        self.I_U = I_U.flatten()
-
-        self.I_C = torch.hstack((I_elim.flatten(),I_rem.flatten()))
+        if (periodic_bc):
+            
+            tot_C      = self.I_Ctot.shape[0];  n_LR = I_Rdir.shape[0]
+            tot_unique = tot_C - n_LR
+            
+            self.I_Ctot_unique = torch.arange(tot_unique)
+            self.I_Ctot_copy1  = torch.arange(n_LR)
+            self.I_Ctot_copy2  = torch.arange(tot_unique, tot_C)
     
     def build_superLU(self,verbose):
         info_dict = dict()
@@ -342,24 +258,16 @@ class Domain_Driver:
         return info_dict
                 
     def get_rhs(self,uu_dir_func,ff_body_func=None,sum_body_load=True):
-        I_slabX = self.I_slabX; I_slabC = self.I_slabC
         I_Ctot  = self.I_Ctot;  I_Xtot  = self.I_Xtot; 
-        
-        slab_Cshape = self.I_C.shape[0]; slab_Xshape = self.I_L.shape[0]
-        Npan = self.Npan
         nrhs = 1
-        
-        ## assume that XX has size npoints, 2
-        XX = self.hps.xx_active
             
         # Dirichlet data
-        uu_dir = uu_dir_func(XX[I_Xtot,:])
+        uu_dir = uu_dir_func(self.XX[I_Xtot,:])
 
         # body load on I_Ctot
         ff_body = -apply_sparse_lowmem(self.A,I_Ctot,I_Xtot,uu_dir)
         if (ff_body_func is not None):
             
-                
             if (self.sparse_assembly == 'reduced_gpu'):
                 device = torch.device('cuda')
                 ff_body += self.hps.reduce_body(device,ff_body_func)[I_Ctot]
