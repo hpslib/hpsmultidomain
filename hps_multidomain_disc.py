@@ -330,7 +330,7 @@ class HPS_Multidomain:
         uu_sol_bnd = uu_sol_bnd.reshape(nboxes,size_ext,nrhs)
         #print(uu_sol_bnd)
         uu_sol_tot = self.get_DtNs(device,mode='solve',data=uu_sol_bnd,ff_body_func=ff_body_func)
-        print(uu_sol_tot)
+        #print(uu_sol_tot)
         
         uu_sol_flat = uu_sol_tot[...,:nrhs].flatten(start_dim=0,end_dim=-2)
         if self.d==3:
