@@ -12,7 +12,6 @@ import os  # For interacting with the operating system, e.g., environment variab
 # Initialize argument parser to define and read command-line arguments
 parser = argparse.ArgumentParser("Call direct solver for 2D domain.")
 # Add expected command-line arguments for the script
-parser.add_argument('--disc', type=str, required=True)  # Discretization method
 parser.add_argument('--p',type=int,required=False)  # Polynomial order for certain methods
 parser.add_argument('--n', type=int, required=True)  # Number of discretization points
 parser.add_argument('--d', type=int, required=False, default=2)  # Spatial dimension of problem
@@ -35,13 +34,12 @@ parser.add_argument('--sparse_assembly',type=str,required=False, default='reduce
 parser.add_argument('--pickle',type=str,required=False)  # File path for pickling results
 parser.add_argument('--store_sol',action='store_true')  # Flag to store solution
 parser.add_argument('--disable_cuda',action='store_true')  # Flag to disable CUDA
-parser.add_argument('--buf_constant',type=float,required=False)  # Buffer constant for domain padding
 parser.add_argument('--periodic_bc', action='store_true')  # Flag for periodic boundary conditions
 
 args = parser.parse_args()  # Parse arguments from command line
 
 # Extract and setup basic parameters from parsed arguments
-n = args.n; disc = args.disc; d = args.d
+n = args.n; d = args.d
 box_geom = torch.tensor([[0,args.box_xlim],[0,args.box_ylim]])  # Domain geometry tensor
 if d==3:
     box_geom = torch.tensor([[0,args.box_xlim],[0,args.box_ylim],[0,args.box_zlim]])
@@ -90,7 +88,6 @@ elif ( (args.pde).startswith('bfield')):
     else:
         nwaves = args.nwaves
         kh = (nwaves)*2*np.pi
-        
     
       
     if (args.pde == 'bfield_constant'):
@@ -145,28 +142,13 @@ else:
     
 ##### Set the domain and discretization parameters
 # Additional conditional logic for different discretization strategies
-if (args.periodic_bc):
-    assert disc == 'hps'
-
-if (disc=='fd'):
-    if (args.buf_constant is None):
-        args.buf_constant = 0.6
-    h = 1/n;
-    dom = Domain_Driver(box_geom,op,\
-                        kh,h,buf_constant=args.buf_constant)
-    N = dom.fd.ns[0] * dom.fd.ns[1]
-elif (disc=='hps'):
-    if (args.p is None):
-        raise ValueError('HPS selected but p not provided')
-    if (args.buf_constant is None):
-        args.buf_constant = 1.0
-    p = args.p
-    npan = n / (p-2); a = 1/(2*npan)
-    dom = Domain_Driver(box_geom,op,\
-                        kh,a,p=p,d=d,buf_constant=args.buf_constant,periodic_bc = args.periodic_bc)
-    N = (p-2) * (p*dom.hps.n[0]*dom.hps.n[1] + dom.hps.n[0] + dom.hps.n[1])
-else:
-    raise ValueError
+if (args.p is None):
+    raise ValueError('HPS selected but p not provided')
+p = args.p
+npan = n / (p-2); a = 1/(2*npan)
+dom = Domain_Driver(box_geom,op,\
+                    kh,a,p=p,d=d,periodic_bc = args.periodic_bc)
+N = (p-2) * (p*dom.hps.n[0]*dom.hps.n[1] + dom.hps.n[0] + dom.hps.n[1])
 
 ################################# BUILD OPERATOR #########################
 # Build operator based on specified parameters and solver information
@@ -175,8 +157,7 @@ build_info = dom.build(sparse_assembly=args.sparse_assembly,\
                         solver_type = args.solver, verbose=True)
 build_info['N']    = N
 build_info['n']    = n
-build_info['disc'] = disc
-build_info['buf']  = dom.buf if disc == 'fd' else dom.buf_pans * (p-2)
+
 build_info['pde']  = args.pde
 build_info['bc']   = args.bc
 build_info['domain'] = args.domain
@@ -185,11 +166,8 @@ build_info['sparse_assembly'] = args.sparse_assembly
 build_info['box_geom'] = box_geom
 build_info['kh']   = kh 
 build_info['periodic_bc'] = args.periodic_bc
-if (disc == 'fd'):
-    build_info['h'] = h
-elif (disc == 'hps'):
-    build_info['a'] = a
-    build_info['p'] = p
+build_info['a'] = a
+build_info['p'] = p
     
     
 ################################# SOLVE PDE ###################################
@@ -269,10 +247,7 @@ else:
 # Optional: Store solution and/or pickle results for later use
 if (args.store_sol):
     print("\t--Storing solution")
-    if (disc == 'fd'):
-        XX = dom.fd.XX
-    elif (disc == 'hps'):
-        XX = dom.hps.xx_tot
+    XX = dom.hps.xx_tot
     solve_info['xx']        = XX
     solve_info['sol']       = uu_sol
     

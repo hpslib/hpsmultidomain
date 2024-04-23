@@ -7,13 +7,13 @@ import scipy.linalg
 
 # Define named tuples for storing partial differential operators (PDOs) and differential schemes (Ds)
 # for both 2D and 3D problems, along with indices (JJ) for domain decomposition.
-Pdo_2d = namedtuple('Pdo_2d', ['c11', 'c22', 'c12', 'c1', 'c2', 'c'])
-Ds_2d = namedtuple('Ds_2d', ['D11', 'D22', 'D12', 'D1', 'D2'])
-JJ_2d = namedtuple('JJ_2d', ['Jl', 'Jr', 'Jd', 'Ju', 'Jx', 'Jc', 'Jxreorder'])
+Pdo_2d   = namedtuple('Pdo_2d',['c11','c22','c12', 'c1','c2','c'])
+Ds_2d    = namedtuple('Ds_2d', ['D11','D22','D12','D1','D2'])
+JJ_2d    = namedtuple('JJ_2d', ['Jl','Jr','Jd','Ju','Jx','Jc','Jxreorder'])
 
 Pdo_3d = namedtuple('Pdo_3d', ['c11', 'c22', 'c33', 'c12', 'c13', 'c23', 'c1', 'c2', 'c3', 'c'])
-Ds_3d = namedtuple('Ds_3d', ['D11', 'D22', 'D33', 'D12', 'D13', 'D23', 'D1', 'D2', 'D3'])
-JJ_3d = namedtuple('JJ_3d', ['Jl', 'Jr', 'Jd', 'Ju', 'Jb', 'Jf', 'Jx', 'Jxreorder', 'Jc', 'Jtot'])
+Ds_3d  = namedtuple('Ds_3d',  ['D11', 'D22', 'D33', 'D12', 'D13', 'D23', 'D1', 'D2', 'D3'])
+JJ_3d  = namedtuple('JJ_3d',  ['Jl', 'Jr', 'Jd', 'Ju', 'Jb', 'Jf', 'Jx', 'Jxreorder', 'Jc', 'Jtot'])
 
 def cheb(p):
     """
@@ -28,14 +28,15 @@ def cheb(p):
     """
     x = np.cos(np.pi * np.arange(p+1) / p)
     c = np.concatenate((np.array([2]), np.ones(p-1), np.array([2])))
-    c = np.multiply(c, np.power(-1, np.arange(p+1)))
-    X = np.tile(x, (p+1, 1))
+    c = np.multiply(c,np.power(np.ones(p+1) * -1, np.arange(p+1)))
+    X = x.repeat(p+1).reshape((-1,p+1))
     dX = X - X.T
-    D = np.divide(np.outer(c, 1/c), dX + np.eye(p+1))
-    D -= np.diag(np.sum(D, axis=1))
-    return D, x
+    # create the off diagonal entries of D
+    D = np.divide(np.outer(c,np.divide(np.ones(p+1),c)), dX + np.eye(p+1))
+    D = D - np.diag(np.sum(D,axis=1))
+    return D,x
 
-def diag_mult(diag, M):
+def diag_mult(diag,M):
     """
     Performs multiplication of a diagonal matrix (represented by a vector) with a matrix.
     
@@ -46,7 +47,7 @@ def diag_mult(diag, M):
     Returns:
     - The result of the diagonal matrix multiplied by M
     """
-    return (diag[:, None] * M).T
+    return (diag * M.T).T
 
 def get_loc_interp(x_cheb, x_cheb_nocorners, q):
     """
@@ -62,16 +63,19 @@ def get_loc_interp(x_cheb, x_cheb_nocorners, q):
     - err: Norm of the interpolation error
     - cond: Condition number of the interpolation matrix
     """
-    Vpoly_cheb = cheb_py.chebvander(x_cheb, q)
-    Vpoly_nocorner = cheb_py.chebvander(x_cheb_nocorners, q)
-    Interp_loc = np.linalg.lstsq(Vpoly_nocorner.T, Vpoly_cheb.T, rcond=None)[0].T
-    err = np.linalg.norm(Interp_loc @ Vpoly_nocorner - Vpoly_cheb)
-    cond = np.linalg.cond(Interp_loc)
-    return Interp_loc, err, cond
+    Vpoly_cheb = cheb_py.chebvander(x_cheb,q)
+    Vpoly_nocorner = cheb_py.chebvander(x_cheb_nocorners,q)
 
-# Class for discretization using the Hierarchical Poincaré-Steklov (HPS) scheme.
+    Interp_loc = np.linalg.lstsq(Vpoly_nocorner.T,Vpoly_cheb.T,rcond=None)[0].T
+    err  = np.linalg.norm(Interp_loc @ Vpoly_nocorner - Vpoly_cheb)
+    cond = np.linalg.cond(Interp_loc) 
+    return Interp_loc,err,cond
+
+
+#################################### 2D discretization ##########################################
+
 class HPS_Disc:
-    def __init__(self, a, p, d):
+    def __init__(self,a,p,d):
         """
         Initializes the HPS discretization class.
         
@@ -80,25 +84,19 @@ class HPS_Disc:
         - p: The polynomial degree for Chebyshev discretization
         - d: Dimension of the problem (2 or 3)
         """
-        self._discretize(a, p, d)
+        self._discretize(a,p,d)
         self.a = a; self.p = p; self.d = d
         self._get_interp_mat()
-    
-    def _discretize(self, a, p, d):
-        """
-        Discretizes the domain based on the dimension specified.
-        """
+        
+    def _discretize(self,a,p,d):
         if d == 2:
             self.zz, self.Ds, self.JJ, self.hmin = HPS_Disc.leaf_discretization_2d(a, p)
         else:
             self.zz, self.Ds, self.JJ, self.hmin = HPS_Disc.leaf_discretization_3d(a, p)
         self.Nx = HPS_Disc.get_diff_ops(self.Ds, self.JJ, d)
-    
         
+    ## Interpolation from data on Ix to Ix_reorder
     def _get_interp_mat(self):
-        """
-        Computes the interpolation matrix for reordering points from Ix to Ix_reorder.
-        """
         
         p = self.p; a = self.a
         

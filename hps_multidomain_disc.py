@@ -54,6 +54,7 @@ class HPS_Multidomain:
         nboxes = torch.prod(n)
         self.n = n; self.nboxes = nboxes
         self.H = hps_disc.HPS_Disc(a,p,d)
+        self.hmin = self.H.hmin
         
         Dtmp  = self.H.Ds
         Ds = 0
