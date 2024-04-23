@@ -53,6 +53,47 @@ def get_Aloc_2d(p, xxloc, Ds, pdo, box_start, box_end, device):
         Aloc_acc(p, 2, nboxes, xx_flat, Aloc, pdo.c, I)
     return Aloc
 
+# Function to assemble local blocks of the global matrix for a 3D domain
+def get_Aloc_3d(p, xxloc, Ds, pdo, box_start, box_end, device):
+    """
+    Assembles local blocks of the global matrix representing the differential operator in a 2D domain.
+    
+    Parameters:
+    - p (int): The polynomial degree for spectral methods or the discretization parameter for FD.
+    - xxloc (tensor): The locations of the grid points.
+    - Ds (list of tensors): The differential operators (e.g., derivatives) in matrix form.
+    - pdo (object): An object containing the functions for the coefficients of the PDE.
+    - box_start, box_end (int): Indices defining the range of boxes to process.
+    - device (torch.device): The computation device (CPU or GPU).
+    
+    Returns:
+    - Aloc (tensor): A tensor containing the assembled local blocks of the global matrix.
+    """
+    nboxes = box_end - box_start  # Number of boxes to process
+    Aloc = torch.zeros(nboxes, p**3, p**3, device=device)  # Initialize the tensor for local blocks
+    xx_flat = xxloc[box_start:box_end].reshape(nboxes*p**3, 3)  # Flatten the grid points for the given range
+
+    # Accumulate the contributions of each coefficient to the local blocks
+    Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c11, Ds[0], c=-1.)
+    Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c22, Ds[1], c=-1.)
+    Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c33, Ds[2], c=-1.)
+    if pdo.c12 is not None:
+        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c12, Ds[3], c=-2.)
+    if pdo.c13 is not None:
+        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c13, Ds[4], c=-2.)
+    if pdo.c23 is not None:
+        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c23, Ds[5], c=-2.)
+    if pdo.c1 is not None:
+        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c1, Ds[6])
+    if pdo.c2 is not None:
+        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c2, Ds[7])
+    if pdo.c3 is not None:
+        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c3, Ds[8])
+    if pdo.c is not None:
+        I = torch.eye(p**3, device=device)
+        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c, I)
+    return Aloc
+
 # Helper function to accumulate the contribution of each coefficient function to the local blocks
 def Aloc_acc(p, d, nboxes, xx_flat, Aloc, func, D, c=1.):
     """
@@ -80,7 +121,8 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Ds,Intmap,pdo,
         args = p,xxloc,Ds,pdo,box_start,box_end
         Aloc = get_Aloc_2d(*args,device)
     else:
-        return ValueError
+        args = p,xxloc,Ds,pdo,box_start,box_end
+        Aloc = get_Aloc_3d(*args,device)
     Acc = Aloc[:,Jc,:][:,:,Jc]
     nrhs = data.shape[-1]
 
@@ -116,11 +158,20 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Ds,Intmap,pdo,
             f_body = tmp.reshape(box_end-box_start,p**2,nrhs)[:,Jc]
         
        
-        uu_sol = torch.zeros(box_end-box_start,p**2,2*nrhs,device=device)
+        uu_sol = torch.zeros(box_end-box_start,p**d,2*nrhs,device=device)
         
-        uu_sol[:,Jxreo,:nrhs] = Intmap.unsqueeze(0) @ data[box_start:box_end]
+        if d==2:
+            uu_sol[:,Jxreo,:nrhs] = Intmap.unsqueeze(0) @ data[box_start:box_end]
+        else:
+            uu_sol[:,Jxreo,:nrhs] = data[box_start:box_end]
+
         if (pdo.c12 is None):
+            #print(nrhs)
+            #print((f_body - Aloc[:,Jc][...,Jx] @ data[box_start:box_end]).shape)
+            #print(Acc.shape)
+            #print(Jc.shape)
             uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc][...,Jx] @ data[box_start:box_end])
+            #print(uu_sol)#[:,Jc,:nrhs])
         else:
             uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc][...,Jxreo] @ uu_sol[:,Jxreo,:nrhs])
             
@@ -150,13 +201,13 @@ def get_DtN_chunksize(p,device):
 def get_DtNs_helper(p,d,xxloc,Nx,Jx,Jc,Jxreo,Ds,Intmap,pdo,\
                     box_start,box_end,chunk_init,device,mode,data,ff_body_func):
     nboxes = box_end - box_start
-    size_face = p-2
+    size_face = (p-2)**(d-1)
     if (mode == 'build'):
-        DtNs = torch.zeros(nboxes,4*size_face,4*size_face,device=device)
+        DtNs = torch.zeros(nboxes,2*d*size_face,2*d*size_face,device=device)
     elif (mode == 'solve'):
-        DtNs = torch.zeros(nboxes,p**2,2*data.shape[-1],device=device)
+        DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1],device=device)
     elif (mode == 'reduce_body'):
-        DtNs = torch.zeros(nboxes,4*size_face,1,device=device)
+        DtNs = torch.zeros(nboxes,2*d*size_face,1,device=device)
         
     chunk_size = chunk_init
     args = p,d,xxloc,Nx,Jx,Jc,Jxreo,Ds,Intmap,pdo

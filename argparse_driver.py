@@ -14,12 +14,14 @@ parser = argparse.ArgumentParser("Call direct solver for 2D domain.")
 # Add expected command-line arguments for the script
 parser.add_argument('--p',type=int,required=False)  # Polynomial order for certain methods
 parser.add_argument('--n', type=int, required=True)  # Number of discretization points
+parser.add_argument('--d', type=int, required=False, default=2)  # Spatial dimension of problem
 
 # Arguments defining the PDE problem
 parser.add_argument('--pde', type=str, required=True)  # Type of PDE
 parser.add_argument('--domain', type=str, required=True)  # Domain shape
 parser.add_argument('--box_xlim', type=float, required=False, default=1.0)  # Domain x limits
 parser.add_argument('--box_ylim', type=float, required=False, default=1.0)  # Domain y limits
+parser.add_argument('--box_zlim', type=float, required=False, default=1.0)  # Domain z limits
 
 # Boundary condition and problem specifics
 parser.add_argument('--bc', type=str, required=True)  # Boundary condition
@@ -37,8 +39,10 @@ parser.add_argument('--periodic_bc', action='store_true')  # Flag for periodic b
 args = parser.parse_args()  # Parse arguments from command line
 
 # Extract and setup basic parameters from parsed arguments
-n = args.n;
+n = args.n; d = args.d
 box_geom = torch.tensor([[0,args.box_xlim],[0,args.box_ylim]])  # Domain geometry tensor
+if d==3:
+    box_geom = torch.tensor([[0,args.box_xlim],[0,args.box_ylim],[0,args.box_zlim]])
 
 # Print configuration based on whether ppw is set
 if (args.ppw is not None):
@@ -65,6 +69,8 @@ if ((args.pde == 'poisson') and (args.domain == 'square')):
     
     # laplace operator
     op = pdo.PDO_2d(pdo.ones,pdo.ones)
+    if d==3:
+        op = pdo.PDO_3d(pdo.ones,pdo.ones,pdo.ones)
     kh = 0
     curved_domain = False
 
@@ -107,7 +113,9 @@ elif ( (args.pde).startswith('bfield')):
         def c(xx):
             return bfield(xx,kh)
         # var coeff Helmholtz operator
-        op = pdo.PDO_2d(pdo.ones,pdo.ones,c=c) 
+        op = pdo.PDO_2d(pdo.ones,pdo.ones,c=c)
+        if d==3:
+            op = pdo.PDO_3d(pdo.ones,pdo.ones,c=c)
         
     elif (args.domain == 'curved'):
         
@@ -134,20 +142,19 @@ else:
     
 ##### Set the domain and discretization parameters
 # Additional conditional logic for different discretization strategies
-
 if (args.p is None):
     raise ValueError('HPS selected but p not provided')
 p = args.p
 npan = n / (p-2); a = 1/(2*npan)
 dom = Domain_Driver(box_geom,op,\
-                    kh,a,p=p,periodic_bc = args.periodic_bc)
+                    kh,a,p=p,d=d,periodic_bc = args.periodic_bc)
 N = (p-2) * (p*dom.hps.n[0]*dom.hps.n[1] + dom.hps.n[0] + dom.hps.n[1])
 
 ################################# BUILD OPERATOR #########################
 # Build operator based on specified parameters and solver information
-    
+
 build_info = dom.build(sparse_assembly=args.sparse_assembly,\
-                       solver_type = args.solver, verbose=True)
+                        solver_type = args.solver, verbose=True)
 build_info['N']    = N
 build_info['n']    = n
 
@@ -173,9 +180,9 @@ if (args.bc == 'free_space'):
     ff_body = None; known_sol = True
     
     if (not curved_domain):
-        uu_dir = lambda xx: uu_dir_func_greens(xx,kh)
+        uu_dir = lambda xx: uu_dir_func_greens(d, xx,kh)
     else:
-        uu_dir = lambda xx: uu_dir_func_greens(param_map(xx),kh)
+        uu_dir = lambda xx: uu_dir_func_greens(d, param_map(xx),kh)
         
 elif (args.bc == 'pulse'):
     ff_body = None; known_sol = False
@@ -200,7 +207,7 @@ elif (args.bc == 'log_dist'):
         assert kh == 0
         assert (not curved_domain)
 
-        uu_dir  = lambda xx: uu_dir_func_greens(xx,kh)
+        uu_dir  = lambda xx: uu_dir_func_greens(d, xx,kh)
         ff_body = None
         known_sol = True
     else:
@@ -227,7 +234,7 @@ elif (args.solver == 'superLU'):
 else:
 
     uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
-    uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
+    #uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
 
     print("\t--Builtin solver %s solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\
           %(args.solver,res,true_res,resloc_hps,toc_solve))
