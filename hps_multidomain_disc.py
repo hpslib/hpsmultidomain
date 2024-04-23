@@ -332,7 +332,8 @@ class HPS_Multidomain:
         print(uu_sol_tot)
         
         uu_sol_flat = uu_sol_tot[...,:nrhs].flatten(start_dim=0,end_dim=-2)
-        print("Flattened diff is " + str(torch.linalg.norm(uu_sol_flat[self.p**3:2*self.p**3] - uu_sol_tot[1,:,:nrhs])))
+        if self.d==3:
+            print("Flattened diff is " + str(torch.linalg.norm(uu_sol_flat[self.p**3:2*self.p**3] - uu_sol_tot[1,:,:nrhs])))
         resvec_blocks = torch.linalg.norm(uu_sol_tot[...,nrhs:])
         res_lochps = torch.max(resvec_blocks).item()
         return uu_sol_flat, res_lochps
