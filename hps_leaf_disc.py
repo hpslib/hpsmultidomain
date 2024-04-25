@@ -39,6 +39,21 @@ def cheb(p):
     D = D - np.diag(np.sum(D,axis=1))
     return D,x
 
+def gauss(p):
+    """
+    Computes the Gaussian points for a given degree p.
+    
+    Parameters:
+    - p: The polynomial degree
+    
+    Returns:
+    - x: The Gaussian points
+    """
+    lcoeff     = np.zeros(p+1)
+    lcoeff[-1] = 1
+
+    return legendre.legroots(lcoeff)
+
 def diag_mult(diag,M):
     """
     Performs multiplication of a diagonal matrix (represented by a vector) with a matrix.
@@ -102,7 +117,7 @@ def get_loc_interp_3d(p, q, a):
         for j in range(p):
             values[:,:] = 0
             values[i,j] = 1
-            Interp_loc.append(interpn(lpoints, values, croots2d.T, method='linear', bounds_error=False, fill_value=None))
+            Interp_loc.append(interpn(lpoints, values, croots2d.T, method='slinear', bounds_error=False, fill_value=None))
 
     Interp_loc = np.column_stack(Interp_loc)
 
@@ -197,12 +212,32 @@ def cheb_3d(a,p):
 
     return zz, Ds
 
+###
+# Given polynomial order p and element size a,
+# Returns Gaussian collocation points on [-a,a]^3
+###
+def gauss_3d(a,p):
+    xvec = gauss(p) # should this be p? We need p+1 points for a degree p polynomial
+    xvec = a * xvec
+
+    # TODO: get the proper components D1, D2, D3, D11, D22, D33, D12, D13, D23
+    # Note that Kronecker product is associative
+    # Could replace some of these with np.eye(p**2)
+
+    zz1 = np.repeat(xvec,p**2)
+    zz2 = np.repeat(xvec,p**2).reshape(-1,p).T.flatten()
+    zz3 = np.repeat(xvec,p**2).reshape(-1,p**2).T.flatten()
+    zz  = np.vstack((zz1,zz2,zz3))
+
+    return zz
+
 def leaf_discretization_3d(a,p):
     """
     Performs leaf-level discretization for a 3D domain.
     """
     zz,Ds = cheb_3d(a,p)
-    hmin = zz[2,1] - zz[2,0]
+    zzG   = gauss_3d(a,p)
+    hmin  = zz[2,1] - zz[2,0]
 
     # Jl, Jr, Jd, Ju are RLDU as expected, with no corners
     # Jc is interior, Jx is all boundaries without corners
@@ -250,7 +285,7 @@ def leaf_discretization_3d(a,p):
     Jtot  = np.concatenate((Jx,Jc))
     JJ    = JJ_3d(Jl= Jl, Jr= Jr, Ju= Ju, Jd= Jd, Jb= Jb,
                   Jf=Jf, Jx=Jx, Jxreorder=Jxreorder, Jc=Jc, Jtot=Jtot)
-    return zz,Ds,JJ,hmin
+    return zz,Ds,JJ,hmin,zzG
 
 def get_diff_ops(Ds,JJ,d):
     if (d == 2):
@@ -291,7 +326,7 @@ class HPS_Disc:
         if d == 2:
             self.zz, self.Ds, self.JJ, self.hmin = leaf_discretization_2d(a, p)
         else:
-            self.zz, self.Ds, self.JJ, self.hmin = leaf_discretization_3d(a, p)
+            self.zz, self.Ds, self.JJ, self.hmin, self.zzG = leaf_discretization_3d(a, p)
         self.Nx = get_diff_ops(self.Ds, self.JJ, d)
         
     ## Interpolation from data on Ix to Ix_reorder
@@ -360,7 +395,7 @@ class HPS_Disc:
             P = Vh @ Vh.T
             
             # Apply this to our interpolation matrix to ensure continuity at corner nodes:
-            self.Interp_mat = P @ self.Interp_mat
+            #self.Interp_mat = P @ self.Interp_mat
 
             toc = time() - tic
             print ("--Interp_mat has condition number %5.5f with error %5.5e and time to calculate %12.5f"\

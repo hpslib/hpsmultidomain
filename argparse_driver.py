@@ -259,13 +259,16 @@ if (args.pickle is not None):
     pickle.dump(solve_info,f)
     f.close()
 
-print("Surface indexing:")
-print(dom.hps.grid_ext)
-print(dom.hps.grid_ext.shape)
+# TODO: develop test. Create Gaussian and Chebyshev grids, apply interpolation map, check error
+if d==3:
+    # First we generate the arrays of Chebyshev and Gaussian nodes:
+    cheb_ext  = torch.from_numpy(dom.hps.H.zz.T[dom.hps.H.JJ.Jxreorder])
+    gauss_ext = torch.from_numpy(dom.hps.H.zzG.T[dom.hps.H.JJ.Jxreorder])
 
-Jxreorder = dom.hps.H.JJ.Jxreorder
+    uu_cheb  = uu_dir(cheb_ext)
+    uu_gauss = uu_dir(gauss_ext)
+    uu_inter = torch.from_numpy(dom.hps.H.Interp_mat) @ uu_gauss
 
-u, c = np.unique(Jxreorder, return_counts=True)
-dup = u[c > 1]
-print(dup)
-print(dup.shape)
+    print(uu_cheb)
+    print(uu_inter)
+    print(torch.norm(uu_cheb - uu_inter) / torch.norm(uu_cheb))
