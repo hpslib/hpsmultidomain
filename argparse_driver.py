@@ -258,3 +258,14 @@ if (args.pickle is not None):
     pickle.dump(build_info,f)
     pickle.dump(solve_info,f)
     f.close()
+
+print("Surface indexing:")
+print(dom.hps.grid_ext)
+print(dom.hps.grid_ext.shape)
+
+Jxreorder = dom.hps.H.JJ.Jxreorder
+
+u, c = np.unique(Jxreorder, return_counts=True)
+dup = u[c > 1]
+print(dup)
+print(dup.shape)

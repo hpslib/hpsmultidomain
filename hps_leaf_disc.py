@@ -5,6 +5,9 @@ from time import time
 import numpy.polynomial.chebyshev as cheb_py
 import scipy.linalg
 
+from numpy.polynomial  import legendre
+from scipy.interpolate import interpn
+
 # Define named tuples for storing partial differential operators (PDOs) and differential schemes (Ds)
 # for both 2D and 3D problems, along with indices (JJ) for domain decomposition.
 Pdo_2d   = namedtuple('Pdo_2d',['c11','c22','c12', 'c1','c2','c'])
@@ -71,6 +74,42 @@ def get_loc_interp(x_cheb, x_cheb_nocorners, q):
     cond = np.linalg.cond(Interp_loc) 
     return Interp_loc,err,cond
 
+def get_loc_interp_3d(p, q, a):
+    """
+    Computes local interpolation matrices from Chebyshev points.
+    
+    Parameters:
+    - p: The degree of the Chebyshev polynomial for interpolation
+    - q: The degree of the Gaussian polynomial for interpolation
+    
+    Returns:
+    - Interp_loc: Local interpolation matrix
+    - err: Norm of the interpolation error
+    - cond: Condition number of the interpolation matrix
+    """
+    _, croots  = cheb(p-1)
+    croots     = a * np.flip(croots)
+    lcoeff     = np.zeros(q+1)
+    lcoeff[-1] = 1
+
+    lroots   = a * legendre.legroots(lcoeff)
+    lroots2d = np.array([np.repeat(lroots, q), np.hstack([lroots]*q)])
+    cpoints  = (croots, croots) # tuple of our 2D Chebyshev points
+    values   = np.zeros((p,p))
+
+    Interp_loc = []
+    for i in range(p):
+        for j in range(p):
+            values[:,:] = 0
+            values[i,j] = 1
+            Interp_loc.append(interpn(cpoints, values, lroots2d.T, method='linear'))
+
+    Interp_loc = np.column_stack(Interp_loc)
+
+    cond = np.linalg.cond(Interp_loc)
+    # TODO: get actual err
+    err = 3.14159
+    return Interp_loc,err,cond
 
 #################################### 2D discretization ##########################################
 
@@ -193,8 +232,21 @@ def leaf_discretization_3d(a,p):
     Jc    = Jc.copy().reshape((p-2)**3,)
     Jx    = np.concatenate((Jl,Jr,Jd,Ju,Jb,Jf))
 
+    Jl_corner    = np.argwhere(zz[0,:] < - a + 0.5 * hmin)
+    Jl_corner    = Jl_corner.copy().reshape(p**2,)
+    Jr_corner    = np.argwhere(zz[0,:] > + a - 0.5 * hmin)
+    Jr_corner    = Jr_corner.copy().reshape(p**2,)
+    Jd_corner    = np.argwhere(zz[1,:] < - a + 0.5 * hmin)
+    Jd_corner    = Jd_corner.copy().reshape(p**2,)
+    Ju_corner    = np.argwhere(zz[1,:] > + a - 0.5 * hmin)
+    Ju_corner    = Ju_corner.copy().reshape(p**2,)
+    Jb_corner    = np.argwhere(zz[2,:] < - a + 0.5 * hmin)
+    Jb_corner    = Jb_corner.copy().reshape(p**2,)
+    Jf_corner    = np.argwhere(zz[2,:] > + a - 0.5 * hmin)
+    Jf_corner    = Jf_corner.copy().reshape(p**2,)
+
     # TODO: figure out corners / switch to Legendre for this
-    Jxreorder = Jx
+    Jxreorder = np.concatenate((Jl_corner,Jr_corner,Jd_corner,Ju_corner,Jb_corner,Jf_corner))
     Jtot  = np.concatenate((Jx,Jc))
     JJ    = JJ_3d(Jl= Jl, Jr= Jr, Ju= Ju, Jd= Jd, Jb= Jb,
                   Jf=Jf, Jx=Jx, Jxreorder=Jxreorder, Jc=Jc, Jtot=Jtot)
@@ -218,6 +270,8 @@ def get_diff_ops(Ds,JJ,d):
 
         Nx = np.concatenate((-Nl,+Nr,-Nd,+Nu,-Nb,+Nf))
     return Nx
+
+#################################### HPS Object ##########################################
 
 class HPS_Disc:
     def __init__(self,a,p,d):
@@ -245,39 +299,47 @@ class HPS_Disc:
         
         p = self.p; a = self.a
         
-        x_cheb = self.zz[-1,:p-1] + a
-        x_cheb_nocorners  = self.zz[-1,1:p-1] + a
-        
-        cond_min = 3.25; cond_max = 3.5; err_tol = 2e-8
-        q = p+5; tic = time()
-        while (True):
-            Interp_loc,err,cond = get_loc_interp(x_cheb,x_cheb_nocorners,q)
+        if self.d==2:
+            x_cheb = self.zz[-1,:p-1] + a
+            x_cheb_nocorners  = self.zz[-1,1:p-1] + a
             
-            if ((cond < cond_min) or ((err > err_tol) and (cond < cond_max)) ):
-                break
-            else:
-                q += 10
-        toc = time() - tic
+            cond_min = 3.25; cond_max = 3.5; err_tol = 2e-8
+            q = p+5; tic = time()
+            while (True):
+                Interp_loc,err,cond = get_loc_interp(x_cheb,x_cheb_nocorners,q)
+                
+                if ((cond < cond_min) or ((err > err_tol) and (cond < cond_max)) ):
+                    break
+                else:
+                    q += 10
+            toc = time() - tic
 
-        #print(Interp_loc)
-        #print(Interp_loc.shape)
+            #print(Interp_loc)
+            #print(Interp_loc.shape)
 
-        # TODO: for 3d, we need to extend this from edge-to-edge to face-to-face. Given p, the final size should be
-        # 6*(p-2)^2 + 12*(p) - 8 X 6*(p-2)^2
-        
-        # Expand the dimensions of Interp_loc once then repeat it four times
-        Interp_mat_chebfleg = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc,0),4,axis=0))
-        #print(Interp_mat_chebfleg.shape)
-        # Reorder the columns
-        perm = np.hstack((np.arange(p-2),\
-                          np.arange(p-2)+3*(p-2),\
-                          np.flip(np.arange(p-2)+1*(p-2),0),\
-                          np.flip(np.arange(p-2)+2*(p-2),0)
-                         ))
-        #print(perm)
-        perm = np.argsort(perm)
-        #print(perm)
-        self.Interp_mat = Interp_mat_chebfleg[:,perm]
-        #print(self.Interp_mat.shape)
-        print ("--Interp_mat required lstsqfit of q=%d, condition number %5.5f with error %5.5e and time to calculate %12.5f"\
-               % (q,cond,err,toc))
+            # TODO: for 3d, we need to extend this from edge-to-edge to face-to-face. Given p, the final size should be
+            # 6*(p-2)^2 + 12*(p) - 8 X 6*(p-2)^2
+            
+            # Expand the dimensions of Interp_loc once then repeat it four times
+            Interp_mat_chebfleg = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc,0),4,axis=0))
+            #print(Interp_mat_chebfleg.shape)
+            # Reorder the columns
+            perm = np.hstack((np.arange(p-2),\
+                            np.arange(p-2)+3*(p-2),\
+                            np.flip(np.arange(p-2)+1*(p-2),0),\
+                            np.flip(np.arange(p-2)+2*(p-2),0)
+                            ))
+            #print(perm)
+            perm = np.argsort(perm)
+            #print(perm)
+            self.Interp_mat = Interp_mat_chebfleg[:,perm]
+            #print(self.Interp_mat.shape)
+            print ("--Interp_mat required lstsqfit of q=%d, condition number %5.5f with error %5.5e and time to calculate %12.5f"\
+                % (q,cond,err,toc))
+        else:
+            tic = time()
+            Interp_loc,err,cond = get_loc_interp_3d(p, p, a)
+            self.Interp_mat = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc,0),6,axis=0))
+            toc = time() - tic
+            print ("--Interp_mat has condition number %5.5f with error %5.5e and time to calculate %12.5f"\
+                % (cond,err,toc))

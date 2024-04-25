@@ -10,7 +10,7 @@ from hps_leaf_disc     import cheb
 
 
 # let p be the degree of polynomial and our domian be [-a,a]:
-p = 8
+p = 5
 q = p # let Chebyshev and Gaussian node counts be the same:
 a = 1.0
 
@@ -35,20 +35,65 @@ print(lroots2d)
 cpoints = (croots, croots) # tuple of our 2D Chebyshev points
 values = np.zeros((p,p))
 
-Interp_loc = []
+def get_loc_interp_3d(p, q, a):
+    """
+    Computes local interpolation matrices from Chebyshev points.
+    
+    Parameters:
+    - q: The degree of the Chebyshev polynomial for interpolation
+    - q: The degree of the Gaussian polynomial for interpolation
+    
+    Returns:
+    - Interp_loc: Local interpolation matrix
+    - err: Norm of the interpolation error
+    - cond: Condition number of the interpolation matrix
+    """
+    _, croots  = cheb(p-1)
+    croots     = a * np.flip(croots)
+    lcoeff     = np.zeros(q+1)
+    lcoeff[-1] = 1
 
-for i in range(p):
-    for j in range(p):
-        values[:,:] = 0
-        values[i,j] = 1
-        Interp_loc.append(interpn(cpoints, values, lroots2d.T, method='linear'))
+    lroots   = a * legendre.legroots(lcoeff)
+    lroots2d = np.array([np.repeat(lroots, q), np.hstack([lroots]*q)])
+    cpoints  = (croots, croots) # tuple of our 2D Chebyshev points
+    values   = np.zeros((p,p))
 
-Interp_loc = np.column_stack(Interp_loc)
+    Interp_loc = []
+    for i in range(p):
+        for j in range(p):
+            values[:,:] = 0
+            values[i,j] = 1
+            Interp_loc.append(interpn(cpoints, values, lroots2d.T, method='linear'))
+
+    Interp_loc = np.column_stack(Interp_loc)
+
+    cond = np.linalg.cond(Interp_loc)
+    # TODO: get err
+    return Interp_loc,cond
+
+Interp_loc, cond = get_loc_interp_3d(p, q, a)
 print("Interpolation matrix is ")
 print(Interp_loc)
 print(Interp_loc.shape)
+print(cond)
 
 # Seems to work, can experiment with different methods (linear, cubic, pchip, etc.)
 
 # For no-corners: need to assign 2 edges and 1-2 corner points to each face.
 # For Gaussian: steal idea from Fortunato paper to fix boundary discontinuities
+
+# Idea: given Gaussian data on the boundaries, we develop a projector similar to Fortunato
+# to convert it into Gaussian data that is continuous on the corners. We then apply this to
+# our Gaussian data when making it Chebyshev
+# Steps:
+# 1. Build "naive" interpolation map that acts on all six faces, converting from Gaussian to Chebyshev
+# 2. Build "B" that enforces continuity on the edge points (12 edges, including 8 corners)
+# 3. SVD B and get V tilde
+# 4. Apply V tilde to right side of interpolation matrix (or left?). Profit.
+
+Interp_mat = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc,0),6,axis=0))
+
+print(Interp_mat)
+print(Interp_mat.shape)
+
+# Determine what indices in Jxreorder are redundant...

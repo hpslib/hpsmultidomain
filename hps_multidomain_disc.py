@@ -288,8 +288,12 @@ class HPS_Multidomain:
         Ds    = self.H.Ds.to(device)
         if (mode =='solve'):
             data = data.to(device)
-            
-        args = p,d,xxloc,Nxtot,Jx,Jc,Jxreo,Ds,Intmap,pdo
+
+        # TEMPORARILY USING Jx instead of Jxreo:
+        if d==2:    
+            args = p,d,xxloc,Nxtot,Jx,Jc,Jxreo,Ds,Intmap,pdo
+        else:
+            args = p,d,xxloc,Nxtot,Jx,Jc,Jx,Ds,Intmap,pdo
         
         # reserve at most 1GB memory for stored DtNs at a time
         f = 0.8e9 # 0.8 GB in bytes
