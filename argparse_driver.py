@@ -269,6 +269,8 @@ if d==3:
     uu_gauss = uu_dir(gauss_ext)
     uu_inter = torch.from_numpy(dom.hps.H.Interp_mat) @ uu_gauss
 
-    print(uu_cheb)
-    print(uu_inter)
+    #print(uu_cheb)
+    #print(uu_inter)
     print(torch.norm(uu_cheb - uu_inter) / torch.norm(uu_cheb))
+
+    #from hps_leaf_disc import get_loc_interp_3d

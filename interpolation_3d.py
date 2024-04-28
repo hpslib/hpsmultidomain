@@ -5,6 +5,7 @@ import numpy.polynomial.chebyshev as cheb_py
 import scipy.linalg
 
 from numpy.polynomial  import legendre
+from numpy.polynomial.polynomial  import polyvander2d
 from scipy.interpolate import RegularGridInterpolator, interpn
 from hps_leaf_disc     import cheb
 
@@ -50,6 +51,7 @@ def get_loc_interp_3d(p, q, a):
     """
     _, croots  = cheb(p-1)
     croots     = a * np.flip(croots)
+    croots2d   = np.array([np.repeat(croots, p), np.hstack([croots]*p)])
     lcoeff     = np.zeros(q+1)
     lcoeff[-1] = 1
 
@@ -58,6 +60,7 @@ def get_loc_interp_3d(p, q, a):
     cpoints  = (croots, croots) # tuple of our 2D Chebyshev points
     values   = np.zeros((p,p))
 
+    """
     Interp_loc = []
     for i in range(p):
         for j in range(p):
@@ -66,6 +69,13 @@ def get_loc_interp_3d(p, q, a):
             Interp_loc.append(interpn(cpoints, values, lroots2d.T, method='linear'))
 
     Interp_loc = np.column_stack(Interp_loc)
+    """
+
+    # Vandermonde-based approach:
+    Vc = polyvander2d(croots2d[0], croots2d[1], (p,p))
+    Vl = polyvander2d(lroots2d[0], lroots2d[1], (q,q))
+
+    Interp_loc = np.linalg.lstsq(Vl.T,Vc.T,rcond=None)[0].T
 
     cond = np.linalg.cond(Interp_loc)
     # TODO: get err
@@ -95,5 +105,12 @@ Interp_mat = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc,0),6,a
 
 print(Interp_mat)
 print(Interp_mat.shape)
+
+print(lroots2d[0])
+print(lroots2d[1])
+
+Vl = polyvander2d(lroots2d[0], lroots2d[1], (q,q))
+
+print(Vl.shape)
 
 # Determine what indices in Jxreorder are redundant...

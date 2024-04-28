@@ -6,6 +6,7 @@ import numpy.polynomial.chebyshev as cheb_py
 import scipy.linalg
 
 from numpy.polynomial  import legendre
+from numpy.polynomial.polynomial import polyvander2d
 from scipy.interpolate import interpn
 
 # Define named tuples for storing partial differential operators (PDOs) and differential schemes (Ds)
@@ -91,10 +92,10 @@ def get_loc_interp(x_cheb, x_cheb_nocorners, q):
 
 def get_loc_interp_3d(p, q, a):
     """
-    Computes local interpolation matrices from Gaussian to Chebyshev points.
+    Computes local interpolation matrices from Chebyshev points.
     
     Parameters:
-    - p: The degree of the Chebyshev polynomial for interpolation
+    - q: The degree of the Chebyshev polynomial for interpolation
     - q: The degree of the Gaussian polynomial for interpolation
     
     Returns:
@@ -104,25 +105,34 @@ def get_loc_interp_3d(p, q, a):
     """
     _, croots  = cheb(p-1)
     croots     = a * np.flip(croots)
+    croots2d   = np.array([np.repeat(croots, p), np.hstack([croots]*p)])
     lcoeff     = np.zeros(q+1)
     lcoeff[-1] = 1
 
     lroots   = a * legendre.legroots(lcoeff)
-    lpoints  = (lroots, lroots) # tuple of our 2D Chebyshev points
-    values   = np.zeros((q,q))
-    croots2d = np.array([np.repeat(croots, p), np.hstack([croots]*p)])
+    lroots2d = np.array([np.repeat(lroots, q), np.hstack([lroots]*q)])
+    cpoints  = (croots, croots) # tuple of our 2D Chebyshev points
+    values   = np.zeros((p,p))
 
+    
     Interp_loc = []
     for i in range(p):
         for j in range(p):
             values[:,:] = 0
             values[i,j] = 1
-            Interp_loc.append(interpn(lpoints, values, croots2d.T, method='slinear', bounds_error=False, fill_value=None))
+            Interp_loc.append(interpn(cpoints, values, lroots2d.T, method='pchip'))
 
-    Interp_loc = np.column_stack(Interp_loc)
+    #Interp_loc = np.column_stack(Interp_loc)
+    
+
+    # Vandermonde-based approach:
+    Vc = polyvander2d(croots2d[0], croots2d[1], (p,p))
+    Vl = polyvander2d(lroots2d[0], lroots2d[1], (q,q))
+
+    Interp_loc = np.linalg.lstsq(Vl.T,Vc.T,rcond=None)[0].T
 
     cond = np.linalg.cond(Interp_loc)
-    # TODO: get actual err
+    # TODO: get err
     err = 3.14159
     return Interp_loc,err,cond
 
@@ -377,6 +387,7 @@ class HPS_Disc:
             self.Interp_mat = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc,0),6,axis=0))
 
             # Form B, then projection operator P = VV^*
+            """
             u, c = np.unique(self.JJ.Jxreorder, return_counts=True)
             dup = u[c > 1]
             B = []
@@ -393,9 +404,20 @@ class HPS_Disc:
             null_rank = B.shape[1] - B.shape[0]
             Vh = Vh[:,-null_rank:]
             P = Vh @ Vh.T
+            #print(B)
+            #print(B.shape)
+            #print(Vh.shape, P.shape)
+            """
+            P = np.eye(self.Interp_mat.shape[0])
+            for i in range(self.Interp_mat.shape[0]):
+                elem = self.JJ.Jxreorder[i]
+                where = np.argwhere(self.JJ.Jxreorder == elem)
+                P[i,where] = 1 / len(where)
+
+            #print(P)
             
             # Apply this to our interpolation matrix to ensure continuity at corner nodes:
-            #self.Interp_mat = P @ self.Interp_mat
+            self.Interp_mat = P @ self.Interp_mat
 
             toc = time() - tic
             print ("--Interp_mat has condition number %5.5f with error %5.5e and time to calculate %12.5f"\
