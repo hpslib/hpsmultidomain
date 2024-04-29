@@ -10,7 +10,7 @@ import pickle  # For serializing and saving results
 import os  # For interacting with the operating system, e.g., environment variables
 
 # Initialize argument parser to define and read command-line arguments
-parser = argparse.ArgumentParser("Call direct solver for 2D domain.")
+parser = argparse.ArgumentParser("Call direct solver for 2D/3D domain.")
 # Add expected command-line arguments for the script
 parser.add_argument('--p',type=int,required=False)  # Polynomial order for certain methods
 parser.add_argument('--n', type=int, required=True)  # Number of discretization points
@@ -36,7 +36,13 @@ parser.add_argument('--store_sol',action='store_true')  # Flag to store solution
 parser.add_argument('--disable_cuda',action='store_true')  # Flag to disable CUDA
 parser.add_argument('--periodic_bc', action='store_true')  # Flag for periodic boundary conditions
 
+# Components tests:
+parser.add_argument('--test_components', type=bool, required=False, default=False) # Test discretization components such as interpolation
+
 args = parser.parse_args()  # Parse arguments from command line
+
+# Check if we test components:
+test_components = args.test_components
 
 # Extract and setup basic parameters from parsed arguments
 n = args.n; d = args.d
@@ -259,8 +265,10 @@ if (args.pickle is not None):
     pickle.dump(solve_info,f)
     f.close()
 
-# TODO: develop test. Create Gaussian and Chebyshev grids, apply interpolation map, check error
-if d==3:
+################################# EVALUATING SYSTEM COMPONENTS ###################################
+# Evaluate certain parts of the 3D problem 
+
+if (d==3) and (args.test_components):
     # First we generate the arrays of Chebyshev and Gaussian nodes:
     cheb_ext  = torch.from_numpy(dom.hps.H.zz.T[dom.hps.H.JJ.Jxreorder])
     gauss_ext = torch.from_numpy(dom.hps.H.zzG.T[dom.hps.H.JJ.Jxreorder])
@@ -271,6 +279,7 @@ if d==3:
 
     #print(uu_cheb)
     #print(uu_inter)
+    print("Relative error of interpolation is:")
     print(torch.norm(uu_cheb - uu_inter) / torch.norm(uu_cheb))
 
     #from hps_leaf_disc import get_loc_interp_3d
