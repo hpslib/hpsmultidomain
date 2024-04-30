@@ -68,8 +68,8 @@ class HPS_Multidomain:
                               torch.tensor(Dtmp.D1), torch.tensor(Dtmp.D2), torch.tensor(Dtmp.D3)))
         self.H.Ds = Ds 
         
-        grid_xx = self.get_grid()
-        self.grid_xx = grid_xx
+        grid_xx       = self.get_grid()
+        self.grid_xx  = grid_xx
         
         Jx = torch.tensor(self.H.JJ.Jx)
         Jc = torch.tensor(self.H.JJ.Jc)
@@ -89,6 +89,9 @@ class HPS_Multidomain:
             print(self.I_unique.shape)
             print(self.I_copy1.shape)
             print(self.I_copy2.shape)"""
+        else:
+            self.gauss_xx = self.get_gaussian_nodes()
+            print(self.gauss_xx.shape)
         
         self.xx_tot = self.grid_xx.flatten(start_dim=0,end_dim=-2)
     
@@ -173,7 +176,7 @@ class HPS_Multidomain:
         zz = torch.tensor(self.H.zz.T)
 
         n = self.n
-        xx = torch.zeros(self.nboxes,self.p**self.d, self.d)
+        xx = torch.zeros(self.nboxes, self.p**self.d, self.d)
         for i in range(n[0]):
             for j in range(n[1]):
                 if self.d==2:
@@ -192,6 +195,32 @@ class HPS_Multidomain:
                         xx[box,:,:] = zzloc
 
         return xx
+
+    def get_gaussian_nodes(self):
+        """
+        Generates the computational box exteriors based on the discretization parameters and domain geometry.
+        
+        Returns:
+        - xxG (torch.Tensor): Tensor representing the Gaussian grid points of the box surfaces in the computational domain.
+        """
+        zzG = torch.tensor(self.H.zzG)
+        print(zzG.shape)
+        n   = self.n
+        xxG = torch.zeros(self.nboxes, 6*self.p**2, self.d)
+        for i in range(n[0]):
+            for j in range(n[1]):
+                if self.d==2:
+                    print("Error! Gaussian only needed for d=3")
+                else:
+                    for k in range(n[2]):
+                        box   = i*n[1]*n[2] + j*n[2] + k
+                        zzloc = zzG.clone()
+                        zzloc[:,0] += self.a + 2*self.a*i + self.domain[0,0]
+                        zzloc[:,1] += self.a + 2*self.a*j + self.domain[1,0]
+                        zzloc[:,2] += self.a + 2*self.a*k + self.domain[2,0]
+                        xxG[box,:,:] = zzloc
+
+        return xxG
     
     def get_unique_inds(self):
         """
@@ -328,7 +357,9 @@ class HPS_Multidomain:
         if self.d==2:
             uu_sol_bnd[self.I_unique] = uu_sol
             uu_sol_bnd[self.I_copy2]  = uu_sol_bnd[self.I_copy1]
-        else: # For 3D we don't identify unique and copy bdries of boxes yet, we just set all the box boundaries to true solution:
+        else:
+            # For 3D we don't identify unique and copy bdries of boxes yet, we just set all the box boundaries to true solution.
+            # BUT... we need to include corners/edges
             uu_sol_bnd[:] = uu_sol
         
         uu_sol_bnd = uu_sol_bnd.reshape(nboxes,size_ext,nrhs)

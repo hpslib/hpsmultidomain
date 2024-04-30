@@ -17,7 +17,7 @@ JJ_2d    = namedtuple('JJ_2d', ['Jl','Jr','Jd','Ju','Jx','Jc','Jxreorder'])
 
 Pdo_3d = namedtuple('Pdo_3d', ['c11', 'c22', 'c33', 'c12', 'c13', 'c23', 'c1', 'c2', 'c3', 'c'])
 Ds_3d  = namedtuple('Ds_3d',  ['D11', 'D22', 'D33', 'D12', 'D13', 'D23', 'D1', 'D2', 'D3'])
-JJ_3d  = namedtuple('JJ_3d',  ['Jl', 'Jr', 'Jd', 'Ju', 'Jb', 'Jf', 'Jx', 'Jxreorder', 'Jc', 'Jtot'])
+JJ_3d  = namedtuple('JJ_3d',  ['Jl', 'Jr', 'Jd', 'Ju', 'Jb', 'Jf', 'Jx', 'Jxreorder', 'Jxunique', 'Jc', 'Jtot'])
 
 def cheb(p):
     """
@@ -292,9 +292,14 @@ def leaf_discretization_3d(a,p):
 
     # TODO: figure out corners / switch to Legendre for this
     Jxreorder = np.concatenate((Jl_corner,Jr_corner,Jd_corner,Ju_corner,Jb_corner,Jf_corner))
+    Jxunique  = np.unique(Jxreorder)
     Jtot  = np.concatenate((Jx,Jc))
-    JJ    = JJ_3d(Jl= Jl, Jr= Jr, Ju= Ju, Jd= Jd, Jb= Jb,
-                  Jf=Jf, Jx=Jx, Jxreorder=Jxreorder, Jc=Jc, Jtot=Jtot)
+
+    # Take only necessary surface values for Gaussian nodes:
+    zzG = zzG.T[Jxreorder,:]
+
+    JJ    = JJ_3d(Jl= Jl, Jr= Jr, Ju= Ju, Jd= Jd, Jb= Jb, Jf=Jf, Jx=Jx,
+                  Jxreorder=Jxreorder, Jxunique=Jxunique, Jc=Jc, Jtot=Jtot)
     return zz,Ds,JJ,hmin,zzG
 
 def get_diff_ops(Ds,JJ,d):

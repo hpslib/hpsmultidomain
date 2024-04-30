@@ -277,9 +277,20 @@ if (d==3) and (args.test_components):
     uu_gauss = uu_dir(gauss_ext)
     uu_inter = torch.from_numpy(dom.hps.H.Interp_mat) @ uu_gauss
 
-    #print(uu_cheb)
-    #print(uu_inter)
     print("Relative error of interpolation is:")
     print(torch.norm(uu_cheb - uu_inter) / torch.norm(uu_cheb))
 
-    #from hps_leaf_disc import get_loc_interp_3d
+    # Check if edges / corners are equal as expected:
+    u, c = np.unique(dom.hps.H.JJ.Jxreorder, return_counts=True)
+    dup = u[c > 1]
+    maxVar = 0
+    for elem in dup:
+        variance = torch.std(uu_inter[dom.hps.H.JJ.Jxreorder == elem])
+        maxVar = np.max([maxVar, variance.item()])
+    print("Largest variance between redundant values is " + str(maxVar))
+
+
+#if d==3:
+#    print(dom.hps.H.JJ.Jxreorder.shape)
+#    print(dom.hps.H.JJ.Jxunique.shape)
+
