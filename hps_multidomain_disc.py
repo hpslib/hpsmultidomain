@@ -91,6 +91,7 @@ class HPS_Multidomain:
             print(self.I_copy2.shape)"""
         else:
             self.gauss_xx = self.get_gaussian_nodes()
+            self.gauss_xx = self.gauss_xx.flatten(start_dim=0,end_dim=-2)
             print(self.gauss_xx.shape)
         
         self.xx_tot = self.grid_xx.flatten(start_dim=0,end_dim=-2)
@@ -298,7 +299,10 @@ class HPS_Multidomain:
         a = self.a; p = self.p; nboxes = self.nboxes; d = self.d
         pdo = self.pdo
         
+        # For Gaussian we might need p^2, not (p-2)^2:
         size_face = (p-2)**(d-1)
+        if d==3:
+            size_face = p**2
 
         if (mode == 'build'):
             DtNs = torch.zeros(nboxes,2*d*size_face,2*d*size_face)
@@ -313,16 +317,18 @@ class HPS_Multidomain:
         Jx    = torch.tensor(self.H.JJ.Jx).to(device)
         Jc    = torch.tensor(self.H.JJ.Jc).to(device)
         Jxreo = torch.tensor(self.H.JJ.Jxreorder).to(device)
+        if d==3:
+            Jxun  = torch.tensor(self.H.JJ.Jxunique).to(device)
         Intmap= torch.tensor(self.H.Interp_mat).to(device)
         Ds    = self.H.Ds.to(device)
         if (mode =='solve'):
             data = data.to(device)
 
-        # TEMPORARILY USING Jx instead of Jxreo:
+        # Only need Jxun for 3D case:
         if d==2:    
-            args = p,d,xxloc,Nxtot,Jx,Jc,Jxreo,Ds,Intmap,pdo
+            args = p,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxreo,Ds,Intmap,pdo
         else:
-            args = p,d,xxloc,Nxtot,Jx,Jc,Jx,Ds,Intmap,pdo
+            args = p,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxun,Ds,Intmap,pdo
         
         # reserve at most 1GB memory for stored DtNs at a time
         f = 0.8e9 # 0.8 GB in bytes
@@ -348,7 +354,7 @@ class HPS_Multidomain:
 
         size_ext = 4*(self.p-2)
         if self.d==3:
-            size_ext = 6*(self.p-2)**2
+            size_ext = 6*(self.p)**2
 
         nboxes   = torch.prod(self.n)
         uu_sol   = uu_sol.to(device)

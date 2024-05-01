@@ -115,7 +115,7 @@ def Aloc_acc(p, d, nboxes, xx_flat, Aloc, func, D, c=1.):
     Aloc     += f_vals * D.unsqueeze(0)
 
     
-def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Ds,Intmap,pdo,
+def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,pdo,
           box_start,box_end,device,mode,data,ff_body_func):
     if (d == 2):
         args = p,xxloc,Ds,pdo,box_start,box_end
@@ -163,9 +163,9 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Ds,Intmap,pdo,
         if d==2:
             uu_sol[:,Jxreo,:nrhs] = Intmap.unsqueeze(0) @ data[box_start:box_end]
         else:
-            uu_sol[:,Jxreo,:nrhs] = data[box_start:box_end]
+            uu_sol[:,Jxreo,:nrhs] = Intmap.unsqueeze(0) @ data[box_start:box_end]
 
-        if (pdo.c12 is None):
+        if (pdo.c12 is None) and (d==2):
             #print(nrhs)
             #print((f_body - Aloc[:,Jc][...,Jx] @ data[box_start:box_end]).shape)
             #print(Acc.shape)
@@ -173,7 +173,8 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Ds,Intmap,pdo,
             uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc][...,Jx] @ data[box_start:box_end])
             #print(uu_sol)#[:,Jc,:nrhs])
         else:
-            uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc][...,Jxreo] @ uu_sol[:,Jxreo,:nrhs]) # Need to make this Jxunique
+            # Need to make this Jxunique like here:
+            uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc][...,Jxun] @ uu_sol[:,Jxun,:nrhs])
             
         # calculate residual
         uu_sol[:,Jc,nrhs:] = Aloc[:,Jc] @ uu_sol[...,:nrhs] - f_body
@@ -198,7 +199,7 @@ def get_DtN_chunksize(p,device):
     return int(chunk_max/4)
 
 
-def get_DtNs_helper(p,d,xxloc,Nx,Jx,Jc,Jxreo,Ds,Intmap,pdo,\
+def get_DtNs_helper(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,pdo,\
                     box_start,box_end,chunk_init,device,mode,data,ff_body_func):
     nboxes = box_end - box_start
     size_face = (p-2)**(d-1)
@@ -210,7 +211,7 @@ def get_DtNs_helper(p,d,xxloc,Nx,Jx,Jc,Jxreo,Ds,Intmap,pdo,\
         DtNs = torch.zeros(nboxes,2*d*size_face,1,device=device)
         
     chunk_size = chunk_init
-    args = p,d,xxloc,Nx,Jx,Jc,Jxreo,Ds,Intmap,pdo
+    args = p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,pdo
     chunk_list = torch.zeros(int(nboxes/chunk_init)+100,device=device).int(); 
     box_curr = 0; nchunks = 0
     while(box_curr < nboxes):

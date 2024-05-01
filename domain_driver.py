@@ -107,15 +107,8 @@ class Domain_Driver:
     def hps_disc(self,box_geom,a,p,d,pdo_op,periodic_bc):
 
         HPS_multi = hps_multidomain_disc.HPS_Multidomain(pdo_op,box_geom,a,p,d)
-        size_face = (HPS_multi.p-2)**(d-1)
 
         self.hps = HPS_multi
-        
-        n0 = HPS_multi.n[0].item()
-        n1 = HPS_multi.n[1].item()
-        n2 = 1
-        if d==3:
-            n2 = HPS_multi.n[2].item()
 
         if d==2:
             self.XX  = self.hps.xx_active
@@ -238,12 +231,12 @@ class Domain_Driver:
                 device = torch.device('cpu')
                 tic = time()
                 self.A,assembly_time_dict    = self.hps.sparse_mat(device,verbose)
-                toc_assembly_tot = time() - tic;
+                toc_assembly_tot = time() - tic
             elif (sparse_assembly == 'reduced_gpu'):
                 device = torch.device('cuda')
                 tic = time()
                 self.A,assembly_time_dict    = self.hps.sparse_mat(device,verbose)
-                toc_assembly_tot = time() - tic;
+                toc_assembly_tot = time() - tic
 
             csr_stor  = self.A.data.nbytes
             csr_stor += self.A.indices.nbytes + self.A.indptr.nbytes
@@ -363,11 +356,11 @@ class Domain_Driver:
             # This shape is total # of points on box edges in the domain, should be
             # (p-2)^2 * ((n0+1) + (n1+1) + (n2+1))
             #sol_tot   = torch.zeros((self.p-2)**2 * 3*(self.hps.n+1),1)
-            size_ext = 6*(self.hps.p-2)**2
+            size_ext = 6*(self.hps.p)**2
             sol_tot   = torch.zeros(self.hps.nboxes*size_ext,1)
             rel_err   = 0
             toc_solve = 0
-            sol_tot[:] = uu_dir_func(self.hps.xx_ext)
+            sol_tot[:] = uu_dir_func(self.hps.gauss_xx)
         
         resloc_hps = torch.tensor([float('nan')])
         if (self.sparse_assembly == 'reduced_gpu'):

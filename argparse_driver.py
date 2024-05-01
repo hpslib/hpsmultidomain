@@ -271,7 +271,7 @@ if (args.pickle is not None):
 if (d==3) and (args.test_components):
     # First we generate the arrays of Chebyshev and Gaussian nodes:
     cheb_ext  = torch.from_numpy(dom.hps.H.zz.T[dom.hps.H.JJ.Jxreorder])
-    gauss_ext = torch.from_numpy(dom.hps.H.zzG.T[dom.hps.H.JJ.Jxreorder])
+    gauss_ext = torch.from_numpy(dom.hps.H.zzG)
 
     uu_cheb  = uu_dir(cheb_ext)
     uu_gauss = uu_dir(gauss_ext)
