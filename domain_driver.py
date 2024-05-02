@@ -375,10 +375,10 @@ class Domain_Driver:
             # (p-2)^2 * ((n0+1) + (n1+1) + (n2+1))
             #sol_tot   = torch.zeros((self.p-2)**2 * 3*(self.hps.n+1),1)
             size_ext = 6*(self.hps.p)**2
-            sol_tot   = torch.zeros(self.hps.nboxes*size_ext,1)
+            sol_tot   = torch.zeros(len(self.hps.I_unique),1)
             rel_err   = 0
             toc_solve = 0
-            sol_tot[:] = uu_dir_func(self.hps.gauss_xx)
+            sol_tot[:] = uu_dir_func(self.hps.gauss_xx[self.hps.I_unique])
         
         resloc_hps = torch.tensor([float('nan')])
         if (self.sparse_assembly == 'reduced_gpu'):

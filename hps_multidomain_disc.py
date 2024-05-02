@@ -80,14 +80,6 @@ class HPS_Multidomain:
             self.xx_ext = self.grid_ext
             self.I_unique, self.I_copy1, self.I_copy2 = self.get_unique_inds()
             self.xx_active = self.xx_ext[self.I_unique,:]
-            """
-            print(self.I_unique)
-            print(self.I_copy1)
-            print(self.I_copy2)
-            print(self.I_unique.shape)
-            print(self.I_copy1.shape)
-            print(self.I_copy2.shape)
-            """
         else:
             self.grid_ext = self.grid_xx[:,Jxreorder,:].flatten(start_dim=0,end_dim=-2)
             self.gauss_xx = self.get_gaussian_nodes()
@@ -417,14 +409,8 @@ class HPS_Multidomain:
         uu_sol   = uu_sol.to(device)
         
         uu_sol_bnd = torch.zeros(nboxes*size_ext,nrhs,device=device)
-        if self.d==2:
-            uu_sol_bnd[self.I_unique] = uu_sol
-            uu_sol_bnd[self.I_copy2]  = uu_sol_bnd[self.I_copy1]
-        else:
-            # For 3D we don't identify unique and copy bdries of boxes yet, we just set all the box boundaries to true solution.
-            # BUT... we need to include corners/edges
-            uu_sol_bnd[self.I_unique] = uu_sol[self.I_unique]
-            uu_sol_bnd[self.I_copy2]  = uu_sol_bnd[self.I_copy1]
+        uu_sol_bnd[self.I_unique] = uu_sol
+        uu_sol_bnd[self.I_copy2]  = uu_sol_bnd[self.I_copy1]
         
         uu_sol_bnd = uu_sol_bnd.reshape(nboxes,size_ext,nrhs)
         #print(uu_sol_bnd)
@@ -432,8 +418,6 @@ class HPS_Multidomain:
         #print(uu_sol_tot)
         
         uu_sol_flat = uu_sol_tot[...,:nrhs].flatten(start_dim=0,end_dim=-2)
-        if self.d==3:
-            print("Flattened diff is " + str(torch.linalg.norm(uu_sol_flat[self.p**3:2*self.p**3] - uu_sol_tot[1,:,:nrhs])))
         resvec_blocks = torch.linalg.norm(uu_sol_tot[...,nrhs:])
         res_lochps = torch.max(resvec_blocks).item()
         return uu_sol_flat, res_lochps
