@@ -387,6 +387,7 @@ class Domain_Driver:
                 Jc   = torch.tensor(self.hps.H.JJ.Jc)#.to(device)
                 Jtot = torch.hstack((Jc,Jx))
                 true_err = torch.linalg.norm(sol_tot[:,Jtot]-uu_true[:,Jtot]) / torch.linalg.norm(uu_true[:,Jtot])
+                #true_err = torch.linalg.norm(sol_tot[:,Jx]-uu_true[:,Jx]) / torch.linalg.norm(uu_true[:,Jx])
             print(sol_tot.shape)
             print(uu_true.shape)
             del uu_true

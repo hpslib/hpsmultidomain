@@ -83,16 +83,18 @@ class HPS_Multidomain:
         if d==2:
             self.I_unique, self.I_copy1, self.I_copy2 = self.get_unique_inds()
             self.xx_active = self.xx_ext[self.I_unique,:]
-            """print(self.I_unique)
+            """
+            print(self.I_unique)
             print(self.I_copy1)
             print(self.I_copy2)
             print(self.I_unique.shape)
             print(self.I_copy1.shape)
-            print(self.I_copy2.shape)"""
+            print(self.I_copy2.shape)
+            """
         else:
             self.gauss_xx = self.get_gaussian_nodes()
             self.gauss_xx = self.gauss_xx.flatten(start_dim=0,end_dim=-2)
-            print(self.gauss_xx.shape)
+            self.I_unique, self.I_copy1, self.I_copy2 = self.get_unique_inds()
         
         self.xx_tot = self.grid_xx.flatten(start_dim=0,end_dim=-2)
     
@@ -205,7 +207,7 @@ class HPS_Multidomain:
         - xxG (torch.Tensor): Tensor representing the Gaussian grid points of the box surfaces in the computational domain.
         """
         zzG = torch.tensor(self.H.zzG)
-        print(zzG.shape)
+        #print(zzG.shape)
         n   = self.n
         xxG = torch.zeros(self.nboxes, 6*self.p**2, self.d)
         for i in range(n[0]):
@@ -288,8 +290,62 @@ class HPS_Multidomain:
             I_unique[offset_unique : offset_unique + n1 * size_face] = R_inds_slablast
             offset_unique += n1 * size_face
         else:
-            size_face = (self.p-2)**2
-            # Unique: bottom boundary of bottom layer of boxes, 
+            # Assuming gaussian nodes with pxp nodes total
+            size_face = self.p**2
+            n0,n1,n2  = self.n
+
+            box_ind = torch.arange(n0*n1*n2*6*size_face).reshape(n0,n1,n2,6*size_face)
+
+            # Keep order in mind: L R D U B F (n0 is LR, n1 is DU, n2 is BF)
+            # Unique: 1 copy of every boundary in the model. This will be:
+            # ALL down, left, and back faces
+            # Right face for the rightmost boxes (on n0)
+            # Up face for the upmost boxes (on n1)
+            # Front face for the frontmost boxes (on n2)
+            I_unique = box_ind.clone()
+            I_unique[:-1,:,:,size_face:2*size_face] = -1 # Eliminate right edges except rightmost
+            I_unique[:,:-1,:,3*size_face:4*size_face] = -1 # Eliminate up edges except upmost
+            I_unique[:,:,:-1,5*size_face:] = -1 # Eliminate front edges except frontmost
+            I_unique = I_unique.flatten()
+            I_unique = I_unique[I_unique > -1]
+            print("I_unique shape is " + str(I_unique.shape))
+            print(I_unique)
+
+            # For copy 1, we need to eliminate edges that make up domain boundary. This is just:
+            # Left faces for all but leftmost boxes
+            # Down faces for all but downmost boxes
+            # Back faces for all but backmost boxes
+            indices_ruf = np.hstack((np.arange(size_face,2*size_face),np.arange(3*size_face,4*size_face),np.arange(5*size_face,6*size_face)))
+            I_copy1 = box_ind.clone()
+            I_copy1[:,:,:,indices_ruf]             = -1 # Eliminate all right, up, and front faces
+            I_copy1[0,:,:,:size_face]              = -1 # Eliminate left faces on left edge
+            I_copy1[:,0,:,2*size_face:3*size_face] = -1 # Eliminate down faces on down edge
+            I_copy1[:,:,0,4*size_face:5*size_face] = -1 # Eliminate back faces on back edge
+            I_copy1 = I_copy1.flatten()
+            I_copy1 = I_copy1[I_copy1 > -1]
+            print("I_copy1 shape is " + str(I_copy1.shape))
+            print(I_copy1)
+
+            # For copy 2, we need to match relative indexing of copy 1 to easily copy from one to the other.
+            # Well do this by copying the correct copy 2 indices to their relative points in copy1,
+            # then mimic the eliminations we did in copy1
+            I_copy2 = box_ind.clone()
+            # Every back index is equal to the front of the preceding box
+            I_copy2[:,:,1:,4*size_face:5*size_face] = I_copy2[:,:,:-1,5*size_face:]
+            # Every down index is equal to the up of the preceding box
+            I_copy2[:,1:,:,2*size_face:3*size_face] = I_copy2[:,:-1,:,3*size_face:4*size_face]
+            # Every back index is equal to the front of the preceding box
+            I_copy2[1:,:,:,:size_face] = I_copy2[:-1,:,:,size_face:2*size_face]
+
+            I_copy2[:,:,:,indices_ruf]             = -1 # Eliminate all right, up, and front faces
+            I_copy2[0,:,:,:size_face]              = -1 # Eliminate left faces on left edge
+            I_copy2[:,0,:,2*size_face:3*size_face] = -1 # Eliminate down faces on down edge
+            I_copy2[:,:,0,4*size_face:5*size_face] = -1 # Eliminate back faces on back edge
+            I_copy2 = I_copy2.flatten()
+            I_copy2 = I_copy2[I_copy2 > -1]
+            print("I_copy2 shape is " + str(I_copy2.shape))
+            print(I_copy2)
+
         return I_unique,I_copy1,I_copy2
     
     
@@ -360,6 +416,7 @@ class HPS_Multidomain:
         uu_sol   = uu_sol.to(device)
         
         uu_sol_bnd = torch.zeros(nboxes*size_ext,nrhs,device=device)
+        uu_sol_bnd2 = torch.zeros(nboxes*size_ext,nrhs,device=device)
         if self.d==2:
             uu_sol_bnd[self.I_unique] = uu_sol
             uu_sol_bnd[self.I_copy2]  = uu_sol_bnd[self.I_copy1]
@@ -367,6 +424,14 @@ class HPS_Multidomain:
             # For 3D we don't identify unique and copy bdries of boxes yet, we just set all the box boundaries to true solution.
             # BUT... we need to include corners/edges
             uu_sol_bnd[:] = uu_sol
+            uu_sol_bnd2[self.I_unique] = uu_sol[self.I_unique]
+            uu_sol_bnd2[self.I_copy2]  = uu_sol_bnd2[self.I_copy1]
+
+        compare = torch.eq(uu_sol_bnd, uu_sol_bnd2)
+        result = torch.where(compare == False)
+        torch.set_printoptions(threshold=10_000)
+        print(uu_sol_bnd.shape, result[0].shape)
+        print(result[0])
         
         uu_sol_bnd = uu_sol_bnd.reshape(nboxes,size_ext,nrhs)
         #print(uu_sol_bnd)
