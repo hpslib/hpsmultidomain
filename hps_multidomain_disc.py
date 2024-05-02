@@ -418,17 +418,14 @@ class HPS_Multidomain:
         uu_sol   = uu_sol.to(device)
         
         uu_sol_bnd = torch.zeros(nboxes*size_ext,nrhs,device=device)
-        uu_sol_bnd2 = torch.zeros(nboxes*size_ext,nrhs,device=device)
         if self.d==2:
             uu_sol_bnd[self.I_unique] = uu_sol
             uu_sol_bnd[self.I_copy2]  = uu_sol_bnd[self.I_copy1]
         else:
             # For 3D we don't identify unique and copy bdries of boxes yet, we just set all the box boundaries to true solution.
             # BUT... we need to include corners/edges
-            uu_sol_bnd[:] = uu_sol
-            #uu_sol_bnd2[self.I_unique] = uu_sol[self.I_unique]
-            #uu_sol_bnd2[self.I_copy2]  = uu_sol_bnd2[self.I_copy1]
-            #print(uu_sol[self.I_copy1] - uu_sol[self.I_copy2])
+            uu_sol_bnd[self.I_unique] = uu_sol[self.I_unique]
+            uu_sol_bnd[self.I_copy2]  = uu_sol_bnd[self.I_copy1]
 
         #compare = torch.eq(uu_sol_bnd, uu_sol_bnd2)
         #result = torch.where(compare == False)

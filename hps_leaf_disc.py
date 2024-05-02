@@ -114,7 +114,7 @@ def get_loc_interp_3d(p, q, a):
     cpoints  = (croots, croots) # tuple of our 2D Chebyshev points
     values   = np.zeros((p,p))
 
-    
+    """
     Interp_loc = []
     for i in range(p):
         for j in range(p):
@@ -122,8 +122,8 @@ def get_loc_interp_3d(p, q, a):
             values[i,j] = 1
             Interp_loc.append(interpn(cpoints, values, lroots2d.T, method='pchip'))
 
-    #Interp_loc = np.column_stack(Interp_loc)
-    
+    Interp_loc = np.column_stack(Interp_loc)
+    """
 
     # Vandermonde-based approach:
     Vc = polyvander2d(croots2d[0], croots2d[1], (p,p))
@@ -297,6 +297,12 @@ def leaf_discretization_3d(a,p):
 
     # Take only necessary surface values for Gaussian nodes:
     zzG = zzG.T[Jxreorder,:]
+    # Need to do a little surface cleaning to make sure the faces of our Gaussian box 
+    # line up with the faces of our Chebyshev box:
+    zzCleanup = zz.T[Jxreorder,:]
+    zzG[:2*p**2,0] = zzCleanup[:2*p**2,0]
+    zzG[2*p**2:4*p**2,1] = zzCleanup[2*p**2:4*p**2,1]
+    zzG[4*p**2:,2] = zzCleanup[4*p**2:,2]
 
     JJ    = JJ_3d(Jl= Jl, Jr= Jr, Ju= Ju, Jd= Jd, Jb= Jb, Jf=Jf, Jx=Jx,
                   Jxreorder=Jxreorder, Jxunique=Jxunique, Jc=Jc, Jtot=Jtot)
@@ -343,8 +349,6 @@ class HPS_Disc:
         else:
             self.zz, self.Ds, self.JJ, self.hmin, self.zzG = leaf_discretization_3d(a, p)
         self.Nx = get_diff_ops(self.Ds, self.JJ, d)
-        print("zzG:")
-        print(self.zzG)
         
     ## Interpolation from data on Ix to Ix_reorder
     def _get_interp_mat(self):
