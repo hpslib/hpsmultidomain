@@ -129,12 +129,30 @@ class Domain_Driver:
 
             if (periodic_bc):
                 
-                tot_C      = self.I_Ctot.shape[0];  n_LR = I_Rdir.shape[0]
+                tot_C = self.I_Ctot.shape[0]
+                n_LR  = I_Rdir.shape[0]
                 tot_unique = tot_C - n_LR
                 
                 self.I_Ctot_unique = torch.arange(tot_unique)
                 self.I_Ctot_copy1  = torch.arange(n_LR)
                 self.I_Ctot_copy2  = torch.arange(tot_unique, tot_C)
+        else: # d==3
+            self.XX  = self.hps.xx_active
+            
+            self.ntot = self.XX.shape[0]
+            
+            tol = 0.01 * self.hps.hmin # Adding a tolerance to avoid potential numerical error
+            I_Ldir = torch.where(self.XX[:,0] < self.box_geom[0,0] + tol)[0]
+            I_Rdir = torch.where(self.XX[:,0] > self.box_geom[0,1] - tol)[0]
+            I_Ddir = torch.where(self.XX[:,1] < self.box_geom[1,0] + tol)[0]
+            I_Udir = torch.where(self.XX[:,1] > self.box_geom[1,1] - tol)[0]
+            I_Bdir = torch.where(self.XX[:,2] < self.box_geom[2,0] + tol)[0]
+            I_Fdir = torch.where(self.XX[:,2] > self.box_geom[2,1] - tol)[0]
+            
+            # Assuming no periodic BC for now:
+            self.I_Xtot = torch.hstack((I_Ldir,I_Rdir,I_Ddir,I_Udir,I_Bdir,I_Fdir))
+            self.I_Ctot = torch.sort(torch_setdiff1d(torch.arange(self.ntot), self.I_Xtot))[0]
+            
     
     # ONLY NEEDED FOR SPARSE SOLVE
     def build_superLU(self,verbose):

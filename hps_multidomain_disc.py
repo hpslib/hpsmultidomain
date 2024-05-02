@@ -72,15 +72,12 @@ class HPS_Multidomain:
         self.grid_xx  = grid_xx
         
         Jx = torch.tensor(self.H.JJ.Jx)
-        Jc = torch.tensor(self.H.JJ.Jc)
-
-        self.grid_ext = self.grid_xx[:,Jx,:].flatten(start_dim=0,end_dim=-2)
-        self.xx_ext = self.grid_ext.flatten(start_dim=0,end_dim=-2)
-        #print(Jx)
-        #print(self.grid_ext)
-        #print(self.grid_ext.shape)
+        Jxreorder = torch.tensor(self.H.JJ.Jxreorder)
+        #Jc = torch.tensor(self.H.JJ.Jc)
         
         if d==2:
+            self.grid_ext = self.grid_xx[:,Jx,:].flatten(start_dim=0,end_dim=-2)
+            self.xx_ext = self.grid_ext
             self.I_unique, self.I_copy1, self.I_copy2 = self.get_unique_inds()
             self.xx_active = self.xx_ext[self.I_unique,:]
             """
@@ -92,9 +89,13 @@ class HPS_Multidomain:
             print(self.I_copy2.shape)
             """
         else:
+            self.grid_ext = self.grid_xx[:,Jxreorder,:].flatten(start_dim=0,end_dim=-2)
             self.gauss_xx = self.get_gaussian_nodes()
             self.gauss_xx = self.gauss_xx.flatten(start_dim=0,end_dim=-2)
             self.I_unique, self.I_copy1, self.I_copy2 = self.get_unique_inds()
+            # I think you want xx_ext to be based on Gaussian nodes:
+            self.xx_ext = self.gauss_xx
+            self.xx_active = self.xx_ext[self.I_unique,:]
         
         self.xx_tot = self.grid_xx.flatten(start_dim=0,end_dim=-2)
     
@@ -346,8 +347,6 @@ class HPS_Multidomain:
             print("I_copy2 shape is " + str(I_copy2.shape))
             #print(I_copy2)
 
-            print(I_copy2 - I_copy1)
-
         return I_unique,I_copy1,I_copy2
     
     
@@ -426,12 +425,6 @@ class HPS_Multidomain:
             # BUT... we need to include corners/edges
             uu_sol_bnd[self.I_unique] = uu_sol[self.I_unique]
             uu_sol_bnd[self.I_copy2]  = uu_sol_bnd[self.I_copy1]
-
-        #compare = torch.eq(uu_sol_bnd, uu_sol_bnd2)
-        #result = torch.where(compare == False)
-        #torch.set_printoptions(threshold=10_000)
-        #print(uu_sol_bnd.shape, result[0].shape)
-        #print(result[0])
         
         uu_sol_bnd = uu_sol_bnd.reshape(nboxes,size_ext,nrhs)
         #print(uu_sol_bnd)
