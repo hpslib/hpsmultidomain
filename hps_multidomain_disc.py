@@ -309,7 +309,7 @@ class HPS_Multidomain:
             I_unique = I_unique.flatten()
             I_unique = I_unique[I_unique > -1]
             print("I_unique shape is " + str(I_unique.shape))
-            print(I_unique)
+            #print(I_unique)
 
             # For copy 1, we need to eliminate edges that make up domain boundary. This is just:
             # Left faces for all but leftmost boxes
@@ -324,7 +324,7 @@ class HPS_Multidomain:
             I_copy1 = I_copy1.flatten()
             I_copy1 = I_copy1[I_copy1 > -1]
             print("I_copy1 shape is " + str(I_copy1.shape))
-            print(I_copy1)
+            #print(I_copy1)
 
             # For copy 2, we need to match relative indexing of copy 1 to easily copy from one to the other.
             # Well do this by copying the correct copy 2 indices to their relative points in copy1,
@@ -344,7 +344,9 @@ class HPS_Multidomain:
             I_copy2 = I_copy2.flatten()
             I_copy2 = I_copy2[I_copy2 > -1]
             print("I_copy2 shape is " + str(I_copy2.shape))
-            print(I_copy2)
+            #print(I_copy2)
+
+            print(I_copy2 - I_copy1)
 
         return I_unique,I_copy1,I_copy2
     
@@ -424,14 +426,15 @@ class HPS_Multidomain:
             # For 3D we don't identify unique and copy bdries of boxes yet, we just set all the box boundaries to true solution.
             # BUT... we need to include corners/edges
             uu_sol_bnd[:] = uu_sol
-            uu_sol_bnd2[self.I_unique] = uu_sol[self.I_unique]
-            uu_sol_bnd2[self.I_copy2]  = uu_sol_bnd2[self.I_copy1]
+            #uu_sol_bnd2[self.I_unique] = uu_sol[self.I_unique]
+            #uu_sol_bnd2[self.I_copy2]  = uu_sol_bnd2[self.I_copy1]
+            #print(uu_sol[self.I_copy1] - uu_sol[self.I_copy2])
 
-        compare = torch.eq(uu_sol_bnd, uu_sol_bnd2)
-        result = torch.where(compare == False)
-        torch.set_printoptions(threshold=10_000)
-        print(uu_sol_bnd.shape, result[0].shape)
-        print(result[0])
+        #compare = torch.eq(uu_sol_bnd, uu_sol_bnd2)
+        #result = torch.where(compare == False)
+        #torch.set_printoptions(threshold=10_000)
+        #print(uu_sol_bnd.shape, result[0].shape)
+        #print(result[0])
         
         uu_sol_bnd = uu_sol_bnd.reshape(nboxes,size_ext,nrhs)
         #print(uu_sol_bnd)

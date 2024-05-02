@@ -343,6 +343,8 @@ class HPS_Disc:
         else:
             self.zz, self.Ds, self.JJ, self.hmin, self.zzG = leaf_discretization_3d(a, p)
         self.Nx = get_diff_ops(self.Ds, self.JJ, d)
+        print("zzG:")
+        print(self.zzG)
         
     ## Interpolation from data on Ix to Ix_reorder
     def _get_interp_mat(self):
