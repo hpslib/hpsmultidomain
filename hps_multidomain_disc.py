@@ -108,8 +108,6 @@ class HPS_Multidomain:
         tic = time()
         DtN_loc = self.get_DtNs(device,'build') # Tentatively think this is already good
         toc_DtN = time() - tic
-        print(DtN_loc)
-        print(DtN_loc.shape)
         
         if self.d==2:
             size_face = self.p-2; size_ext = 4*size_face
@@ -156,19 +154,36 @@ class HPS_Multidomain:
 
             toc_forloop = toc_index + toc_flatten + toc_alloc
         else:
-            # For 3D, we're indexing box by box. Thus let's follow a similar approach here:
-            # We need an array
-            hmm = 1
-        
-        
-        sp_mat = 0
-        if self.d==2:
+            # For 3D, we're indexing box by box. Thus let's follow that approach here:
             tic = time()
-            sp_mat = sp.coo_matrix(( np.array(data),\
-                                    (np.array(row_data,dtype=int),np.array(col_data,dtype=int)))).tocsr()
-            sp_mat = sp_mat.tocsr()
-            toc_csr_scipy = time() - tic
-            
+            col_data = torch.arange(size_ext)
+            col_data = col_data.repeat((size_ext,1))
+            row_data = col_data.T
+
+            box_range = size_ext * torch.arange(nprod)
+            box_range = box_range.unsqueeze(-1)
+            box_range = box_range.unsqueeze(-1)
+
+            row_data = box_range + row_data
+            col_data = box_range + col_data
+
+            data = DtN_loc.flatten()
+            row_data = row_data.flatten()
+            col_data = col_data.flatten()
+            toc_flatten = time() - tic
+
+            # TODO: find all entries of row_data / col_data in I_copy2 and switch them into
+            # I_copy1
+        
+        
+        tic = time()
+        sp_mat = sp.coo_matrix(( np.array(data),(np.array(row_data,dtype=int),np.array(col_data,dtype=int)))).tocsr()
+        sp_mat = sp_mat.tocsr()
+        toc_csr_scipy = time() - tic
+
+        print(sp_mat)
+
+        if self.d==2:
             if (verbose) and (self.d==2):
                 print("\t--time to do for loop (alloc,index, flatten) (%5.2f,%5.2f,%5.2f)"\
                     %(toc_alloc,toc_index,toc_flatten))

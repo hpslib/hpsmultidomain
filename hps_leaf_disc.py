@@ -96,7 +96,7 @@ def get_loc_interp_3d(p, q, a):
     Computes local interpolation matrices from Chebyshev points.
     
     Parameters:
-    - q: The degree of the Chebyshev polynomial for interpolation
+    - p: The degree of the Chebyshev polynomial for interpolation
     - q: The degree of the Gaussian polynomial for interpolation
     
     Returns:
@@ -112,19 +112,6 @@ def get_loc_interp_3d(p, q, a):
 
     lroots   = a * legendre.legroots(lcoeff)
     lroots2d = np.array([np.repeat(lroots, q), np.hstack([lroots]*q)])
-    cpoints  = (croots, croots) # tuple of our 2D Chebyshev points
-    values   = np.zeros((p,p))
-
-    """
-    Interp_loc = []
-    for i in range(p):
-        for j in range(p):
-            values[:,:] = 0
-            values[i,j] = 1
-            Interp_loc.append(interpn(cpoints, values, lroots2d.T, method='pchip'))
-
-    Interp_loc = np.column_stack(Interp_loc)
-    """
 
     # Vandermonde-based approach:
     Vc = polyvander2d(croots2d[0], croots2d[1], (p,p))
