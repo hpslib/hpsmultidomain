@@ -244,18 +244,16 @@ class Domain_Driver:
         self.sparse_assembly = sparse_assembly
         self.solver_type     = solver_type
         ########## sparse assembly ##########
-        if self.d==2:
-            if (sparse_assembly == 'reduced_cpu'):
-                device = torch.device('cpu')
-                tic = time()
-                self.A,assembly_time_dict    = self.hps.sparse_mat(device,verbose)
-                toc_assembly_tot = time() - tic
-            elif (sparse_assembly == 'reduced_gpu'):
-                device = torch.device('cuda')
-                tic = time()
-                self.A,assembly_time_dict    = self.hps.sparse_mat(device,verbose)
-                toc_assembly_tot = time() - tic
+        if (sparse_assembly == 'reduced_cpu'):
+            device = torch.device('cpu')
+        elif (sparse_assembly == 'reduced_gpu'):
+            device = torch.device('cuda')
 
+        tic = time()
+        self.A,assembly_time_dict = self.hps.sparse_mat(device,verbose)
+        toc_assembly_tot = time() - tic
+        
+        if self.d==2:
             csr_stor  = self.A.data.nbytes
             csr_stor += self.A.indices.nbytes + self.A.indptr.nbytes
             csr_stor /= 1e9

@@ -128,7 +128,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,pdo,
 
     if (mode == 'build'):
         
-        if (pdo.c12 is None):
+        if (pdo.c12 is None) and (d==2):
             S_tmp   = -torch.linalg.solve(Acc,Aloc[:,Jc][...,Jx])
             Irep    = torch.eye(Jx.shape[0],device=device).unsqueeze(0).repeat(box_end-box_start,1,1)
             S_full  = torch.concat((S_tmp,Irep),dim=1)
@@ -137,10 +137,10 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,pdo,
             DtN     = Nx[...,Jtot].unsqueeze(0) @ S_full
         else:
             S_tmp   = -torch.linalg.solve(Acc,Aloc[:,Jc][...,Jxreo])
-            Irep    = torch.eye(Jx.shape[0],device=device).unsqueeze(0).repeat(box_end-box_start,1,1)
+            Irep    = torch.eye(Jxreo.shape[0],device=device).unsqueeze(0).repeat(box_end-box_start,1,1)
             S_full  = torch.concat((S_tmp @ Intmap.unsqueeze(0),Irep),dim=1)
             
-            Jtot    = torch.hstack((Jc,Jx))
+            Jtot    = torch.hstack((Jc,Jxreo)) # Might be Jx instead of Jxreo
             DtN     = Nx[...,Jtot].unsqueeze(0) @ S_full
             
             #S_tmp   = -torch.linalg.solve(Acc,Aloc[:,Jc][...,Jxreo])
@@ -203,6 +203,8 @@ def get_DtNs_helper(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,pdo,\
                     box_start,box_end,chunk_init,device,mode,data,ff_body_func):
     nboxes = box_end - box_start
     size_face = (p-2)**(d-1)
+    if d==3:
+        size_face = p**2
     if (mode == 'build'):
         DtNs = torch.zeros(nboxes,2*d*size_face,2*d*size_face,device=device)
     elif (mode == 'solve'):

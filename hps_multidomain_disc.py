@@ -48,6 +48,8 @@ class HPS_Multidomain:
         self.p      = p
         self.a      = a
         self.d      = d
+
+        self.q = p
         
         n = (self.domain[:,1] - self.domain[:,0]) / (2*self.a)
         n = torch.round(n).int()
@@ -104,62 +106,79 @@ class HPS_Multidomain:
         - t_dict: Dictionary containing timing information for different parts of the matrix assembly process.
         """
         tic = time()
-        DtN_loc = self.get_DtNs(device,'build')
-        toc_DtN = time() - tic;
+        DtN_loc = self.get_DtNs(device,'build') # Tentatively think this is already good
+        toc_DtN = time() - tic
+        print(DtN_loc)
+        print(DtN_loc.shape)
         
-        size_face = self.p-2; size_ext = 4*size_face
-        n0,n1 = self.n
+        if self.d==2:
+            size_face = self.p-2; size_ext = 4*size_face
+            n0,n1 = self.n
+            nprod = n0*n1
+        else:
+            size_face = self.q**2; size_ext = 6*size_face
+            n0,n1,n2 = self.n
+            nprod=n0*n1*n2
         
-        tic = time()
-        Iext_box  = torch.arange(size_face).repeat(n0*n1,4).reshape(n0*n1,size_ext)
-        toc_alloc = time() - tic;
-        
-        tic = time()
-        # Go through range of n
-        for Npan_ind in range(n0):
-            # This increases in each level
-            npan_offset = (2*n1+1)*Npan_ind
+        if self.d==2:
+            tic = time()
+            Iext_box  = torch.arange(size_face).repeat(nprod,2*self.d).reshape(nprod,size_ext)
+            toc_alloc = time() - tic
             
-            for box_j in range(n1):
+            tic = time()
+            # Go through range of n
+            for Npan_ind in range(n0):
+                # This increases in each level
+                npan_offset = (2*n1+1)*Npan_ind
                 
-                box_ind = Npan_ind*n1 + box_j
-                
-                l_ind = npan_offset + box_j
-                r_ind = npan_offset + 2*n1 + 1 + box_j
-                d_ind = npan_offset + n1 + box_j
-                u_ind = npan_offset + n1 + box_j + 1
-                Iext_box[box_ind,:size_face]              += l_ind * size_face;
-                Iext_box[box_ind,size_face:2*size_face]   += r_ind * size_face;
-                Iext_box[box_ind,2*size_face:3*size_face] += d_ind * size_face;
-                Iext_box[box_ind,3*size_face:]            += u_ind * size_face
-        toc_index = time() - tic
+                for box_j in range(n1):
+                    
+                    box_ind = Npan_ind*n1 + box_j
+                    
+                    l_ind = npan_offset + box_j
+                    r_ind = npan_offset + 2*n1 + 1 + box_j
+                    d_ind = npan_offset + n1 + box_j
+                    u_ind = npan_offset + n1 + box_j + 1
+                    Iext_box[box_ind,:size_face]              += l_ind * size_face
+                    Iext_box[box_ind,size_face:2*size_face]   += r_ind * size_face
+                    Iext_box[box_ind,2*size_face:3*size_face] += d_ind * size_face
+                    Iext_box[box_ind,3*size_face:]            += u_ind * size_face
+            toc_index = time() - tic
+            
+            tic = time()
+            row_data,col_data = batched_meshgrid(n0*n1,size_ext,Iext_box,Iext_box)
+            
+            # LOOK HERE:
+            data = DtN_loc.flatten()
+            row_data = row_data.flatten()
+            col_data = col_data.flatten()
+            toc_flatten = time() - tic
+
+            toc_forloop = toc_index + toc_flatten + toc_alloc
+        else:
+            # For 3D, we're indexing box by box. Thus let's follow a similar approach here:
+            # We need an array
+            hmm = 1
         
-        tic = time()
-        row_data,col_data = batched_meshgrid(n0*n1,size_ext,Iext_box,Iext_box)
         
-        # LOOK HERE:
-        data = DtN_loc.flatten()
-        row_data = row_data.flatten()
-        col_data = col_data.flatten()
-        toc_flatten = time() - tic
-        
-        tic = time()
-        sp_mat = sp.coo_matrix(( np.array(data),\
-                                (np.array(row_data,dtype=int),np.array(col_data,dtype=int)))).tocsr()
-        sp_mat = sp_mat.tocsr()
-        toc_csr_scipy = time() - tic;
-        
-        toc_forloop = toc_index + toc_flatten + toc_alloc
-        
-        if (verbose):
-            print("\t--time to do for loop (alloc,index, flatten) (%5.2f,%5.2f,%5.2f)"\
-                  %(toc_alloc,toc_index,toc_flatten))
-            print("\t--time to assemble sparse HPS (DtN ops, for loop, csr_scipy) (%5.2f,%5.2f,%5.2f)"\
-                  %(toc_DtN,toc_forloop,toc_csr_scipy))
+        sp_mat = 0
+        if self.d==2:
+            tic = time()
+            sp_mat = sp.coo_matrix(( np.array(data),\
+                                    (np.array(row_data,dtype=int),np.array(col_data,dtype=int)))).tocsr()
+            sp_mat = sp_mat.tocsr()
+            toc_csr_scipy = time() - tic
+            
+            if (verbose) and (self.d==2):
+                print("\t--time to do for loop (alloc,index, flatten) (%5.2f,%5.2f,%5.2f)"\
+                    %(toc_alloc,toc_index,toc_flatten))
+                print("\t--time to assemble sparse HPS (DtN ops, for loop, csr_scipy) (%5.2f,%5.2f,%5.2f)"\
+                    %(toc_DtN,toc_forloop,toc_csr_scipy))
         t_dict = dict()
         t_dict['toc_DtN'] = toc_DtN
-        t_dict['toc_forloop'] = toc_forloop
-        t_dict['toc_sparse'] = toc_csr_scipy
+        if self.d==2:
+            t_dict['toc_forloop'] = toc_forloop
+            t_dict['toc_sparse'] = toc_csr_scipy
         return sp_mat,t_dict
     
     def get_grid(self):
@@ -368,8 +387,9 @@ class HPS_Multidomain:
         Jxreo = torch.tensor(self.H.JJ.Jxreorder).to(device)
         if d==3:
             Jxun  = torch.tensor(self.H.JJ.Jxunique).to(device)
-        Intmap= torch.tensor(self.H.Interp_mat).to(device)
-        Ds    = self.H.Ds.to(device)
+
+        Intmap = torch.tensor(self.H.Interp_mat).to(device)
+        Ds     = self.H.Ds.to(device)
         if (mode =='solve'):
             data = data.to(device)
 
