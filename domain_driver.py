@@ -187,6 +187,7 @@ class Domain_Driver:
         info_dict = dict()
         tmp = self.A_CC.tocsr()
         pA = PETSc.Mat().createAIJ(tmp.shape, csr=(tmp.indptr,tmp.indices,tmp.data),comm=PETSc.COMM_WORLD)
+        print("Created the PETSc matrix")
         
         ksp = PETSc.KSP().create(comm=PETSc.COMM_WORLD)
         ksp.setOperators(pA)
@@ -197,13 +198,15 @@ class Domain_Driver:
         
         px = PETSc.Vec().createWithArray(np.ones(tmp.shape[0]),comm=PETSc.COMM_WORLD)
         pb = PETSc.Vec().createWithArray(np.ones(tmp.shape[0]),comm=PETSc.COMM_WORLD)
-        
+
+        print("Initiated the ksp operator, still need to do a solve to break it in")        
         tic = time()
         ksp.solve(pb, px)
         toc_build = time() - tic
         if (verbose):
             print("\t--time for %s build through petsc = %5.2f seconds"\
                   % (solvertype,toc_build))
+        print("Broke it in!")
                
         info_dict['toc_build_blackbox']   = toc_build
         info_dict['solver_type']          = "petsc_"+solvertype
@@ -214,7 +217,7 @@ class Domain_Driver:
     # ONLY NEEDED FOR SPARSE SOLVE
     def build_blackboxsolver(self,solvertype,verbose):
         info_dict = dict()
-        
+        print("Made it to build_blackboxsolver")
         if (not self.periodic_bc):
             A_CC = self.A[self.I_Ctot][:,self.I_Ctot].tocsc()
             self.A_CC = A_CC
@@ -231,6 +234,7 @@ class Domain_Driver:
             
             A_CC = A_copy[np.ix_(self.I_Ctot_unique,self.I_Ctot_unique)].tocsc()
             self.A_CC = A_CC
+        print("Trimmed the unnecessary parts to make A_CC, now assembly with PETSc")
         if (not petsc_available):
             info_dict = self.build_superLU(verbose)
         else:
@@ -252,31 +256,30 @@ class Domain_Driver:
         tic = time()
         self.A,assembly_time_dict = self.hps.sparse_mat(device,verbose)
         toc_assembly_tot = time() - tic
+
+        csr_stor  = self.A.data.nbytes
+        csr_stor += self.A.indices.nbytes + self.A.indptr.nbytes
+        csr_stor /= 1e9
+        if (verbose):
+            print("SPARSE ASSEMBLY")
+            print("\t--time for (sparse assembly) (%5.2f) s"\
+                  % (toc_assembly_tot))
+            print("\t--memory for (A sparse) (%5.2f) GB"\
+                  % (csr_stor))
         
         if self.d==2:
-            csr_stor  = self.A.data.nbytes
-            csr_stor += self.A.indices.nbytes + self.A.indptr.nbytes
-            csr_stor /= 1e9
-            if (verbose):
-                print("SPARSE ASSEMBLY")
-                print("\t--time for (sparse assembly) (%5.2f) s"\
-                      % (toc_assembly_tot))
-                print("\t--memory for (A sparse) (%5.2f) GB"\
-                  % (csr_stor))
-
             assert self.ntot == self.A.shape[0]
             
         ########## sparse slab operations ##########
         info_dict = dict()
-        if self.d==2:
-            if (solver_type == 'slabLU'):
-                raise ValueError("not included in this version")
-            else:
-                info_dict = self.build_blackboxsolver(solver_type,verbose)
-                if ('toc_build_blackbox' in info_dict):
-                    info_dict['toc_build_blackbox'] += toc_assembly_tot
+        if (solver_type == 'slabLU'):
+            raise ValueError("not included in this version")
+        else:
+            info_dict = self.build_blackboxsolver(solver_type,verbose)
+            if ('toc_build_blackbox' in info_dict):
+                info_dict['toc_build_blackbox'] += toc_assembly_tot
                     
-            info_dict['toc_assembly'] = assembly_time_dict['toc_DtN']
+        info_dict['toc_assembly'] = assembly_time_dict['toc_DtN']
         return info_dict
                 
     # ONLY NEEDED FOR SPARSE SOLVE
@@ -345,12 +348,6 @@ class Domain_Driver:
         
         
     def solve(self,uu_dir_func,ff_body_func=None,known_sol=False):
-        """
-        print(self.I_Ctot)
-        print(self.I_Ctot.shape)
-        print(self.I_Xtot)
-        print(self.I_Xtot.shape)
-        """
         if self.d==2:
             if (self.solver_type == 'slabLU'):
                 raise ValueError("not included in this version")
@@ -369,14 +366,15 @@ class Domain_Driver:
             sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
             del sol
         else: # 3D
-            # This shape is total # of points on box edges in the domain, should be
-            # (p-2)^2 * ((n0+1) + (n1+1) + (n2+1))
-            #sol_tot   = torch.zeros((self.p-2)**2 * 3*(self.hps.n+1),1)
             size_ext = 6*(self.hps.p)**2
             sol_tot   = torch.zeros(len(self.hps.I_unique),1)
             rel_err   = 0
             toc_solve = 0
-            sol_tot[:] = uu_dir_func(self.hps.gauss_xx[self.hps.I_unique])
+            
+            sol_tot[self.I_Ctot] = uu_dir_func(self.hps.xx_active[self.I_Ctot])
+            # Here we set the true exterior to the given data:
+            sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
+            
         
         resloc_hps = torch.tensor([float('nan')])
         if (self.sparse_assembly == 'reduced_gpu'):
@@ -404,8 +402,6 @@ class Domain_Driver:
                 Jtot = torch.hstack((Jc,Jx))
                 true_err = torch.linalg.norm(sol_tot[:,Jtot]-uu_true[:,Jtot]) / torch.linalg.norm(uu_true[:,Jtot])
                 #true_err = torch.linalg.norm(sol_tot[:,Jx]-uu_true[:,Jx]) / torch.linalg.norm(uu_true[:,Jx])
-            print(sol_tot.shape)
-            print(uu_true.shape)
             del uu_true
             true_err = true_err.item()
 

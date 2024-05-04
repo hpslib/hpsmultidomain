@@ -157,7 +157,15 @@ class HPS_Multidomain:
             # For 3D, we're indexing box by box. Thus let's follow that approach here:
             tic = time()
             col_data = torch.arange(size_ext)
+            # Add one box worth to F, n2 box worth to U, n1*n2 box worth to L
+            # The idea is that this ensures all matrix entries correspond to boundary values in
+            # I_copy1 and not I_copy2
+            col_data[size_face:2*size_face]   += n1*n2*size_ext - size_face
+            col_data[3*size_face:4*size_face] += n2*size_ext - size_face
+            col_data[5*size_face:]            += size_ext - size_face
+
             col_data = col_data.repeat((size_ext,1))
+
             row_data = col_data.T
 
             box_range = size_ext * torch.arange(nprod)
@@ -171,17 +179,12 @@ class HPS_Multidomain:
             row_data = row_data.flatten()
             col_data = col_data.flatten()
             toc_flatten = time() - tic
-
-            # TODO: find all entries of row_data / col_data in I_copy2 and switch them into
-            # I_copy1
         
         
         tic = time()
         sp_mat = sp.coo_matrix(( np.array(data),(np.array(row_data,dtype=int),np.array(col_data,dtype=int)))).tocsr()
         sp_mat = sp_mat.tocsr()
         toc_csr_scipy = time() - tic
-
-        print(sp_mat)
 
         if self.d==2:
             if (verbose) and (self.d==2):
@@ -193,7 +196,7 @@ class HPS_Multidomain:
         t_dict['toc_DtN'] = toc_DtN
         if self.d==2:
             t_dict['toc_forloop'] = toc_forloop
-            t_dict['toc_sparse'] = toc_csr_scipy
+        t_dict['toc_sparse'] = toc_csr_scipy
         return sp_mat,t_dict
     
     def get_grid(self):
@@ -335,7 +338,7 @@ class HPS_Multidomain:
             I_unique[:,:,:-1,5*size_face:] = -1 # Eliminate front edges except frontmost
             I_unique = I_unique.flatten()
             I_unique = I_unique[I_unique > -1]
-            print("I_unique shape is " + str(I_unique.shape))
+            #print("I_unique shape is " + str(I_unique.shape))
             #print(I_unique)
 
             # For copy 1, we need to eliminate edges that make up domain boundary. This is just:
@@ -350,7 +353,7 @@ class HPS_Multidomain:
             I_copy1[:,:,0,4*size_face:5*size_face] = -1 # Eliminate back faces on back edge
             I_copy1 = I_copy1.flatten()
             I_copy1 = I_copy1[I_copy1 > -1]
-            print("I_copy1 shape is " + str(I_copy1.shape))
+            #print("I_copy1 shape is " + str(I_copy1.shape))
             #print(I_copy1)
 
             # For copy 2, we need to match relative indexing of copy 1 to easily copy from one to the other.
@@ -370,7 +373,7 @@ class HPS_Multidomain:
             I_copy2[:,:,0,4*size_face:5*size_face] = -1 # Eliminate back faces on back edge
             I_copy2 = I_copy2.flatten()
             I_copy2 = I_copy2[I_copy2 > -1]
-            print("I_copy2 shape is " + str(I_copy2.shape))
+            #print("I_copy2 shape is " + str(I_copy2.shape))
             #print(I_copy2)
 
         return I_unique,I_copy1,I_copy2
