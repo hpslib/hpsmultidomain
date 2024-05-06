@@ -117,12 +117,13 @@ def get_loc_interp_3d(p, q, a):
     Vc = polyvander2d(croots2d[0], croots2d[1], (p,p))
     Vl = polyvander2d(lroots2d[0], lroots2d[1], (q,q))
 
-    Interp_loc = np.linalg.lstsq(Vl.T,Vc.T,rcond=None)[0].T
+    Interp_loc_GtC = np.linalg.lstsq(Vl.T,Vc.T,rcond=None)[0].T
+    Interp_loc_CtG = np.linalg.lstsq(Vc.T,Vl.T,rcond=None)[0].T
 
-    cond = np.linalg.cond(Interp_loc)
+    cond = np.linalg.cond(Interp_loc_GtC)
     # TODO: get err
     err = 3.14159
-    return Interp_loc,err,cond
+    return Interp_loc_GtC,Interp_loc_CtG,err,cond
 
 #################################### 2D discretization ##########################################
 
@@ -385,31 +386,11 @@ class HPS_Disc:
                 % (q,cond,err,toc))
         else:
             tic = time()
-            Interp_loc,err,cond = get_loc_interp_3d(p, p, a)
-            self.Interp_mat = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc,0),6,axis=0))
+            Interp_loc_GtC,Interp_loc_CtG,err,cond = get_loc_interp_3d(p, p, a)
+            self.Interp_mat         = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_GtC,0),6,axis=0))
+            self.Interp_mat_reverse = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_CtG,0),6,axis=0))
 
-            # Form B, then projection operator P = VV^*
-            """
-            u, c = np.unique(self.JJ.Jxreorder, return_counts=True)
-            dup = u[c > 1]
-            B = []
-            for elem in dup:
-                where = np.argwhere(self.JJ.Jxreorder == elem)
-                Brows = np.zeros((len(where)-1, self.JJ.Jxreorder.shape[0]))
-                Brows[:,where[0]] = 1
-                for index in range(len(where[1:])):
-                    Brows[index,where[1+index]] = -1
-                B.append(Brows)
-            
-            B = np.vstack(B)
-            _, _, Vh = np.linalg.svd(B, full_matrices=True)
-            null_rank = B.shape[1] - B.shape[0]
-            Vh = Vh[:,-null_rank:]
-            P = Vh @ Vh.T
-            #print(B)
-            #print(B.shape)
-            #print(Vh.shape, P.shape)
-            """
+            # Form averaging operator P
             P = np.eye(self.Interp_mat.shape[0])
             for i in range(self.Interp_mat.shape[0]):
                 elem = self.JJ.Jxreorder[i]

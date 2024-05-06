@@ -115,7 +115,7 @@ def Aloc_acc(p, d, nboxes, xx_flat, Aloc, func, D, c=1.):
     Aloc     += f_vals * D.unsqueeze(0)
 
     
-def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,pdo,
+def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,pdo,
           box_start,box_end,device,mode,data,ff_body_func):
     if (d == 2):
         args = p,xxloc,Ds,pdo,box_start,box_end
@@ -139,9 +139,12 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,pdo,
             S_tmp   = -torch.linalg.solve(Acc,Aloc[:,Jc][...,Jxreo])
             Irep    = torch.eye(Jxreo.shape[0],device=device).unsqueeze(0).repeat(box_end-box_start,1,1)
             S_full  = torch.concat((S_tmp @ Intmap.unsqueeze(0),Irep),dim=1)
+            S_full = torch.concat((S_tmp,Irep),dim=1)
             
             Jtot    = torch.hstack((Jc,Jxreo)) # Might be Jx instead of Jxreo
             DtN     = Nx[...,Jtot].unsqueeze(0) @ S_full
+            if d==3:
+                DtN = Intmap_rev.unsqueeze(0) @ DtN
             
             #S_tmp   = -torch.linalg.solve(Acc,Aloc[:,Jc][...,Jxreo])
             #Irep    = torch.eye(Jxreo.shape[0],device=device).unsqueeze(0).repeat(box_end-box_start,1,1)
@@ -199,7 +202,7 @@ def get_DtN_chunksize(p,device):
     return int(chunk_max/4)
 
 
-def get_DtNs_helper(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,pdo,\
+def get_DtNs_helper(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,pdo,\
                     box_start,box_end,chunk_init,device,mode,data,ff_body_func):
     nboxes = box_end - box_start
     size_face = (p-2)**(d-1)
@@ -213,7 +216,7 @@ def get_DtNs_helper(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,pdo,\
         DtNs = torch.zeros(nboxes,2*d*size_face,1,device=device)
         
     chunk_size = chunk_init
-    args = p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,pdo
+    args = p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,pdo
     chunk_list = torch.zeros(int(nboxes/chunk_init)+100,device=device).int(); 
     box_curr = 0; nchunks = 0
     while(box_curr < nboxes):

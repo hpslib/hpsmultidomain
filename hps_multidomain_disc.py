@@ -164,6 +164,10 @@ class HPS_Multidomain:
             col_data[3*size_face:4*size_face] += n2*size_ext - size_face
             col_data[5*size_face:]            += size_ext - size_face
 
+            # This might cause problems for the RUF edges on the domain... should modify this to
+            # avoid accidentally hitting those. That said, these accidental hits should be on
+            # boundaries that aren't touched by A_CC anyway
+
             col_data = col_data.repeat((size_ext,1))
 
             row_data = col_data.T
@@ -185,6 +189,11 @@ class HPS_Multidomain:
         sp_mat = sp.coo_matrix(( np.array(data),(np.array(row_data,dtype=int),np.array(col_data,dtype=int)))).tocsr()
         sp_mat = sp_mat.tocsr()
         toc_csr_scipy = time() - tic
+
+        #import sys
+        #np.set_printoptions(threshold=sys.maxsize)
+        dense_mat = sp_mat.toarray()
+        print(dense_mat.shape)
 
         if self.d==2:
             if (verbose) and (self.d==2):
@@ -405,6 +414,7 @@ class HPS_Multidomain:
         Jxreo = torch.tensor(self.H.JJ.Jxreorder).to(device)
         if d==3:
             Jxun  = torch.tensor(self.H.JJ.Jxunique).to(device)
+            Intmap_rev = torch.tensor(self.H.Interp_mat_reverse).to(device)
 
         Intmap = torch.tensor(self.H.Interp_mat).to(device)
         Ds     = self.H.Ds.to(device)
@@ -413,9 +423,9 @@ class HPS_Multidomain:
 
         # Only need Jxun for 3D case:
         if d==2:    
-            args = p,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxreo,Ds,Intmap,pdo
+            args = p,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxreo,Ds,Intmap,Intmap,pdo
         else:
-            args = p,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxun,Ds,Intmap,pdo
+            args = p,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,pdo
         
         # reserve at most 1GB memory for stored DtNs at a time
         f = 0.8e9 # 0.8 GB in bytes

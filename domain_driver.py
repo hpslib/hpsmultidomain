@@ -219,8 +219,16 @@ class Domain_Driver:
         info_dict = dict()
         print("Made it to build_blackboxsolver")
         if (not self.periodic_bc):
-            A_CC = self.A[self.I_Ctot][:,self.I_Ctot].tocsc()
+            if self.d==2:
+                A_CC = self.A[self.I_Ctot][:,self.I_Ctot].tocsc()
+            else:
+                I_unique = self.hps.I_unique.detach().cpu().numpy()
+                A_CC = self.A[I_unique[self.I_Ctot]][:,I_unique[self.I_Ctot]].tocsc()
             self.A_CC = A_CC
+            #dense_A_CC = self.A_CC.toarray()
+            #print(dense_A_CC)
+            #print(dense_A_CC.shape)
+            #print(np.linalg.det(dense_A_CC))
         else:
             A_copy = self.A[np.ix_(self.I_Ctot,self.I_Ctot)].tolil()
             A_copy[np.ix_(self.I_Ctot_unique,self.I_Ctot_copy1)] += \
@@ -366,12 +374,16 @@ class Domain_Driver:
             sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
             del sol
         else: # 3D
-            size_ext = 6*(self.hps.p)**2
-            sol_tot   = torch.zeros(len(self.hps.I_unique),1)
-            rel_err   = 0
-            toc_solve = 0
+            if (self.solver_type == 'slabLU'):
+                raise ValueError("not included in this version")
+            else:
+                sol,rel_err,toc_solve = self.solve_helper_blackbox(uu_dir_func,ff_body_func)
+                #print(sol)
+
+            # self.A is black box matrix:
+            sol_tot = torch.zeros(len(self.hps.I_unique),1)
             
-            sol_tot[self.I_Ctot] = uu_dir_func(self.hps.xx_active[self.I_Ctot])
+            sol_tot[self.I_Ctot] = sol #uu_dir_func(self.hps.xx_active[self.I_Ctot])
             # Here we set the true exterior to the given data:
             sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
             
