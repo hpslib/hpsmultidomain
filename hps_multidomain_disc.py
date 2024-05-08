@@ -416,6 +416,7 @@ class HPS_Multidomain:
         if d==3:
             Jxun  = torch.tensor(self.H.JJ.Jxunique).to(device)
             Intmap_rev = torch.tensor(self.H.Interp_mat_reverse).to(device)
+            Intmap_unq = torch.tensor(self.H.Interp_mat_unique).to(device)
 
         Intmap = torch.tensor(self.H.Interp_mat).to(device)
         Ds     = self.H.Ds.to(device)
@@ -424,9 +425,9 @@ class HPS_Multidomain:
 
         # Only need Jxun for 3D case:
         if d==2:    
-            args = p,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxreo,Ds,Intmap,Intmap,pdo
+            args = p,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxreo,Ds,Intmap,Intmap,Intmap,pdo
         else:
-            args = p,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,pdo
+            args = p,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
         
         # reserve at most 1GB memory for stored DtNs at a time
         f = 0.8e9 # 0.8 GB in bytes

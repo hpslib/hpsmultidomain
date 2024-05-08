@@ -344,6 +344,7 @@ if d==3:
         uu_neumann[i,4*size_face:5*size_face] = -du3_true(xx_folded[i,4*size_face:5*size_face,:])
         uu_neumann[i,5*size_face:6*size_face] =  du3_true(xx_folded[i,5*size_face:6*size_face,:])
 
+    print("Relative error of Neumann computation is")
     print(torch.linalg.norm(uu_neumann_approx - uu_neumann) / torch.linalg.norm(uu_neumann))
 
     #print(uu_neumann.shape)

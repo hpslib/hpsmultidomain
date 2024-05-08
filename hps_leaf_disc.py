@@ -309,12 +309,12 @@ def get_diff_ops(Ds,JJ,d):
         Nx = np.concatenate((-Nl,+Nr,-Nd,+Nu))
     else: # Need to include corners here...
         Jtot = np.hstack((JJ.Jc,JJ.Jxreorder))
-        Nl = Ds.D1[JJ.Jlc]#[:,Jtot]
-        Nr = Ds.D1[JJ.Jrc]#[:,Jtot]
-        Nd = Ds.D2[JJ.Jdc]#[:,Jtot]
-        Nu = Ds.D2[JJ.Juc]#[:,Jtot]
-        Nb = Ds.D3[JJ.Jbc]#[:,Jtot]
-        Nf = Ds.D3[JJ.Jfc]#[:,Jtot]
+        Nl = Ds.D1[JJ.Jlc]
+        Nr = Ds.D1[JJ.Jrc]
+        Nd = Ds.D2[JJ.Jdc]
+        Nu = Ds.D2[JJ.Juc]
+        Nb = Ds.D3[JJ.Jbc]
+        Nf = Ds.D3[JJ.Jfc]
 
         Nx = np.concatenate((-Nl,+Nr,-Nd,+Nu,-Nb,+Nf))
     return Nx
@@ -397,10 +397,17 @@ class HPS_Disc:
                 where = np.argwhere(self.JJ.Jxreorder == elem)
                 P[i,where] = 1 / len(where)
 
+            # Delete rows of P corresponding to duplicate entries in Jxreorder
+            # I THINK these are just duplicate rows thanks to how P is formed:
+            Pnew = np.unique(P, axis=0)
+            print("Pnew is shape " + str(Pnew.shape))
+            #P = Pnew
+
             #print(P)
             
             # Apply this to our interpolation matrix to ensure continuity at corner nodes:
-            self.Interp_mat = P @ self.Interp_mat
+            self.Interp_mat_unique = Pnew @ self.Interp_mat # without redundant corners
+            self.Interp_mat        = P @ self.Interp_mat    # with
 
             toc = time() - tic
             print ("--Interp_mat has condition number %5.5f with error %5.5e and time to calculate %12.5f"\
