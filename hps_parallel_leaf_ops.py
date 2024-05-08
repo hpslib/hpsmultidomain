@@ -139,18 +139,11 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,pdo,
             S_tmp   = -torch.linalg.solve(Acc,Aloc[:,Jc][...,Jxreo])
             Irep    = torch.eye(Jxreo.shape[0],device=device).unsqueeze(0).repeat(box_end-box_start,1,1)
             S_full  = torch.concat((S_tmp @ Intmap.unsqueeze(0),Irep),dim=1)
-            S_full = torch.concat((S_tmp,Irep),dim=1)
             
             Jtot    = torch.hstack((Jc,Jxreo)) # Might be Jx instead of Jxreo
             DtN     = Nx[...,Jtot].unsqueeze(0) @ S_full
             if d==3:
                 DtN = Intmap_rev.unsqueeze(0) @ DtN
-            
-            #S_tmp   = -torch.linalg.solve(Acc,Aloc[:,Jc][...,Jxreo])
-            #Irep    = torch.eye(Jxreo.shape[0],device=device).unsqueeze(0).repeat(box_end-box_start,1,1)
-            #S_full  = torch.concat((S_tmp,Irep),dim=1) @ Intmap.unsqueeze(0)
-            #Jtot    = torch.hstack((Jc,Jxreo))
-            #DtN     = Nx[...,Jtot].unsqueeze(0) @ S_full
         return DtN
     elif (mode == 'solve'):
         

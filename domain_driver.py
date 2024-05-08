@@ -222,8 +222,15 @@ class Domain_Driver:
             if self.d==2:
                 A_CC = self.A[self.I_Ctot][:,self.I_Ctot].tocsc()
             else:
-                I_unique = self.hps.I_unique.detach().cpu().numpy()
-                A_CC = self.A[I_unique[self.I_Ctot]][:,I_unique[self.I_Ctot]].tocsc()
+                # Since the 3D A uses indices for the total boundary, we need to
+                # hit only indices in I_unique here:
+                #I_unique = self.hps.I_unique.detach().cpu().numpy()
+                #A_CC = self.A[I_unique[self.I_Ctot]][:,I_unique[self.I_Ctot]].tocsc()
+                I_copy1 = self.hps.I_copy1.detach().cpu().numpy()
+                I_copy2 = self.hps.I_copy2.detach().cpu().numpy()
+                A_CC = self.A[I_copy1][:,I_copy1].tocsc()
+                A_CC_add = self.A[I_copy2][:,I_copy2].tocsc()
+                A_CC = A_CC + A_CC_add
             self.A_CC = A_CC
             #dense_A_CC = self.A_CC.toarray()
             #print(dense_A_CC)
@@ -316,7 +323,7 @@ class Domain_Driver:
         
         return ff_body
     
-    # ONLY NEEDED FOR SPARSE SOLVE
+    # This takes our computed solution sol and plugs it into A to get the difference, A sol - f
     def solve_residual_calc(self,sol,ff_body):
         if (not self.periodic_bc):
             res = apply_sparse_lowmem(self.A,self.I_Ctot,self.I_Ctot,sol) - ff_body
@@ -386,7 +393,12 @@ class Domain_Driver:
             sol_tot[self.I_Ctot] = sol #uu_dir_func(self.hps.xx_active[self.I_Ctot])
             # Here we set the true exterior to the given data:
             sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
-            
+
+            #print(uu_dir_func(self.hps.xx_active[self.I_Ctot]))
+            #print(sol_tot[self.I_Ctot])
+
+            print("Relative error on unique boundary is:")
+            print(torch.linalg.norm(sol - uu_dir_func(self.hps.xx_active[self.I_Ctot])) / torch.linalg.norm(uu_dir_func(self.hps.xx_active[self.I_Ctot])))
         
         resloc_hps = torch.tensor([float('nan')])
         if (self.sparse_assembly == 'reduced_gpu'):

@@ -157,12 +157,13 @@ class HPS_Multidomain:
             # For 3D, we're indexing box by box. Thus let's follow that approach here:
             tic = time()
             col_data = torch.arange(size_ext)
+            
             # Add one box worth to F, n2 box worth to U, n1*n2 box worth to L
             # The idea is that this ensures all matrix entries correspond to boundary values in
             # I_copy1 and not I_copy2
-            col_data[size_face:2*size_face]   += n1*n2*size_ext - size_face
-            col_data[3*size_face:4*size_face] += n2*size_ext - size_face
-            col_data[5*size_face:]            += size_ext - size_face
+            #col_data[size_face:2*size_face]   += n1*n2*size_ext - size_face
+            #col_data[3*size_face:4*size_face] += n2*size_ext - size_face
+            #col_data[5*size_face:]            += size_ext - size_face
 
             # This might cause problems for the RUF edges on the domain... should modify this to
             # avoid accidentally hitting those. That said, these accidental hits should be on
@@ -192,8 +193,8 @@ class HPS_Multidomain:
 
         #import sys
         #np.set_printoptions(threshold=sys.maxsize)
-        dense_mat = sp_mat.toarray()
-        print(dense_mat.shape)
+        #dense_mat = sp_mat.toarray()
+        #print(dense_mat.shape)
 
         if self.d==2:
             if (verbose) and (self.d==2):

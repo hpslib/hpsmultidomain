@@ -290,7 +290,63 @@ if (d==3) and (args.test_components):
     print("Largest variance between redundant values is " + str(maxVar))
 
 
-#if d==3:
-#    print(dom.hps.H.JJ.Jxreorder.shape)
-#    print(dom.hps.H.JJ.Jxunique.shape)
+# Test the accuracy of I_copy1 and I_copy2:
+if d==3:
+    zz_copy1 = dom.hps.gauss_xx[dom.hps.I_copy1,:]
+    zz_copy2 = dom.hps.gauss_xx[dom.hps.I_copy2,:]
+    print("Numerical error of copy1 vs copy2 is:")
+    print(torch.linalg.norm(zz_copy1 - zz_copy2) / torch.linalg.norm(zz_copy1))
 
+# Test DtN_loc accuracy:
+if d==3:
+    # Here we'll test our DtN operators on a known function. First we define the known function and its
+    # first order derivatives:
+    def u_true(xx):
+        return torch.exp(xx[:,0]) * torch.sin(xx[:,1])
+    
+    def du1_true(xx):
+        return torch.exp(xx[:,0]) * torch.sin(xx[:,1])
+    
+    def du2_true(xx):
+        return torch.exp(xx[:,0]) * torch.cos(xx[:,1])
+    
+    def du3_true(xx):
+        return torch.zeros((xx.shape[0]))
+
+    size_face = dom.hps.p**2
+    size_ext = 6 * size_face
+
+    # Now we get our DtN maps. These don't depend on u_true
+    device = torch.device('cpu')
+    DtN_loc = dom.hps.get_DtNs(device,'build')
+
+    # Here we get our dirichlet data, reshape it, and then multiply with DtNs to get our Neumann data
+    uu_dir_gauss = u_true(dom.hps.gauss_xx)
+    uu_dir_gauss = torch.reshape(uu_dir_gauss, (DtN_loc.shape[0],-1))
+    uu_dir_gauss = torch.unsqueeze(uu_dir_gauss, -1)
+    print(DtN_loc.shape)
+    print(uu_dir_gauss.shape)
+
+    uu_neumann_approx = torch.matmul(DtN_loc, uu_dir_gauss)
+    uu_neumann_approx = torch.squeeze(uu_neumann_approx)
+    print(uu_neumann_approx.shape)
+
+    # Next we fold our spatial inputs and compute our actual neumann data:
+    xx_folded = torch.reshape(dom.hps.gauss_xx, (DtN_loc.shape[0],DtN_loc.shape[1], -1))
+    print(xx_folded.shape)
+
+    uu_neumann = torch.zeros((xx_folded.shape[0], xx_folded.shape[1]))
+    for i in range(xx_folded.shape[0]):
+        uu_neumann[i,:size_face]              = -du1_true(xx_folded[i,:size_face,:])
+        uu_neumann[i,size_face:2*size_face]   =  du1_true(xx_folded[i,size_face:2*size_face,:])
+        uu_neumann[i,2*size_face:3*size_face] = -du2_true(xx_folded[i,2*size_face:3*size_face,:])
+        uu_neumann[i,3*size_face:4*size_face] =  du2_true(xx_folded[i,3*size_face:4*size_face,:])
+        uu_neumann[i,4*size_face:5*size_face] = -du3_true(xx_folded[i,4*size_face:5*size_face,:])
+        uu_neumann[i,5*size_face:6*size_face] =  du3_true(xx_folded[i,5*size_face:6*size_face,:])
+
+    print(torch.linalg.norm(uu_neumann_approx - uu_neumann) / torch.linalg.norm(uu_neumann))
+
+    #print(uu_neumann.shape)
+    #print(uu_neumann_approx[0,:])
+    #print(uu_neumann[0,:])
+    #print(dom.hps.gauss_xx)
