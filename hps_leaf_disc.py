@@ -309,12 +309,12 @@ def get_diff_ops(Ds,JJ,d):
         Nx = np.concatenate((-Nl,+Nr,-Nd,+Nu))
     else: # Need to include corners here...
         Jtot = np.hstack((JJ.Jc,JJ.Jxreorder))
-        Nl = Ds.D1[JJ.Jlc][:,Jtot]
-        Nr = Ds.D1[JJ.Jrc][:,Jtot]
-        Nd = Ds.D2[JJ.Jdc][:,Jtot]
-        Nu = Ds.D2[JJ.Juc][:,Jtot]
-        Nb = Ds.D3[JJ.Jbc][:,Jtot]
-        Nf = Ds.D3[JJ.Jfc][:,Jtot]
+        Nl = Ds.D1[JJ.Jlc]#[:,Jtot]
+        Nr = Ds.D1[JJ.Jrc]#[:,Jtot]
+        Nd = Ds.D2[JJ.Jdc]#[:,Jtot]
+        Nu = Ds.D2[JJ.Juc]#[:,Jtot]
+        Nb = Ds.D3[JJ.Jbc]#[:,Jtot]
+        Nf = Ds.D3[JJ.Jfc]#[:,Jtot]
 
         Nx = np.concatenate((-Nl,+Nr,-Nd,+Nu,-Nb,+Nf))
     return Nx
