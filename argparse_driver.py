@@ -121,7 +121,7 @@ elif ( (args.pde).startswith('bfield')):
         # var coeff Helmholtz operator
         op = pdo.PDO_2d(pdo.ones,pdo.ones,c=c)
         if d==3:
-            op = pdo.PDO_3d(pdo.ones,pdo.ones,c=c)
+            op = pdo.PDO_3d(pdo.ones,pdo.ones,pdo.ones,c=c)
         
     elif (args.domain == 'curved'):
         
@@ -268,7 +268,7 @@ if (args.pickle is not None):
 ################################# EVALUATING SYSTEM COMPONENTS ###################################
 # Evaluate certain parts of the 3D problem 
 
-if (d==3) and (args.test_components):
+if (d==3):
     # First we generate the arrays of Chebyshev and Gaussian nodes:
     cheb_ext  = torch.from_numpy(dom.hps.H.zz.T[dom.hps.H.JJ.Jxreorder])
     gauss_ext = torch.from_numpy(dom.hps.H.zzG)
@@ -324,16 +324,16 @@ if d==3:
     uu_dir_gauss = u_true(dom.hps.gauss_xx)
     uu_dir_gauss = torch.reshape(uu_dir_gauss, (DtN_loc.shape[0],-1))
     uu_dir_gauss = torch.unsqueeze(uu_dir_gauss, -1)
-    print(DtN_loc.shape)
-    print(uu_dir_gauss.shape)
+    #print(DtN_loc.shape)
+    #print(uu_dir_gauss.shape)
 
     uu_neumann_approx = torch.matmul(DtN_loc, uu_dir_gauss)
     uu_neumann_approx = torch.squeeze(uu_neumann_approx)
-    print(uu_neumann_approx.shape)
+    #print(uu_neumann_approx.shape)
 
     # Next we fold our spatial inputs and compute our actual neumann data:
     xx_folded = torch.reshape(dom.hps.gauss_xx, (DtN_loc.shape[0],DtN_loc.shape[1], -1))
-    print(xx_folded.shape)
+    #print(xx_folded.shape)
 
     uu_neumann = torch.zeros((xx_folded.shape[0], xx_folded.shape[1]))
     for i in range(xx_folded.shape[0]):

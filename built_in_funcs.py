@@ -137,7 +137,8 @@ def uu_dir_func_greens(d,xx,kh,center=torch.tensor([-0.1,+0.,+0.2])):
             uu_exact = (1j/4) * hankel1(0,kh*dist_x)
             uu_exact = np.real(uu_exact)
         else:
-            print("Oops, need to add 3d for kh != 0.")
+            dist_x = np.sqrt(ddsq)
+            uu_exact = np.cos(kh * dist_x) / (4*np.pi * dist_x)
     return uu_exact.unsqueeze(-1)
 
 def ff_body_pulse(xx,kh):

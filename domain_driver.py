@@ -199,14 +199,14 @@ class Domain_Driver:
         px = PETSc.Vec().createWithArray(np.ones(tmp.shape[0]),comm=PETSc.COMM_WORLD)
         pb = PETSc.Vec().createWithArray(np.ones(tmp.shape[0]),comm=PETSc.COMM_WORLD)
 
-        print("Initiated the ksp operator, still need to do a solve to break it in")        
+        #print("Initiated the ksp operator, still need to do a solve to break it in")        
         tic = time()
         ksp.solve(pb, px)
         toc_build = time() - tic
         if (verbose):
             print("\t--time for %s build through petsc = %5.2f seconds"\
                   % (solvertype,toc_build))
-        print("Broke it in!")
+        #print("Broke it in!")
                
         info_dict['toc_build_blackbox']   = toc_build
         info_dict['solver_type']          = "petsc_"+solvertype
@@ -390,7 +390,7 @@ class Domain_Driver:
             # self.A is black box matrix:
             sol_tot = torch.zeros(len(self.hps.I_unique),1)
             
-            sol_tot[self.I_Ctot] = sol #uu_dir_func(self.hps.xx_active[self.I_Ctot])
+            sol_tot[self.I_Ctot] = uu_dir_func(self.hps.xx_active[self.I_Ctot])
             # Here we set the true exterior to the given data:
             sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
 
