@@ -391,7 +391,7 @@ class HPS_Multidomain:
     
     ########################################## DtN multidomain build and solve ###################################
         
-    def get_DtNs(self,device,mode='build',data=0,ff_body_func=None):
+    def get_DtNs(self,device,mode='build',data=0,ff_body_func=None,uu_true=None):
         a = self.a; p = self.p; nboxes = self.nboxes; d = self.d
         pdo = self.pdo
         
@@ -440,7 +440,7 @@ class HPS_Multidomain:
             #print("Indices: " + str(j*chunk_size) + " to " + str((j+1)*chunk_size))
             DtNs[j*chunk_size:(j+1)*chunk_size],Aloc_chunklist = \
             leaf_ops.get_DtNs_helper(*args,j*chunk_size,(j+1)*chunk_size, Aloc_chunkinit,device,\
-                                    mode,data,ff_body_func)
+                                    mode,data,ff_body_func,uu_true)
 
             if Aloc_chunklist.shape[0] > 2:
                 Aloc_chunkinit = int(Aloc_chunklist[-2])
@@ -452,12 +452,12 @@ class HPS_Multidomain:
         return DtNs
 
     # Input: uu_sol on I_unique
-    def solve(self,device,uu_sol,ff_body_func=None):
+    def solve(self,device,uu_sol,ff_body_func=None,uu_true=None):
         nrhs     = uu_sol.shape[-1] # almost always 1, guessing this if for solving multiple rhs in parallel
 
         size_ext = 4*(self.p-2)
         if self.d==3:
-            size_ext = 6*(self.p)**2
+            size_ext = 6*(self.p**2)
 
         nboxes   = torch.prod(self.n)
         uu_sol   = uu_sol.to(device)
@@ -468,10 +468,19 @@ class HPS_Multidomain:
         
         uu_sol_bnd = uu_sol_bnd.reshape(nboxes,size_ext,nrhs)
         #print(uu_sol_bnd)
-        uu_sol_tot = self.get_DtNs(device,mode='solve',data=uu_sol_bnd,ff_body_func=ff_body_func)
+        uu_sol_tot = self.get_DtNs(device,mode='solve',data=uu_sol_bnd,ff_body_func=ff_body_func,uu_true=uu_true)
         #print(uu_sol_tot)
         
         uu_sol_flat = uu_sol_tot[...,:nrhs].flatten(start_dim=0,end_dim=-2)
+
+        #print(uu_sol_tot[...,nrhs:].shape)
+        #print("Residual on boundary:")
+        #print(uu_sol_tot[:,self.H.JJ.Jxunique,nrhs:])
+        #print("Max is " + str(torch.max(uu_sol_tot[:,self.H.JJ.Jxunique,nrhs:])))
+        #print("Residual on interior. Shape is " + str(uu_sol_tot[:,self.H.JJ.Jc,nrhs:].shape))
+        #print(uu_sol_tot[:,self.H.JJ.Jc,nrhs:])
+        #print("Max is " + str(torch.max(uu_sol_tot[:,self.H.JJ.Jc,nrhs:])))
+
         resvec_blocks = torch.linalg.norm(uu_sol_tot[...,nrhs:])
         res_lochps = torch.max(resvec_blocks).item()
         return uu_sol_flat, res_lochps

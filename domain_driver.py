@@ -390,6 +390,7 @@ class Domain_Driver:
             # self.A is black box matrix:
             sol_tot = torch.zeros(len(self.hps.I_unique),1)
             
+            # Replace this with sol to do full system solve:
             sol_tot[self.I_Ctot] = uu_dir_func(self.hps.xx_active[self.I_Ctot])
             # Here we set the true exterior to the given data:
             sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
@@ -406,7 +407,13 @@ class Domain_Driver:
         else:
             device = torch.device('cpu')
         tic = time()
-        sol_tot,resloc_hps = self.hps.solve(device,sol_tot,ff_body_func=ff_body_func)
+
+        GridX = self.hps.grid_xx.clone()
+        uu_true = torch.zeros((GridX.shape[0], GridX.shape[1],1))
+        for i in range(GridX.shape[0]):
+            uu_true[i] = uu_dir_func(GridX[i])
+        
+        sol_tot,resloc_hps = self.hps.solve(device,sol_tot,ff_body_func=ff_body_func,uu_true=uu_true)
         toc_solve += time() - tic
         sol_tot = sol_tot.cpu()
 

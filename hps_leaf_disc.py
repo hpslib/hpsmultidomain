@@ -18,7 +18,8 @@ JJ_2d    = namedtuple('JJ_2d', ['Jl','Jr','Jd','Ju','Jx','Jc','Jxreorder'])
 Pdo_3d = namedtuple('Pdo_3d', ['c11', 'c22', 'c33', 'c12', 'c13', 'c23', 'c1', 'c2', 'c3', 'c'])
 Ds_3d  = namedtuple('Ds_3d',  ['D11', 'D22', 'D33', 'D12', 'D13', 'D23', 'D1', 'D2', 'D3'])
 JJ_3d  = namedtuple('JJ_3d',  ['Jl', 'Jr', 'Jd', 'Ju', 'Jb', 'Jf', 'Jx', 'Jlc', 'Jrc', 'Jdc',
-                               'Juc', 'Jbc', 'Jfc', 'Jxreorder', 'Jxunique', 'Jc', 'Jtot'])
+                               'Juc', 'Jbc', 'Jfc', 'Jxreorder', 'Jxunique', 'Jc', 'Jtot',
+                               'unique_in_reorder'])
 
 def cheb(p):
     """
@@ -281,7 +282,7 @@ def leaf_discretization_3d(a,p):
 
     # TODO: figure out corners / switch to Legendre for this
     Jxreorder = np.concatenate((Jl_corner,Jr_corner,Jd_corner,Ju_corner,Jb_corner,Jf_corner))
-    Jxunique  = np.unique(Jxreorder)
+    Jxunique, unique_in_reorder  = np.unique(Jxreorder, return_index=True)
     Jtot  = np.concatenate((Jx,Jc))
 
     # Take only necessary surface values for Gaussian nodes:
@@ -296,7 +297,8 @@ def leaf_discretization_3d(a,p):
     JJ    = JJ_3d(Jl= Jl, Jr= Jr, Ju= Ju, Jd= Jd, Jb= Jb, Jf=Jf, Jx=Jx,
                   Jlc=Jl_corner, Jrc=Jr_corner, Jdc=Jd_corner,
                   Juc=Ju_corner, Jbc=Jb_corner, Jfc=Jf_corner,
-                  Jxreorder=Jxreorder, Jxunique=Jxunique, Jc=Jc, Jtot=Jtot)
+                  Jxreorder=Jxreorder, Jxunique=Jxunique, Jc=Jc, Jtot=Jtot,
+                  unique_in_reorder = unique_in_reorder)
     return zz,Ds,JJ,hmin,zzG
 
 def get_diff_ops(Ds,JJ,d):
@@ -397,13 +399,8 @@ class HPS_Disc:
                 where = np.argwhere(self.JJ.Jxreorder == elem)
                 P[i,where] = 1 / len(where)
 
-            # Delete rows of P corresponding to duplicate entries in Jxreorder
-            # I THINK these are just duplicate rows thanks to how P is formed:
-            Pnew = np.unique(P, axis=0)
-            print("Pnew is shape " + str(Pnew.shape))
-            #P = Pnew
-
-            #print(P)
+            # Delete rows of P corresponding to duplicate entries in Jxreorder:
+            Pnew = P[self.JJ.unique_in_reorder,:]
             
             # Apply this to our interpolation matrix to ensure continuity at corner nodes:
             self.Interp_mat_unique = Pnew @ self.Interp_mat # without redundant corners

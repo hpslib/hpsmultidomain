@@ -118,7 +118,7 @@ def uu_dir_pulse(xx,kh):
     uu_dir[inds_left] = c * torch.exp( - width * (xx[inds_left,1] - 0.5)**2).unsqueeze(-1)
     return uu_dir
 
-def uu_dir_func_greens(d,xx,kh,center=torch.tensor([-0.1,+0.,+0.2])):
+def uu_dir_func_greens(d,xx,kh,center=torch.tensor([-1.1,+1.,+1.2])):
     
     dd0 = xx[:,0] - center[0]
     dd1 = xx[:,1] - center[1]

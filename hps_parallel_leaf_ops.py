@@ -116,7 +116,7 @@ def Aloc_acc(p, d, nboxes, xx_flat, Aloc, func, D, c=1.):
 
     
 def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
-          box_start,box_end,device,mode,data,ff_body_func):
+          box_start,box_end,device,mode,data,ff_body_func,uu_true):
     if (d == 2):
         args = p,xxloc,Ds,pdo,box_start,box_end
         Aloc = get_Aloc_2d(*args,device)
@@ -141,7 +141,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             S_full  = torch.concat((S_tmp @ Intmap_unq.unsqueeze(0),Irep),dim=1)
             
             Jtot    = torch.hstack((Jc,Jxreo)) # Might be Jx instead of Jxreo
-            DtN     = Nx[...,Jtot].unsqueeze(0) @ S_full
+            DtN     = Nx[:,Jtot].unsqueeze(0) @ S_full
             if d==3:
                 DtN = Intmap_rev.unsqueeze(0) @ DtN
         return DtN
@@ -159,7 +159,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         if d==2:
             uu_sol[:,Jxreo,:nrhs] = Intmap.unsqueeze(0) @ data[box_start:box_end]
         else:
-            uu_sol[:,Jxreo,:nrhs] = Intmap.unsqueeze(0) @ data[box_start:box_end]
+            uu_sol[:,Jxun,:nrhs] = Intmap_unq.unsqueeze(0) @ data[box_start:box_end]
 
         if (pdo.c12 is None) and (d==2):
             #print(nrhs)
@@ -173,7 +173,10 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc][...,Jxun] @ uu_sol[:,Jxun,:nrhs])
             
         # calculate residual
-        uu_sol[:,Jc,nrhs:] = Aloc[:,Jc] @ uu_sol[...,:nrhs] - f_body
+        if uu_true is None:
+            uu_sol[:,Jc,nrhs:] = Aloc[:,Jc] @ uu_sol[...,:nrhs] - f_body
+        else:
+            uu_sol[:,Jc,nrhs:] = Aloc[:,Jc] @ uu_true[box_start:box_end] - f_body
         return uu_sol
                                                       
     elif (mode == 'reduce_body'):
@@ -196,7 +199,7 @@ def get_DtN_chunksize(p,device):
 
 
 def get_DtNs_helper(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,\
-                    box_start,box_end,chunk_init,device,mode,data,ff_body_func):
+                    box_start,box_end,chunk_init,device,mode,data,ff_body_func,uu_true):
     nboxes = box_end - box_start
     size_face = (p-2)**(d-1)
     if d==3:
@@ -217,7 +220,7 @@ def get_DtNs_helper(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_un
         b1 = box_curr + box_start
         b2 = np.min([box_end, b1 + chunk_size])
         
-        tmp = form_DtNs(*args,b1,b2,device,mode,data,ff_body_func)
+        tmp = form_DtNs(*args,b1,b2,device,mode,data,ff_body_func,uu_true)
         
         DtNs[box_curr:box_curr + chunk_size] = tmp
         box_curr += chunk_size
