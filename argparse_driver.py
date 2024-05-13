@@ -90,7 +90,7 @@ elif ( (args.pde).startswith('bfield')):
         raise ValueError('ppw and nwaves both set')
     elif (ppw_set):
         nwaves = int(n/args.ppw)
-        kh = (nwaves+0.03)*2*np.pi+1.8;
+        kh = (nwaves+0.03)*2*np.pi+1.8 # This wrong for 3d?
     else:
         nwaves = args.nwaves
         kh = (nwaves)*2*np.pi
@@ -151,7 +151,9 @@ else:
 if (args.p is None):
     raise ValueError('HPS selected but p not provided')
 p = args.p
-npan = n / (p-2); a = 1/(2*npan)
+npan = n / (p-2)
+a = 1/(2*npan)
+
 dom = Domain_Driver(box_geom,op,\
                     kh,a,p=p,d=d,periodic_bc = args.periodic_bc)
 N = (p-2) * (p*dom.hps.n[0]*dom.hps.n[1] + dom.hps.n[0] + dom.hps.n[1])
@@ -240,7 +242,7 @@ elif (args.solver == 'superLU'):
 else:
 
     uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
-    #uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
+    uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
 
     print("\t--Builtin solver %s solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\
           %(args.solver,res,true_res,resloc_hps,toc_solve))
@@ -267,7 +269,7 @@ if (args.pickle is not None):
 
 ################################# EVALUATING SYSTEM COMPONENTS ###################################
 # Evaluate certain parts of the 3D problem 
-
+"""
 if (d==3):
     # First we generate the arrays of Chebyshev and Gaussian nodes:
     cheb_ext  = torch.from_numpy(dom.hps.H.zz.T[dom.hps.H.JJ.Jxreorder])
@@ -351,3 +353,4 @@ if d==3:
     #print(uu_neumann_approx[0,:])
     #print(uu_neumann[0,:])
     #print(dom.hps.gauss_xx)
+"""

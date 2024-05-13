@@ -441,7 +441,11 @@ class HPS_Multidomain:
             DtNs[j*chunk_size:(j+1)*chunk_size],Aloc_chunklist = \
             leaf_ops.get_DtNs_helper(*args,j*chunk_size,(j+1)*chunk_size, Aloc_chunkinit,device,\
                                     mode,data,ff_body_func)
-            Aloc_chunkinit = int(Aloc_chunklist[-2])
+
+            if Aloc_chunklist.shape[0] > 2:
+                Aloc_chunkinit = int(Aloc_chunklist[-2])
+            else:
+                Aloc_chunkinit = int(Aloc_chunklist[0])
         #print("DtNs interior = " + str(DtNs[:,Jc]))
         #print("DtNs exterior = " + str(DtNs[:,Jx]))
         #print("Whole DtN = " + str(DtNs))
