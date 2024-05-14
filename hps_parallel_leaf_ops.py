@@ -117,11 +117,10 @@ def Aloc_acc(p, d, nboxes, xx_flat, Aloc, func, D, c=1.):
     
 def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
           box_start,box_end,device,mode,data,ff_body_func,uu_true):
+    args = p,xxloc,Ds,pdo,box_start,box_end
     if (d == 2):
-        args = p,xxloc,Ds,pdo,box_start,box_end
         Aloc = get_Aloc_2d(*args,device)
     else:
-        args = p,xxloc,Ds,pdo,box_start,box_end
         Aloc = get_Aloc_3d(*args,device)
     Acc = Aloc[:,Jc,:][:,:,Jc]
     nrhs = data.shape[-1]
@@ -136,12 +135,13 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             
             DtN     = Nx[...,Jtot].unsqueeze(0) @ S_full
         else:
-            S_tmp   = -torch.linalg.solve(Acc,Aloc[:,Jc][...,Jxun]) # Should this be Jxun? Seems different from solve
-            Irep    = torch.eye(Jxreo.shape[0],device=device).unsqueeze(0).repeat(box_end-box_start,1,1)
-            S_full  = torch.concat((S_tmp @ Intmap_unq.unsqueeze(0),Irep),dim=1)
+            S_tmp   = -torch.linalg.solve(Acc,Aloc[:,Jc][...,Jxun]) # Should append Identity here and not repeat Intmap
+            Intmap_repeat = Intmap_unq.unsqueeze(0).repeat(box_end-box_start,1,1)
+            S_full        = torch.concat((S_tmp @ Intmap_unq.unsqueeze(0),Intmap_repeat),dim=1)
             
-            Jtot    = torch.hstack((Jc,Jxreo)) # Might be Jx instead of Jxreo
+            Jtot    = torch.hstack((Jc,Jxun))
             DtN     = Nx[:,Jtot].unsqueeze(0) @ S_full
+            print(DtN.shape)
             if d==3:
                 DtN = Intmap_rev.unsqueeze(0) @ DtN
         return DtN

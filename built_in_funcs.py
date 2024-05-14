@@ -130,7 +130,7 @@ def uu_dir_func_greens(d,xx,kh,center=torch.tensor([-1.1,+1.,+1.2])):
         if d==2:
             uu_exact = (1/np.pi) * np.log(ddsq)
         else:
-            uu_exact = (1 / (4*np.pi)) * (1 / np.sqrt(ddsq))
+            uu_exact = 1 / (4 * np.pi * np.sqrt(ddsq))
     else:
         if d==2:
             dist_x = np.sqrt(ddsq)
@@ -140,6 +140,20 @@ def uu_dir_func_greens(d,xx,kh,center=torch.tensor([-1.1,+1.,+1.2])):
             dist_x = np.sqrt(ddsq)
             uu_exact = np.cos(kh * dist_x) / (4*np.pi * dist_x)
     return uu_exact.unsqueeze(-1)
+
+def du_dir_func_greens(deriv,d,xx,kh,center=torch.tensor([-1.1,+1.,+1.2])):
+    if d==2:
+        print("Error! This is only for d=3")
+    dd0 = xx[:,0] - center[0]
+    dd1 = xx[:,1] - center[1]
+    dd2 = xx[:,2] - center[2]
+    ddsq = np.multiply(dd0,dd0) + np.multiply(dd1,dd1) + np.multiply(dd2,dd2)
+    if kh==0:
+        dd = np.sqrt(ddsq)
+        du_exact = -(xx[:,deriv] - center[deriv]) / (4*np.pi * dd**3)
+        return du_exact
+    else:
+        print("Error! Not set for Helmholtz yet")
 
 def ff_body_pulse(xx,kh):
     

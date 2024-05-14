@@ -157,6 +157,14 @@ a = 1/(2*npan)
 dom = Domain_Driver(box_geom,op,\
                     kh,a,p=p,d=d,periodic_bc = args.periodic_bc)
 N = (p-2) * (p*dom.hps.n[0]*dom.hps.n[1] + dom.hps.n[0] + dom.hps.n[1])
+"""
+print("PDO:")
+from pprint import pprint
+pprint(vars(op))
+import inspect
+print(inspect.getsource(op.c))
+print(inspect.getsource(bfield))
+"""
 
 ################################# BUILD OPERATOR #########################
 # Build operator based on specified parameters and solver information
@@ -269,19 +277,23 @@ if (args.pickle is not None):
 
 ################################# EVALUATING SYSTEM COMPONENTS ###################################
 # Evaluate certain parts of the 3D problem 
-"""
-if (d==3):
+
+if (d==3 and 1==0):
     # First we generate the arrays of Chebyshev and Gaussian nodes:
     cheb_ext  = torch.from_numpy(dom.hps.H.zz.T[dom.hps.H.JJ.Jxreorder])
     gauss_ext = torch.from_numpy(dom.hps.H.zzG)
 
     uu_cheb  = uu_dir(cheb_ext)
     uu_gauss = uu_dir(gauss_ext)
-    uu_inter = torch.from_numpy(dom.hps.H.Interp_mat) @ uu_gauss
+    uu_interC = torch.from_numpy(dom.hps.H.Interp_mat) @ uu_gauss
+    uu_interG = torch.from_numpy(dom.hps.H.Interp_mat_reverse) @ uu_cheb
 
-    print("Relative error of interpolation is:")
-    print(torch.norm(uu_cheb - uu_inter) / torch.norm(uu_cheb))
+    print("Relative error of Gaussian-to-Chebyshev interpolation is:")
+    print(torch.norm(uu_cheb - uu_interC) / torch.norm(uu_cheb))
+    print("Relative error of Chebyshev-to-Gaussian interpolation is:")
+    print(torch.norm(uu_gauss - uu_interG) / torch.norm(uu_gauss))
 
+    """
     # Check if edges / corners are equal as expected:
     u, c = np.unique(dom.hps.H.JJ.Jxreorder, return_counts=True)
     dup = u[c > 1]
@@ -290,10 +302,11 @@ if (d==3):
         variance = torch.std(uu_inter[dom.hps.H.JJ.Jxreorder == elem])
         maxVar = np.max([maxVar, variance.item()])
     print("Largest variance between redundant values is " + str(maxVar))
+    """
 
 
 # Test the accuracy of I_copy1 and I_copy2:
-if d==3:
+if (d==3 and 1==0):
     zz_copy1 = dom.hps.gauss_xx[dom.hps.I_copy1,:]
     zz_copy2 = dom.hps.gauss_xx[dom.hps.I_copy2,:]
     print("Numerical error of copy1 vs copy2 is:")
@@ -302,18 +315,22 @@ if d==3:
 # Test DtN_loc accuracy:
 if d==3:
     # Here we'll test our DtN operators on a known function. First we define the known function and its
-    # first order derivatives:
+    # first order derivatives (this test is for Laplace only):
     def u_true(xx):
-        return torch.exp(xx[:,0]) * torch.sin(xx[:,1])
+        #return torch.exp(xx[:,0]) * torch.sin(xx[:,1])
+        return uu_dir_func_greens(3,xx,0)
     
     def du1_true(xx):
-        return torch.exp(xx[:,0]) * torch.sin(xx[:,1])
+        #return torch.exp(xx[:,0]) * torch.sin(xx[:,1])
+        return du_dir_func_greens(0,3,xx,0)
     
     def du2_true(xx):
-        return torch.exp(xx[:,0]) * torch.cos(xx[:,1])
+        #return torch.exp(xx[:,0]) * torch.cos(xx[:,1])
+        return du_dir_func_greens(1,3,xx,0)
     
     def du3_true(xx):
-        return torch.zeros((xx.shape[0]))
+        #return torch.zeros((xx.shape[0]))
+        return du_dir_func_greens(2,3,xx,0)
 
     size_face = dom.hps.p**2
     size_ext = 6 * size_face
@@ -324,10 +341,12 @@ if d==3:
 
     # Here we get our dirichlet data, reshape it, and then multiply with DtNs to get our Neumann data
     uu_dir_gauss = u_true(dom.hps.gauss_xx)
+    print(uu_dir_gauss.shape)
     uu_dir_gauss = torch.reshape(uu_dir_gauss, (DtN_loc.shape[0],-1))
+    print(uu_dir_gauss.shape)
     uu_dir_gauss = torch.unsqueeze(uu_dir_gauss, -1)
-    #print(DtN_loc.shape)
-    #print(uu_dir_gauss.shape)
+    print(DtN_loc.shape)
+    print(uu_dir_gauss.shape)
 
     uu_neumann_approx = torch.matmul(DtN_loc, uu_dir_gauss)
     uu_neumann_approx = torch.squeeze(uu_neumann_approx)
@@ -336,6 +355,8 @@ if d==3:
     # Next we fold our spatial inputs and compute our actual neumann data:
     xx_folded = torch.reshape(dom.hps.gauss_xx, (DtN_loc.shape[0],DtN_loc.shape[1], -1))
     #print(xx_folded.shape)
+    #np.set_printoptions(threshold=sys.maxsize)
+    #print(xx_folded[3,3*size_face:4*size_face,:].detach().numpy())
 
     uu_neumann = torch.zeros((xx_folded.shape[0], xx_folded.shape[1]))
     for i in range(xx_folded.shape[0]):
@@ -348,9 +369,12 @@ if d==3:
 
     print("Relative error of Neumann computation is")
     print(torch.linalg.norm(uu_neumann_approx - uu_neumann) / torch.linalg.norm(uu_neumann))
-
-    #print(uu_neumann.shape)
-    #print(uu_neumann_approx[0,:])
-    #print(uu_neumann[0,:])
-    #print(dom.hps.gauss_xx)
-"""
+    """
+    print(uu_neumann.shape)
+    print("DtN result:")
+    print(uu_neumann_approx[0,:])
+    print("True Neumann derivatives:")
+    print(uu_neumann[0,:])
+    #np.set_printoptions(threshold=sys.maxsize)
+    #print(dom.hps.gauss_xx.detach().numpy())
+    """
