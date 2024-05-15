@@ -154,6 +154,8 @@ class Domain_Driver:
             self.I_Xtot = I_dir
             self.I_Ctot = torch.sort(torch_setdiff1d(torch.arange(self.ntot), self.I_Xtot))[0]
 
+            self.I_Xtot_in_unique = self.hps.I_unique[self.I_Xtot]
+
             # Note that I_Xtot and I_Ctot are both out of all XX, not just the unique
             # boundaries. I might want to redefine this later.
             
@@ -235,6 +237,7 @@ class Domain_Driver:
 
             self.A_CC = A_CC
             self.dense_A_CC = self.A_CC.toarray()
+            print("Condition number of A_CC: " + str(np.linalg.cond(self.dense_A_CC)))
             #import sys
             #np.set_printoptions(threshold=sys.maxsize)
             #print(self.dense_A_CC)
@@ -316,11 +319,10 @@ class Domain_Driver:
         if self.d==2:
             ff_body = -apply_sparse_lowmem(self.A,I_Ctot,I_Xtot,uu_dir)
         else:
-            I_unique = self.hps.I_unique
             I_copy1  = self.hps.I_copy1
             I_copy2  = self.hps.I_copy2
-            ff_body  = -apply_sparse_lowmem(self.A,I_copy1,I_unique[I_Xtot],uu_dir)
-            ff_body  = ff_body - apply_sparse_lowmem(self.A,I_copy2,I_unique[I_Xtot],uu_dir)
+            ff_body  = -apply_sparse_lowmem(self.A,I_copy1,self.I_Xtot_in_unique,uu_dir)
+            ff_body  = ff_body - apply_sparse_lowmem(self.A,I_copy2,self.I_Xtot_in_unique,uu_dir)
         if (ff_body_func is not None):
             
             if (self.sparse_assembly == 'reduced_gpu'):
@@ -340,11 +342,14 @@ class Domain_Driver:
     # This takes our computed solution sol and plugs it into A to get the difference, A sol - f
     def solve_residual_calc(self,sol,ff_body):
         if (not self.periodic_bc):
-            I_copy1 = self.hps.I_copy1
-            I_copy2 = self.hps.I_copy2
-            res = apply_sparse_lowmem(self.A,I_copy1,I_copy1,sol)
-            res = res + apply_sparse_lowmem(self.A,I_copy2,I_copy2,sol)
-            res = res - ff_body
+            if self.d==2:
+                res = apply_sparse_lowmem(self.A,self.I_Ctot,self.I_Ctot,sol) - ff_body
+            else:
+                I_copy1 = self.hps.I_copy1
+                I_copy2 = self.hps.I_copy2
+                res = apply_sparse_lowmem(self.A,I_copy1,I_copy1,sol)
+                res = res + apply_sparse_lowmem(self.A,I_copy2,I_copy2,sol)
+                res = res - ff_body
         else:
             res  = - ff_body
             res += apply_sparse_lowmem(self.A,self.I_Ctot[self.I_Ctot_unique],\
@@ -385,7 +390,7 @@ class Domain_Driver:
             if (self.solver_type == 'slabLU'):
                 raise ValueError("not included in this version")
             else:
-                sol,rel_err,toc_solve = self.solve_helper_blackbox(uu_dir_func,ff_body_func)
+                sol,rel_err,toc_solve, _ = self.solve_helper_blackbox(uu_dir_func,ff_body_func)
 
             # self.A is black box matrix:
             sol_tot = torch.zeros(self.A.shape[0],1)
@@ -414,16 +419,26 @@ class Domain_Driver:
             sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
 
             # As a test, let's try multiplying the dense A_CC by the true solution:
-            """
-            print("System X true solution:")
+            
             true_c_sol = uu_dir_func(self.hps.xx_active[self.I_Ctot])
-            print(true_c_sol)
-            print("Residual error:")
-            print((torch.from_numpy(self.dense_A_CC) @ true_c_sol - ff_body) / ff_body)
+            #print("System X true solution:")
+            #print(true_c_sol)
+            print("Residual error for sparse A_CC X true solution - ff_body:")
+            #print((self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()))
+            print(np.linalg.norm(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body))
+
+            print("Residual error for sparse A_CC X computed solution - ff_body:")
+            print(np.linalg.norm(self.A_CC @ sol - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body))
+
+            
             print("Relative error on unique boundary is:")
-            print((sol - true_c_sol) / true_c_sol)
+            #print((sol - true_c_sol) / true_c_sol)
+            #print("Real shared boundary is")
+            #print(true_c_sol)
+            #print("Computed is")
+            #print(sol)
             print("With norm of " + str(torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)))
-            """
+            
         resloc_hps = torch.tensor([float('nan')])
         if (self.sparse_assembly == 'reduced_gpu'):
             device=torch.device('cuda')
@@ -451,11 +466,10 @@ class Domain_Driver:
                 sol_tot = torch.reshape(sol_tot, (self.hps.nboxes,self.hps.p**3))
                 uu_true = torch.reshape(uu_true, (self.hps.nboxes,self.hps.p**3))
 
-                Jx   = torch.tensor(self.hps.H.JJ.Jx)#.to(device)
+                Jx   = torch.tensor(self.hps.H.JJ.Jxunique)#.to(device)
                 Jc   = torch.tensor(self.hps.H.JJ.Jc)#.to(device)
                 Jtot = torch.hstack((Jc,Jx))
                 true_err = torch.linalg.norm(sol_tot[:,Jtot]-uu_true[:,Jtot]) / torch.linalg.norm(uu_true[:,Jtot])
-                #true_err = torch.linalg.norm(sol_tot[:,Jx]-uu_true[:,Jx]) / torch.linalg.norm(uu_true[:,Jx])
             del uu_true
             true_err = true_err.item()
 
