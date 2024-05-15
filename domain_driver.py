@@ -75,7 +75,7 @@ def apply_sparse_lowmem(A, I, J, v, transpose=False):
     Returns:
     - The resulting vector after applying A (or A^T if transpose=True) to v, extracting indices I.
     """
-    vec_full = torch.zeros(A.shape[0], v.shape[-1])
+    vec_full = torch.zeros(A.shape[1], v.shape[-1]) # shouldn't it be A.shape[1]? In case A isn't square?
     vec_full[J] = v
     vec_full = A.T @ vec_full if transpose else A @ vec_full
     return torch.tensor(vec_full[I])
@@ -137,21 +137,25 @@ class Domain_Driver:
                 self.I_Ctot_copy1  = torch.arange(n_LR)
                 self.I_Ctot_copy2  = torch.arange(tot_unique, tot_C)
         else: # d==3
+            # self.XX consists of the unique X values of 
             self.XX  = self.hps.xx_active
             
             self.ntot = self.XX.shape[0]
             
             tol = 0.01 * self.hps.hmin # Adding a tolerance to avoid potential numerical error
-            I_Ldir = torch.where(self.XX[:,0] < self.box_geom[0,0] + tol)[0]
-            I_Rdir = torch.where(self.XX[:,0] > self.box_geom[0,1] - tol)[0]
-            I_Ddir = torch.where(self.XX[:,1] < self.box_geom[1,0] + tol)[0]
-            I_Udir = torch.where(self.XX[:,1] > self.box_geom[1,1] - tol)[0]
-            I_Bdir = torch.where(self.XX[:,2] < self.box_geom[2,0] + tol)[0]
-            I_Fdir = torch.where(self.XX[:,2] > self.box_geom[2,1] - tol)[0]
+            I_dir = torch.where((self.XX[:,0] < self.box_geom[0,0] + tol)
+                              | (self.XX[:,0] > self.box_geom[0,1] - tol)
+                              | (self.XX[:,1] < self.box_geom[1,0] + tol)
+                              | (self.XX[:,1] > self.box_geom[1,1] - tol)
+                              | (self.XX[:,2] < self.box_geom[2,0] + tol)
+                              | (self.XX[:,2] > self.box_geom[2,1] - tol))[0]
             
             # Assuming no periodic BC for now:
-            self.I_Xtot = torch.hstack((I_Ldir,I_Rdir,I_Ddir,I_Udir,I_Bdir,I_Fdir))
+            self.I_Xtot = I_dir
             self.I_Ctot = torch.sort(torch_setdiff1d(torch.arange(self.ntot), self.I_Xtot))[0]
+
+            # Note that I_Xtot and I_Ctot are both out of all XX, not just the unique
+            # boundaries. I might want to redefine this later.
             
     
     # ONLY NEEDED FOR SPARSE SOLVE
@@ -224,18 +228,18 @@ class Domain_Driver:
             else:
                 # Since the 3D A uses indices for the total boundary, we need to
                 # hit only indices in I_unique here:
-                #I_unique = self.hps.I_unique.detach().cpu().numpy()
-                #A_CC = self.A[I_unique[self.I_Ctot]][:,I_unique[self.I_Ctot]].tocsc()
                 I_copy1 = self.hps.I_copy1.detach().cpu().numpy()
                 I_copy2 = self.hps.I_copy2.detach().cpu().numpy()
-                A_CC = self.A[I_copy1][:,I_copy1].tocsc()
-                A_CC_add = self.A[I_copy2][:,I_copy2].tocsc()
-                A_CC = A_CC + A_CC_add
+                A_CC = self.A[I_copy1] + self.A[I_copy2]
+                A_CC = A_CC[:,I_copy1] + A_CC[:,I_copy2]
+
             self.A_CC = A_CC
-            #dense_A_CC = self.A_CC.toarray()
-            #print(dense_A_CC)
-            #print(dense_A_CC.shape)
-            #print(np.linalg.det(dense_A_CC))
+            self.dense_A_CC = self.A_CC.toarray()
+            #import sys
+            #np.set_printoptions(threshold=sys.maxsize)
+            #print(self.dense_A_CC)
+            #print(self.dense_A_CC.shape)
+            #print(np.linalg.det(self.dense_A_CC))
         else:
             A_copy = self.A[np.ix_(self.I_Ctot,self.I_Ctot)].tolil()
             A_copy[np.ix_(self.I_Ctot_unique,self.I_Ctot_copy1)] += \
@@ -299,14 +303,24 @@ class Domain_Driver:
                 
     # ONLY NEEDED FOR SPARSE SOLVE
     def get_rhs(self,uu_dir_func,ff_body_func=None,sum_body_load=True):
-        I_Ctot  = self.I_Ctot;  I_Xtot  = self.I_Xtot; 
+        I_Ctot   = self.I_Ctot
+        I_Xtot   = self.I_Xtot
         nrhs = 1
             
         # Dirichlet data
+        # Note for 3D self.XX is already converted to Gaussian nodes and features unique entries, so
+        # this is right
         uu_dir = uu_dir_func(self.XX[I_Xtot,:])
 
         # body load on I_Ctot
-        ff_body = -apply_sparse_lowmem(self.A,I_Ctot,I_Xtot,uu_dir)
+        if self.d==2:
+            ff_body = -apply_sparse_lowmem(self.A,I_Ctot,I_Xtot,uu_dir)
+        else:
+            I_unique = self.hps.I_unique
+            I_copy1  = self.hps.I_copy1
+            I_copy2  = self.hps.I_copy2
+            ff_body  = -apply_sparse_lowmem(self.A,I_copy1,I_unique[I_Xtot],uu_dir)
+            ff_body  = ff_body - apply_sparse_lowmem(self.A,I_copy2,I_unique[I_Xtot],uu_dir)
         if (ff_body_func is not None):
             
             if (self.sparse_assembly == 'reduced_gpu'):
@@ -326,7 +340,11 @@ class Domain_Driver:
     # This takes our computed solution sol and plugs it into A to get the difference, A sol - f
     def solve_residual_calc(self,sol,ff_body):
         if (not self.periodic_bc):
-            res = apply_sparse_lowmem(self.A,self.I_Ctot,self.I_Ctot,sol) - ff_body
+            I_copy1 = self.hps.I_copy1
+            I_copy2 = self.hps.I_copy2
+            res = apply_sparse_lowmem(self.A,I_copy1,I_copy1,sol)
+            res = res + apply_sparse_lowmem(self.A,I_copy2,I_copy2,sol)
+            res = res - ff_body
         else:
             res  = - ff_body
             res += apply_sparse_lowmem(self.A,self.I_Ctot[self.I_Ctot_unique],\
@@ -359,7 +377,7 @@ class Domain_Driver:
         res = self.solve_residual_calc(sol,ff_body)
         
         rel_err = torch.linalg.norm(res) / torch.linalg.norm(ff_body)
-        return sol,rel_err,toc_solve
+        return sol,rel_err,toc_solve, ff_body
         
         
     def solve(self,uu_dir_func,ff_body_func=None,known_sol=False):
@@ -384,7 +402,7 @@ class Domain_Driver:
             if (self.solver_type == 'slabLU'):
                 raise ValueError("not included in this version")
             else:
-                sol,rel_err,toc_solve = self.solve_helper_blackbox(uu_dir_func,ff_body_func)
+                sol,rel_err,toc_solve, ff_body = self.solve_helper_blackbox(uu_dir_func,ff_body_func) # REMOVE FF_BODY LATER
                 #print(sol)
 
             # self.A is black box matrix:
@@ -395,12 +413,17 @@ class Domain_Driver:
             # Here we set the true exterior to the given data:
             sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
 
-            #print(uu_dir_func(self.hps.xx_active[self.I_Ctot]))
-            #print(sol_tot[self.I_Ctot])
-
+            # As a test, let's try multiplying the dense A_CC by the true solution:
+            """
+            print("System X true solution:")
+            true_c_sol = uu_dir_func(self.hps.xx_active[self.I_Ctot])
+            print(true_c_sol)
+            print("Residual error:")
+            print((torch.from_numpy(self.dense_A_CC) @ true_c_sol - ff_body) / ff_body)
             print("Relative error on unique boundary is:")
-            print(torch.linalg.norm(sol - uu_dir_func(self.hps.xx_active[self.I_Ctot])) / torch.linalg.norm(uu_dir_func(self.hps.xx_active[self.I_Ctot])))
-        
+            print((sol - true_c_sol) / true_c_sol)
+            print("With norm of " + str(torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)))
+            """
         resloc_hps = torch.tensor([float('nan')])
         if (self.sparse_assembly == 'reduced_gpu'):
             device=torch.device('cuda')

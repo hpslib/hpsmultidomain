@@ -141,7 +141,6 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             
             Jtot    = torch.hstack((Jc,Jxun))
             DtN     = Nx[:,Jtot].unsqueeze(0) @ S_full
-            print(DtN.shape)
             if d==3:
                 DtN = Intmap_rev.unsqueeze(0) @ DtN
         return DtN

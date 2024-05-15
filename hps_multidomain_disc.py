@@ -183,11 +183,13 @@ class HPS_Multidomain:
             data = DtN_loc.flatten()
             row_data = row_data.flatten()
             col_data = col_data.flatten()
+            print(len(torch.unique(row_data)))
+            print(len(torch.unique(col_data)))
             toc_flatten = time() - tic
         
         
         tic = time()
-        sp_mat = sp.coo_matrix(( np.array(data),(np.array(row_data,dtype=int),np.array(col_data,dtype=int)))).tocsr()
+        sp_mat = sp.coo_matrix((np.array(data),(np.array(row_data,dtype=int),np.array(col_data,dtype=int)))).tocsr()
         sp_mat = sp_mat.tocsr()
         toc_csr_scipy = time() - tic
 

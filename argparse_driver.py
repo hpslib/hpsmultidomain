@@ -306,31 +306,42 @@ if (d==3 and 1==0):
 
 
 # Test the accuracy of I_copy1 and I_copy2:
-if (d==3 and 1==0):
+if (d==3):
     zz_copy1 = dom.hps.gauss_xx[dom.hps.I_copy1,:]
     zz_copy2 = dom.hps.gauss_xx[dom.hps.I_copy2,:]
     print("Numerical error of copy1 vs copy2 is:")
     print(torch.linalg.norm(zz_copy1 - zz_copy2) / torch.linalg.norm(zz_copy1))
 
+    # Let's also check that I_copy1 isn't on the domain boundary:
+    tol   = 0.01 * dom.hps.hmin
+    I_dir = torch.where((zz_copy1[:,0] < dom.box_geom[0,0] + tol)
+                      | (zz_copy1[:,0] > dom.box_geom[0,1] - tol)
+                      | (zz_copy1[:,1] < dom.box_geom[1,0] + tol)
+                      | (zz_copy1[:,1] > dom.box_geom[1,1] - tol)
+                      | (zz_copy1[:,2] < dom.box_geom[2,0] + tol)
+                      | (zz_copy1[:,2] > dom.box_geom[2,1] - tol))[0]
+
+    print("Number of I_copy entries on domain boundary (should be 0): " + str(len(I_dir)))
+
 # Test DtN_loc accuracy:
-if d==3:
+if (d==3):
     # Here we'll test our DtN operators on a known function. First we define the known function and its
     # first order derivatives (this test is for Laplace only):
     def u_true(xx):
         #return torch.exp(xx[:,0]) * torch.sin(xx[:,1])
-        return uu_dir_func_greens(3,xx,0)
+        return uu_dir_func_greens(3,xx,kh)
     
     def du1_true(xx):
         #return torch.exp(xx[:,0]) * torch.sin(xx[:,1])
-        return du_dir_func_greens(0,3,xx,0)
+        return du_dir_func_greens(0,3,xx,kh)
     
     def du2_true(xx):
         #return torch.exp(xx[:,0]) * torch.cos(xx[:,1])
-        return du_dir_func_greens(1,3,xx,0)
+        return du_dir_func_greens(1,3,xx,kh)
     
     def du3_true(xx):
         #return torch.zeros((xx.shape[0]))
-        return du_dir_func_greens(2,3,xx,0)
+        return du_dir_func_greens(2,3,xx,kh)
 
     size_face = dom.hps.p**2
     size_ext = 6 * size_face
@@ -341,22 +352,18 @@ if d==3:
 
     # Here we get our dirichlet data, reshape it, and then multiply with DtNs to get our Neumann data
     uu_dir_gauss = u_true(dom.hps.gauss_xx)
-    print(uu_dir_gauss.shape)
+
+    uu_neumann_from_A = torch.from_numpy(dom.A @ uu_dir_gauss)
+    uu_neumann_from_A = torch.reshape(uu_neumann_from_A, (DtN_loc.shape[0],-1))
+
     uu_dir_gauss = torch.reshape(uu_dir_gauss, (DtN_loc.shape[0],-1))
-    print(uu_dir_gauss.shape)
     uu_dir_gauss = torch.unsqueeze(uu_dir_gauss, -1)
-    print(DtN_loc.shape)
-    print(uu_dir_gauss.shape)
 
     uu_neumann_approx = torch.matmul(DtN_loc, uu_dir_gauss)
     uu_neumann_approx = torch.squeeze(uu_neumann_approx)
-    #print(uu_neumann_approx.shape)
 
     # Next we fold our spatial inputs and compute our actual neumann data:
     xx_folded = torch.reshape(dom.hps.gauss_xx, (DtN_loc.shape[0],DtN_loc.shape[1], -1))
-    #print(xx_folded.shape)
-    #np.set_printoptions(threshold=sys.maxsize)
-    #print(xx_folded[3,3*size_face:4*size_face,:].detach().numpy())
 
     uu_neumann = torch.zeros((xx_folded.shape[0], xx_folded.shape[1]))
     for i in range(xx_folded.shape[0]):
@@ -367,14 +374,21 @@ if d==3:
         uu_neumann[i,4*size_face:5*size_face] = -du3_true(xx_folded[i,4*size_face:5*size_face,:])
         uu_neumann[i,5*size_face:6*size_face] =  du3_true(xx_folded[i,5*size_face:6*size_face,:])
 
-    print("Relative error of Neumann computation is")
+    print("Relative error of Neumann computation using tensor DtNs is")
     print(torch.linalg.norm(uu_neumann_approx - uu_neumann) / torch.linalg.norm(uu_neumann))
-    """
-    print(uu_neumann.shape)
-    print("DtN result:")
-    print(uu_neumann_approx[0,:])
-    print("True Neumann derivatives:")
-    print(uu_neumann[0,:])
-    #np.set_printoptions(threshold=sys.maxsize)
-    #print(dom.hps.gauss_xx.detach().numpy())
-    """
+    print("Relative error of Neumann computation using sparse matrix A is")
+    print(torch.linalg.norm(uu_neumann_from_A - uu_neumann) / torch.linalg.norm(uu_neumann))
+
+if (d==3 and 1==0):
+    I_copy1  = dom.hps.I_copy1
+    I_copy2  = dom.hps.I_copy2
+    A_CC     = dom.A[I_copy1][:,I_copy1]
+    A_CC_add = dom.A[I_copy2][:,I_copy2]
+
+    error = 0
+    for i in range(len(I_copy1)):
+        for j in range(len(I_copy1)):
+            error = error + np.abs(A_CC[i,j] - dom.A[I_copy1[i], I_copy1[j]])
+            error = error + np.abs(A_CC_add[i,j] - dom.A[I_copy2[i], I_copy2[j]])
+
+    print("Error in copies of A going into A_CC is " + str(error))
