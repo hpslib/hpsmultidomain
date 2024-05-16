@@ -400,7 +400,7 @@ class HPS_Multidomain:
         # For Gaussian we might need p^2, not (p-2)^2:
         size_face = (p-2)**(d-1)
         if d==3:
-            size_face = p**2
+            size_face = (p-2)**2
 
         if (mode == 'build'):
             DtNs = torch.zeros(nboxes,2*d*size_face,2*d*size_face)

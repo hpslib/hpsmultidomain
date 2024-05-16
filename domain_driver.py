@@ -423,11 +423,11 @@ class Domain_Driver:
             true_c_sol = uu_dir_func(self.hps.xx_active[self.I_Ctot])
             #print("System X true solution:")
             #print(true_c_sol)
-            print("Residual error for sparse A_CC X true solution - ff_body:")
+            print("Relative residual error for sparse A_CC X true solution - ff_body:")
             #print((self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()))
             print(np.linalg.norm(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body))
 
-            print("Residual error for sparse A_CC X computed solution - ff_body:")
+            print("Relative residual error for sparse A_CC X computed solution - ff_body:")
             print(np.linalg.norm(self.A_CC @ sol - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body))
 
             
