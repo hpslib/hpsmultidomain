@@ -458,8 +458,18 @@ class Domain_Driver:
         true_err = torch.tensor([float('nan')])
         if (known_sol):
             XX = self.hps.xx_tot
-            uu_true  = uu_dir_func(XX.clone())
-            true_err = torch.linalg.norm(sol_tot-uu_true) / torch.linalg.norm(uu_true)
+            uu_true = uu_dir_func(XX.clone())
+            if self.d==2:
+                true_err = torch.linalg.norm(sol_tot-uu_true) / torch.linalg.norm(uu_true)
+            if self.d==3:
+                # special protocol for 3D case, temporarily avoiding edges of boxes:
+                sol_tot = torch.reshape(sol_tot, (self.hps.nboxes,self.hps.p**3))
+                uu_true = torch.reshape(uu_true, (self.hps.nboxes,self.hps.p**3))
+
+                Jx   = torch.tensor(self.hps.H.JJ.Jx)#.to(device)
+                Jc   = torch.tensor(self.hps.H.JJ.Jc)#.to(device)
+                Jtot = torch.hstack((Jc,Jx))
+                true_err = torch.linalg.norm(sol_tot[:,Jtot]-uu_true[:,Jtot]) / torch.linalg.norm(uu_true[:,Jtot])
             del uu_true
             true_err = true_err.item()
 

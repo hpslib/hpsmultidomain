@@ -307,8 +307,8 @@ if (d==3 and 1==0):
 
 # Test the accuracy of I_copy1 and I_copy2:
 if (d==3):
-    zz_copy1 = dom.hps.gauss_xx[dom.hps.I_copy1,:]
-    zz_copy2 = dom.hps.gauss_xx[dom.hps.I_copy2,:]
+    zz_copy1 = dom.hps.xx_ext[dom.hps.I_copy1,:]
+    zz_copy2 = dom.hps.xx_ext[dom.hps.I_copy2,:]
     print("Numerical error of copy1 vs copy2 is:")
     print(torch.linalg.norm(zz_copy1 - zz_copy2) / torch.linalg.norm(zz_copy1))
 
@@ -343,7 +343,7 @@ if (d==3):
         #return torch.zeros((xx.shape[0]))
         return du_dir_func_greens(2,3,xx,kh)
 
-    size_face = dom.hps.p**2
+    size_face = dom.hps.q**2
     size_ext = 6 * size_face
 
     # Now we get our DtN maps. These don't depend on u_true
@@ -351,7 +351,7 @@ if (d==3):
     DtN_loc = dom.hps.get_DtNs(device,'build')
 
     # Here we get our dirichlet data, reshape it, and then multiply with DtNs to get our Neumann data
-    uu_dir_gauss = u_true(dom.hps.gauss_xx)
+    uu_dir_gauss = u_true(dom.hps.xx_ext)
 
     uu_neumann_from_A = torch.from_numpy(dom.A @ uu_dir_gauss)
     uu_neumann_from_A = torch.reshape(uu_neumann_from_A, (DtN_loc.shape[0],-1))
@@ -363,7 +363,7 @@ if (d==3):
     uu_neumann_approx = torch.squeeze(uu_neumann_approx)
 
     # Next we fold our spatial inputs and compute our actual neumann data:
-    xx_folded = torch.reshape(dom.hps.gauss_xx, (DtN_loc.shape[0],DtN_loc.shape[1], -1))
+    xx_folded = torch.reshape(dom.hps.xx_ext, (DtN_loc.shape[0],DtN_loc.shape[1], -1))
 
     uu_neumann = torch.zeros((xx_folded.shape[0], xx_folded.shape[1]))
     for i in range(xx_folded.shape[0]):

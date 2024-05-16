@@ -49,7 +49,7 @@ class HPS_Multidomain:
         self.a      = a
         self.d      = d
 
-        self.q = p
+        self.q = p-2
         
         n = (self.domain[:,1] - self.domain[:,0]) / (2*self.a)
         n = torch.round(n).int()
@@ -88,7 +88,7 @@ class HPS_Multidomain:
             self.gauss_xx = self.gauss_xx.flatten(start_dim=0,end_dim=-2)
             self.I_unique, self.I_copy1, self.I_copy2 = self.get_unique_inds()
             # I think you want xx_ext to be based on Gaussian nodes:
-            self.xx_ext = self.gauss_xx
+            self.xx_ext = self.grid_xx[:,Jx,:].flatten(start_dim=0,end_dim=-2)#self.gauss_xx
             self.xx_active = self.xx_ext[self.I_unique,:]
         
         self.xx_tot = self.grid_xx.flatten(start_dim=0,end_dim=-2)
@@ -333,7 +333,7 @@ class HPS_Multidomain:
             offset_unique += n1 * size_face
         else:
             # Assuming gaussian nodes with pxp nodes total
-            size_face = self.p**2
+            size_face = self.q**2
             n0,n1,n2  = self.n
 
             box_ind = torch.arange(n0*n1*n2*6*size_face).reshape(n0,n1,n2,6*size_face)
@@ -459,7 +459,7 @@ class HPS_Multidomain:
 
         size_ext = 4*(self.p-2)
         if self.d==3:
-            size_ext = 6*(self.p**2)
+            size_ext = 6*(self.q**2)
 
         nboxes   = torch.prod(self.n)
         uu_sol   = uu_sol.to(device)
