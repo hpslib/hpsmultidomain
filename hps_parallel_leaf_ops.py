@@ -157,8 +157,10 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         
         if d==2:
             uu_sol[:,Jxreo,:nrhs] = Intmap.unsqueeze(0) @ data[box_start:box_end]
-        elif d==3 and pdo.c12 is not None:
+        elif d==3 and pdo.c12 is not None and pdo.c13 is not None and pdo.c23 is not None:
             uu_sol[:,Jxun,:nrhs] = Intmap_unq.unsqueeze(0) @ data[box_start:box_end]
+        else:
+            uu_sol[:,Jx,:nrhs] = data[box_start:box_end]
 
         if (pdo.c12 is None):
             #print(nrhs)
