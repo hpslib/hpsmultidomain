@@ -1,7 +1,7 @@
 import numpy as np
 
 import matplotlib.pyplot as plt
-
+"""
 # Number of boxes along an axis (so the total is cubed)
 # These are for p=12:
 nBoxes = np.array([2, 3, 4, 5, 6, 8, 10, 12])
@@ -22,6 +22,7 @@ leafSolveError = [1.10e-13, 3.70e-14, 1.31e-14, 1.45e-14, 3.44e-14, 4.18e-15, 7.
 
 interpolationError = [0.0154, 0.0160, 0.0005, 5.3633e-05, 1.4921e-05, 5.8685e-07, 2.2868e-07, 3.9676e-08]
 interpolationError = [1.1760e-14, 2.3474e-15, 2.6497e-15, 1.1555e-15, 3.4974e-15]
+"""
 """
 plt.plot(nBoxes, assemblyTime)
 plt.title("Assembly Times, p=12")
@@ -58,6 +59,7 @@ plt.title("Accuracy of box interpolation, p=12")
 plt.xlabel("Number of boxes along one axis (domain fixed)")
 plt.ylabel("Relative error")
 plt.show()
+"""
 """
 nBoxes = (10*nBoxes) ** 3
 plt.plot(nBoxes, assemblyTime)
@@ -111,3 +113,13 @@ plt.xlabel("N = n^3")
 plt.ylabel("Relative Error")
 plt.legend(["True, p=12", "True, p=18", "Residual, p=12", "Residual, p=18"])
 plt.show()
+"""
+
+import pandas as pd
+import pickle
+
+with open('output_test.pkl', 'rb') as f:
+    obj = pickle.load(f)
+print(obj)
+obj = pd.read_pickle(r'output_test.pkl')
+print(obj)

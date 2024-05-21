@@ -5,16 +5,9 @@ os.environ['LANG']='en_US.UTF-8'
 
 torch.set_default_dtype(torch.double)  # Ensure all torch tensors are double precision for accuracy
 
-def run_test_via_argparse(domain, box_xlim=1.0, box_ylim=1.0, periodic_bc=False, components=False):
+def run_test_via_argparse(domain, pde, bc, disc_n, p, box_xlim=1.0, box_ylim=1.0, periodic_bc=False, ppw=1, components=False):
     assembly_type = 'reduced_cpu'
-    pde    = 'poisson'
-    bc     = 'log_dist'
-    disc_n = 100
-    #ppw    = 40
-
-    p      = 12
-    solver = 'superLU'
-
+    solver     = 'superLU'
     pickle_loc = 'tmp_test_file'
 
     s = 'python argparse_driver.py --n %d --pde %s --bc %s --pickle %s' % (disc_n,pde,bc,pickle_loc)
@@ -53,7 +46,7 @@ def run_test_via_argparse(domain, box_xlim=1.0, box_ylim=1.0, periodic_bc=False,
         raise ValueError("test failed")
 
 def test_helm_poisson(components=False):
-    run_test_via_argparse('square', components=components)
+    run_test_via_argparse('square', 'poisson', 'log_dist', 100, 12, components=components)
 
 def test_helm_poisson_annulus():
     run_test_via_argparse('annulus')

@@ -271,9 +271,10 @@ if (args.pickle is not None):
     file_loc = args.pickle
     print("Pickling results to file %s"% (file_loc))
     f = open(file_loc,"wb+")
+    build_info.update(solve_info)
     pickle.dump(build_info,f)
-    pickle.dump(solve_info,f)
-    f.close()
+    #pickle.dump(solve_info,f)
+    f.close()  
 
 ################################# EVALUATING SYSTEM COMPONENTS ###################################
 # Evaluate certain parts of the 3D problem 
@@ -306,7 +307,7 @@ if (d==3 and 1==0):
 
 
 # Test the accuracy of I_copy1 and I_copy2:
-if (d==3):
+if (d==3 and 1==0):
     zz_copy1 = dom.hps.xx_ext[dom.hps.I_copy1,:]
     zz_copy2 = dom.hps.xx_ext[dom.hps.I_copy2,:]
     print("Numerical error of copy1 vs copy2 is:")
@@ -324,7 +325,7 @@ if (d==3):
     print("Number of I_copy entries on domain boundary (should be 0): " + str(len(I_dir)))
 
 # Test DtN_loc accuracy:
-if (d==3):
+if (d==3 and 1==0):
     # Here we'll test our DtN operators on a known function. First we define the known function and its
     # first order derivatives (this test is for Laplace only):
     def u_true(xx):

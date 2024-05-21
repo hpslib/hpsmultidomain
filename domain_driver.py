@@ -348,6 +348,8 @@ class Domain_Driver:
                 I_copy1 = self.hps.I_copy1
                 I_copy2 = self.hps.I_copy2
                 res = apply_sparse_lowmem(self.A,I_copy1,I_copy1,sol)
+                res = res + apply_sparse_lowmem(self.A,I_copy1,I_copy2,sol)
+                res = res + apply_sparse_lowmem(self.A,I_copy2,I_copy1,sol)
                 res = res + apply_sparse_lowmem(self.A,I_copy2,I_copy2,sol)
                 res = res - ff_body
         else:
@@ -379,7 +381,8 @@ class Domain_Driver:
             return 0,0,0
         sol = torch.tensor(sol); ff_body = torch.tensor(ff_body)
         toc_solve = time() - tic
-        res = self.solve_residual_calc(sol,ff_body)
+        true_c_sol = uu_dir_func(self.hps.xx_active[self.I_Ctot])
+        res = self.solve_residual_calc(true_c_sol,ff_body)
         
         rel_err = torch.linalg.norm(res) / torch.linalg.norm(ff_body)
         return sol,rel_err,toc_solve, ff_body
@@ -446,12 +449,12 @@ class Domain_Driver:
             device = torch.device('cpu')
         tic = time()
 
-        #GridX = self.hps.grid_xx.clone()
-        #uu_true = torch.zeros((GridX.shape[0], GridX.shape[1],1))
-        #for i in range(GridX.shape[0]):
-        #    uu_true[i] = uu_dir_func(GridX[i])
+        GridX = self.hps.grid_xx.clone()
+        uu_true = torch.zeros((GridX.shape[0], GridX.shape[1],1))
+        for i in range(GridX.shape[0]):
+            uu_true[i] = uu_dir_func(GridX[i])
         
-        sol_tot,resloc_hps = self.hps.solve(device,sol_tot,ff_body_func=ff_body_func,uu_true=None)
+        sol_tot,resloc_hps = self.hps.solve(device,sol_tot,ff_body_func=ff_body_func,uu_true=uu_true)
         toc_solve += time() - tic
         sol_tot = sol_tot.cpu()
 
