@@ -15,5 +15,6 @@ for p in p_list:
     n_list = list(range(2*(p-2), 100, p-2))
 
     for n in n_list:
+        print(str(p) + ", " + str(n) + " done")
         test_file = "test_results/test_results_p_" + str(p) + "_n_" + str(n) + ".pkl"
         run_test_via_argparse(domain, pde, bc, n, p, box_xlim=1.0, box_ylim=1.0, periodic_bc=False, ppw=1, components=False, pickle_loc=test_file)
