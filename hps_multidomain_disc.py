@@ -156,7 +156,7 @@ class HPS_Multidomain:
         else:
             # For 3D, we're indexing box by box. Thus let's follow that approach here:
             tic = time()
-            col_data = torch.arange(size_ext)
+            col_data = torch.arange(size_ext, device=device)
             
             # Add one box worth to F, n2 box worth to U, n1*n2 box worth to L
             # The idea is that this ensures all matrix entries correspond to boundary values in
@@ -173,7 +173,7 @@ class HPS_Multidomain:
 
             row_data = col_data.T
 
-            box_range = size_ext * torch.arange(nprod)
+            box_range = size_ext * torch.arange(nprod, device=device)
             box_range = box_range.unsqueeze(-1)
             box_range = box_range.unsqueeze(-1)
 
@@ -189,7 +189,7 @@ class HPS_Multidomain:
         
         
         tic = time()
-        sp_mat = sp.coo_matrix((np.array(data),(np.array(row_data,dtype=int),np.array(col_data,dtype=int)))).tocsr()
+        sp_mat = sp.coo_matrix((data.detach().cpu().numpy(),(row_data.detach().cpu().numpy(),col_data.detach().cpu().numpy())))
         sp_mat = sp_mat.tocsr()
         toc_csr_scipy = time() - tic
 
@@ -208,6 +208,8 @@ class HPS_Multidomain:
         t_dict['toc_DtN'] = toc_DtN
         if self.d==2:
             t_dict['toc_forloop'] = toc_forloop
+        if self.d==3:
+            t_dict['toc_indices'] = toc_flatten
         t_dict['toc_sparse'] = toc_csr_scipy
         return sp_mat,t_dict
     

@@ -191,7 +191,7 @@ class Domain_Driver:
     # ONLY NEEDED FOR SPARSE SOLVE
     def build_petsc(self,solvertype,verbose):
         info_dict = dict()
-        tmp = self.A_CC.tocsr()
+        tmp = self.A_CC #.tocsr()
         pA = PETSc.Mat().createAIJ(tmp.shape, csr=(tmp.indptr,tmp.indices,tmp.data),comm=PETSc.COMM_WORLD)
         
         ksp = PETSc.KSP().create(comm=PETSc.COMM_WORLD)
