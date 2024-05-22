@@ -5,7 +5,7 @@
 from test_3d import run_test_via_argparse
 
 # First we'll run a suite of Poisson problems for different n and p:
-p_list = [10] #[6, 8, 10, 12, 14, 18, 22, 30]
+p_list = [8] #[6, 8, 10, 12, 14, 18, 22, 30]
 
 domain = "square"
 pde = "poisson"

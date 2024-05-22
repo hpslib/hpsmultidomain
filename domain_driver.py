@@ -274,10 +274,11 @@ class Domain_Driver:
         elif (sparse_assembly == 'reduced_gpu'):
             device = torch.device('cuda')
 
+        print("About to build sparse matrix")
         tic = time()
         self.A,assembly_time_dict = self.hps.sparse_mat(device,verbose)
         toc_assembly_tot = time() - tic
-
+        print("Built sparse matrix A")
         csr_stor  = self.A.data.nbytes
         csr_stor += self.A.indices.nbytes + self.A.indptr.nbytes
         csr_stor /= 1e9
