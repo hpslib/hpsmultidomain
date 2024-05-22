@@ -5,9 +5,8 @@ os.environ['LANG']='en_US.UTF-8'
 
 torch.set_default_dtype(torch.double)  # Ensure all torch tensors are double precision for accuracy
 
-def run_test_via_argparse(domain, pde, bc, disc_n, p, box_xlim=1.0, box_ylim=1.0, periodic_bc=False, ppw=1, components=False, pickle_loc='tmp_test_file'):
+def run_test_via_argparse(domain, pde, bc, disc_n, p, box_xlim=1.0, box_ylim=1.0, periodic_bc=False, ppw=1, components=False, solver='superLU', pickle_loc='tmp_test_file'):
     assembly_type = 'reduced_cpu'
-    solver     = 'superLU'
 
     s = 'python argparse_driver.py --n %d --pde %s --bc %s --pickle %s' % (disc_n,pde,bc,pickle_loc)
 
@@ -21,7 +20,7 @@ def run_test_via_argparse(domain, pde, bc, disc_n, p, box_xlim=1.0, box_ylim=1.0
     s += ' --box_xlim %f' % box_xlim
     s += ' --box_ylim %f' % box_ylim
 
-    s += ' --disable_cuda'
+    #s += ' --disable_cuda'
     if (periodic_bc):
         s += ' --periodic_bc'
 
