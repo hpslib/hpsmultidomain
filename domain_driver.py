@@ -222,7 +222,7 @@ class Domain_Driver:
     # ONLY NEEDED FOR SPARSE SOLVE
     def build_blackboxsolver(self,solvertype,verbose):
         info_dict = dict()
-        print("Made it to build_blackboxsolver")
+        #print("Made it to build_blackboxsolver")
         if (not self.periodic_bc):
             if self.d==2:
                 A_CC = self.A[self.I_Ctot][:,self.I_Ctot].tocsc()
@@ -274,11 +274,11 @@ class Domain_Driver:
         elif (sparse_assembly == 'reduced_gpu'):
             device = torch.device('cuda')
 
-        print("About to build sparse matrix")
+        #print("About to build sparse matrix")
         tic = time()
         self.A,assembly_time_dict = self.hps.sparse_mat(device,verbose)
         toc_assembly_tot = time() - tic
-        print("Built sparse matrix A")
+        #print("Built sparse matrix A")
         csr_stor  = self.A.data.nbytes
         csr_stor += self.A.indices.nbytes + self.A.indptr.nbytes
         csr_stor /= 1e9
@@ -450,7 +450,7 @@ class Domain_Driver:
         tic = time()
 
         GridX = self.hps.grid_xx.clone()
-        uu_true = torch.zeros((GridX.shape[0], GridX.shape[1],1))
+        uu_true = torch.zeros((GridX.shape[0], GridX.shape[1],1), device=device)
         for i in range(GridX.shape[0]):
             uu_true[i] = uu_dir_func(GridX[i])
         

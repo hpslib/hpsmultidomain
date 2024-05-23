@@ -5,8 +5,7 @@ os.environ['LANG']='en_US.UTF-8'
 
 torch.set_default_dtype(torch.double)  # Ensure all torch tensors are double precision for accuracy
 
-def run_test_via_argparse(domain, pde, bc, disc_n, p, box_xlim=1.0, box_ylim=1.0, periodic_bc=False, ppw=1, components=False, solver='superLU', pickle_loc='tmp_test_file'):
-    assembly_type = 'reduced_cpu'
+def run_test_via_argparse(domain, pde, bc, disc_n, p, box_xlim=1.0, box_ylim=1.0, periodic_bc=False, ppw=1, components=False, solver='superLU', assembly_type="reduced_cpu", pickle_loc='tmp_test_file'):
 
     s = 'python argparse_driver.py --n %d --pde %s --bc %s --pickle %s' % (disc_n,pde,bc,pickle_loc)
 

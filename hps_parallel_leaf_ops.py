@@ -125,15 +125,25 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
     Acc = Aloc[:,Jc,:][:,:,Jc]
     nrhs = data.shape[-1]
 
+    #print(device)
+    #print("Got local arrays for form_DtNs")
     if (mode == 'build'):
         
         if (pdo.c12 is None):
-            S_tmp   = -torch.linalg.solve(Acc,Aloc[:,Jc][...,Jx])
+            #print(Acc.shape)
+            #print(Aloc[:,Jc][...,Jx].shape)
+            #print(Acc.device)
+            #print(Aloc[:,Jc][...,Jx].device)
+            thing = Aloc[:,Jc][...,Jx]
+            S_tmp   = -torch.linalg.solve(Acc,thing)
+            #print("Formed S_tmp")
             Irep    = torch.eye(Jx.shape[0],device=device).unsqueeze(0).repeat(box_end-box_start,1,1)
             S_full  = torch.concat((S_tmp,Irep),dim=1)
+            #print("Made S_full")
             Jtot    = torch.hstack((Jc,Jx))
             
             DtN     = Nx[...,Jtot].unsqueeze(0) @ S_full
+            #print("Applied Nx")
         else:
             S_tmp   = -torch.linalg.solve(Acc,Aloc[:,Jc][...,Jxun]) # Should append Identity here and not repeat Intmap
             Intmap_repeat = Intmap_unq.unsqueeze(0).repeat(box_end-box_start,1,1)
@@ -143,6 +153,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             DtN     = Nx[:,Jtot].unsqueeze(0) @ S_full
             if d==3:
                 DtN = Intmap_rev.unsqueeze(0) @ DtN
+        #print("Assembled the DtN")
         return DtN
     elif (mode == 'solve'):
         
@@ -211,12 +222,14 @@ def get_DtNs_helper(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_un
         DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1],device=device)
     elif (mode == 'reduce_body'):
         DtNs = torch.zeros(nboxes,2*d*size_face,1,device=device)
-        
+    #print("Built zero arrays in helper")
     chunk_size = chunk_init
     args = p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
     chunk_list = torch.zeros(int(nboxes/chunk_init)+100,device=device).int(); 
     box_curr = 0; nchunks = 0
     while(box_curr < nboxes):
+        #print("box_curr = " + str(box_curr))
+        #print("nboxes   = " + str(nboxes))
 
         b1 = box_curr + box_start
         b2 = np.min([box_end, b1 + chunk_size])

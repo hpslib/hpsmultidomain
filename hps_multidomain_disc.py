@@ -105,10 +105,11 @@ class HPS_Multidomain:
         - sp_mat: Sparse matrix representation of the HPS operator.
         - t_dict: Dictionary containing timing information for different parts of the matrix assembly process.
         """
+        #print("Building DtNs")
         tic = time()
         DtN_loc = self.get_DtNs(device,'build') # Tentatively think this is already good
         toc_DtN = time() - tic
-        
+        print("Built DtNs")
         if self.d==2:
             size_face = self.p-2; size_ext = 4*size_face
             n0,n1 = self.n
@@ -179,19 +180,21 @@ class HPS_Multidomain:
 
             row_data = box_range + row_data
             col_data = box_range + col_data
-
+            print("Built row and column data")
             data = DtN_loc.flatten()
             row_data = row_data.flatten()
             col_data = col_data.flatten()
             #print(len(torch.unique(row_data)))
             #print(len(torch.unique(col_data)))
             toc_flatten = time() - tic
-        
+            print("Flattened data")
         
         tic = time()
         sp_mat = sp.coo_matrix((data.detach().cpu().numpy(),(row_data.detach().cpu().numpy(),col_data.detach().cpu().numpy())))
         sp_mat = sp_mat.tocsr()
         toc_csr_scipy = time() - tic
+
+        print("Assembled sparse matrix")
 
         #import sys
         #np.set_printoptions(threshold=sys.maxsize)
@@ -403,10 +406,11 @@ class HPS_Multidomain:
         size_face = (p-2)**(d-1)
         if d==3:
             size_face = (p-2)**2
-
+        #print("set size_face")
         if (mode == 'build'):
             DtNs = torch.zeros(nboxes,2*d*size_face,2*d*size_face)
             data = torch.zeros(nboxes,2*d*size_face,1)
+            #print("Initialized arrays of zeros")
         elif (mode == 'solve'):
             DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1])
         elif (mode == 'reduce_body'):
@@ -421,9 +425,10 @@ class HPS_Multidomain:
             Jxun  = torch.tensor(self.H.JJ.Jxunique).to(device)
             Intmap_rev = torch.tensor(self.H.Interp_mat_reverse).to(device)
             Intmap_unq = torch.tensor(self.H.Interp_mat_unique).to(device)
-
+            
         Intmap = torch.tensor(self.H.Interp_mat).to(device)
         Ds     = self.H.Ds.to(device)
+        #print("Copied all required parts to device")
         if (mode =='solve'):
             data = data.to(device)
 
@@ -440,12 +445,14 @@ class HPS_Multidomain:
         
         assert np.mod(nboxes,chunk_size) == 0
         Aloc_chunkinit = np.min([50,int(nboxes/4)])
+        #print("Handled memory chunks")
         for j in range(int(nboxes / chunk_size)):
             #print("Indices: " + str(j*chunk_size) + " to " + str((j+1)*chunk_size))
             DtNs[j*chunk_size:(j+1)*chunk_size],Aloc_chunklist = \
             leaf_ops.get_DtNs_helper(*args,j*chunk_size,(j+1)*chunk_size, Aloc_chunkinit,device,\
                                     mode,data,ff_body_func,uu_true)
 
+            #print("Did chunk " + str(j))
             if Aloc_chunklist.shape[0] > 2:
                 Aloc_chunkinit = int(Aloc_chunklist[-2])
             else:

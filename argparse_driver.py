@@ -169,6 +169,8 @@ print(inspect.getsource(bfield))
 ################################# BUILD OPERATOR #########################
 # Build operator based on specified parameters and solver information
 
+print(args.sparse_assembly)
+
 build_info = dom.build(sparse_assembly=args.sparse_assembly,\
                         solver_type = args.solver, verbose=True)
 build_info['N']    = N
