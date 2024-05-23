@@ -11,7 +11,9 @@ def run_test_via_argparse(domain, pde, bc, disc_n, p, box_xlim=1.0, box_ylim=1.0
 
     s += ' --p %d' % (p)    
     s += ' --domain %s' % (domain)
-    #s += ' --ppw %d' % (ppw)
+
+    if pde == "bfield_constant":
+        s += ' --ppw %d' % (ppw)
 
     s += ' --solver %s' % (solver)
     s += ' --sparse_assembly %s' % (assembly_type)

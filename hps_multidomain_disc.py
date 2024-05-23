@@ -109,7 +109,7 @@ class HPS_Multidomain:
         tic = time()
         DtN_loc = self.get_DtNs(device,'build') # Tentatively think this is already good
         toc_DtN = time() - tic
-        print("Built DtNs")
+        #print("Built DtNs")
         if self.d==2:
             size_face = self.p-2; size_ext = 4*size_face
             n0,n1 = self.n
@@ -180,14 +180,14 @@ class HPS_Multidomain:
 
             row_data = box_range + row_data
             col_data = box_range + col_data
-            print("Built row and column data")
+            #print("Built row and column data")
             data = DtN_loc.flatten()
             row_data = row_data.flatten()
             col_data = col_data.flatten()
             #print(len(torch.unique(row_data)))
             #print(len(torch.unique(col_data)))
             toc_flatten = time() - tic
-            print("Flattened data")
+            #print("Flattened data")
         
         tic = time()
         sp_mat = sp.coo_matrix((data.detach().cpu().numpy(),(row_data.detach().cpu().numpy(),col_data.detach().cpu().numpy())))
