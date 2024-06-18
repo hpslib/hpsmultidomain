@@ -27,6 +27,7 @@ parser.add_argument('--box_zlim', type=float, required=False, default=1.0)  # Do
 parser.add_argument('--bc', type=str, required=True)  # Boundary condition
 parser.add_argument('--ppw',type=int, required=False)  # Points per wavelength for oscillatory problems
 parser.add_argument('--nwaves',type=float, required=False)  # Number of wavelengths
+parser.add_argument('--kh', type=str, required=False)       # checks if we have a given non-constant wavenumber
 
 # Solver and computational specifics
 parser.add_argument('--solver',type=str,required=False)  # Solver to use
@@ -83,11 +84,14 @@ if ((args.pde == 'poisson') and (args.domain == 'square')):
 elif ( (args.pde).startswith('bfield')):
     ppw_set = args.ppw is not None
     nwaves_set = args.nwaves is not None
+    kh_set = args.kh is not None
     
-    if ((not ppw_set and not nwaves_set)):
+    if ((not ppw_set and not nwaves_set and not kh_set)):
         raise ValueError('oscillatory bfield chosen but ppw and nwaves NOT set')
-    elif (ppw_set and nwaves_set):
-        raise ValueError('ppw and nwaves both set')
+    elif (ppw_set and nwaves_set) or (kh_set and nwaves_set) or (ppw_set and kh_set):
+        raise ValueError('At least two of the three between ppw, nwaves, and kh are set. Only use 1!')
+    elif (kh_set):
+        raise ValueError("kh not yet supported")
     elif (ppw_set):
         nwaves = int(n/args.ppw)
         kh = (nwaves+0.03)*2*np.pi+1.8 # This wrong for 3d?

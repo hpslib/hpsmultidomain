@@ -6,7 +6,7 @@ from test_3d import run_test_via_argparse
 
 # First we'll run a suite of Poisson problems for different n and p:
 #p_list = [10, 12, 14, 18, 22]
-p_list = [24]
+p_list = [30]
 
 domain = "square"
 pde = "bfield_constant"
@@ -14,7 +14,7 @@ bc = "free_space"
 ppw = 10
 
 for p in p_list:
-    n_list = list(range(2*(p-2), min(100, 100*(p-2)), p-2))
+    n_list = list(range(2*(p-2), 100, p-2))
     #n_list = list(range(76, 100, 2))
     
     for n in n_list:

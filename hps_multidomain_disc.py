@@ -355,8 +355,6 @@ class HPS_Multidomain:
             I_unique[:,:,:-1,5*size_face:] = -1 # Eliminate front edges except frontmost
             I_unique = I_unique.flatten()
             I_unique = I_unique[I_unique > -1]
-            #print("I_unique shape is " + str(I_unique.shape))
-            #print(I_unique)
 
             # For copy 1, we need to eliminate edges that make up domain boundary. This is just:
             # Left faces for all but leftmost boxes
