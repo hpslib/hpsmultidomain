@@ -27,7 +27,7 @@ parser.add_argument('--box_zlim', type=float, required=False, default=1.0)  # Do
 parser.add_argument('--bc', type=str, required=True)  # Boundary condition
 parser.add_argument('--ppw',type=int, required=False)  # Points per wavelength for oscillatory problems
 parser.add_argument('--nwaves',type=float, required=False)  # Number of wavelengths
-parser.add_argument('--kh', type=str, required=False)       # checks if we have a given non-constant wavenumber
+parser.add_argument('--kh', type=float, required=False)       # checks if we have a given non-constant wavenumber
 
 # Solver and computational specifics
 parser.add_argument('--solver',type=str,required=False)  # Solver to use
@@ -91,7 +91,7 @@ elif ( (args.pde).startswith('bfield')):
     elif (ppw_set and nwaves_set) or (kh_set and nwaves_set) or (ppw_set and kh_set):
         raise ValueError('At least two of the three between ppw, nwaves, and kh are set. Only use 1!')
     elif (kh_set):
-        raise ValueError("kh not yet supported")
+        kh = args.kh
     elif (ppw_set):
         nwaves = int(n/args.ppw)
         kh = (nwaves+0.03)*2*np.pi+1.8 # This wrong for 3d?
@@ -102,6 +102,8 @@ elif ( (args.pde).startswith('bfield')):
       
     if (args.pde == 'bfield_constant'):
         bfield = bfield_constant
+    if (args.pde == 'bfield_variable'):
+        bfield = bfield_variable
     elif (args.pde == 'bfield_bumpy'):
         bfield = bfield_bumpy
     elif (args.pde == 'bfield_gaussian_bumps'):
@@ -198,13 +200,23 @@ print("SOLVE RESULTS")
 solve_info = dict()
 
 if (args.bc == 'free_space'):
-    assert args.pde == 'bfield_constant'
-    ff_body = None; known_sol = True
-    
-    if (not curved_domain):
-        uu_dir = lambda xx: uu_dir_func_greens(d, xx,kh)
+    if (args.pde == 'bfield_constant'):
+        ff_body = None; known_sol = True
+        
+        if (not curved_domain):
+            uu_dir = lambda xx: uu_dir_func_greens(d, xx,kh)
+        else:
+            uu_dir = lambda xx: uu_dir_func_greens(d, param_map(xx),kh)
+    elif (args.pde == 'bfield_variable'):
+        ff_body = None; known_sol = True
+
+        if (not curved_domain):
+            uu_dir = lambda xx: uu_true_variable_helmholtz(d, xx,kh)
+        else:
+            print("Error! Curved domain for bfield_variable")
     else:
-        uu_dir = lambda xx: uu_dir_func_greens(d, param_map(xx),kh)
+        print("Error! Free space for not bfield constant or variable")
+
         
 elif (args.bc == 'pulse'):
     ff_body = None; known_sol = False

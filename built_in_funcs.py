@@ -141,6 +141,19 @@ def uu_dir_func_greens(d,xx,kh,center=torch.tensor([-1.1,+1.,+1.2])):
             uu_exact = np.cos(kh * dist_x) / (4*np.pi * dist_x)
     return uu_exact.unsqueeze(-1)
 
+def uu_true_variable_helmholtz(d,xx,kh,center=torch.tensor([-1.1,+2.,+2.2])):
+    
+    dd0 = xx[:,0] - center[0]
+    dd1 = xx[:,1] - center[1]
+    dd2 = xx[:,2] - center[2]
+    ddsq = np.multiply(dd0,dd0) + np.multiply(dd1,dd1)
+
+
+    
+    dist_x = np.sqrt(ddsq)
+    uu_exact = np.sin(kh * xx[:,0]) * xx[:,1] * xx[:,1] * xx[:,2] * xx[:,2]
+    return uu_exact.unsqueeze(-1)
+
 def du_dir_func_greens(deriv,d,xx,kh,center=torch.tensor([-1.1,+1.,+1.2])):
     if d==2:
         print("Error! This is only for d=3")
@@ -164,6 +177,9 @@ def ff_body_pulse(xx,kh):
 
 def bfield_constant(xx,kh):
     return -(kh**2) * torch.ones(xx.shape[0],device=xx.device)
+
+def bfield_variable(xx,kh):
+    return -(kh**2 - 2 / (xx[:,1]*xx[:,1]) - 2 / (xx[:,2]*xx[:,2])).unsqueeze(-1)
 
 def bfield_bumpy(xx,kh):
     
