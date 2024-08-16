@@ -102,7 +102,7 @@ elif ( (args.pde).startswith('bfield')):
       
     if (args.pde == 'bfield_constant'):
         bfield = bfield_constant
-    if (args.pde == 'bfield_variable'):
+    elif (args.pde == 'bfield_variable'):
         bfield = bfield_variable
     elif (args.pde == 'bfield_bumpy'):
         bfield = bfield_bumpy
@@ -132,7 +132,7 @@ elif ( (args.pde).startswith('bfield')):
     elif (args.domain == 'curved'):
         
         op, param_map, \
-        inv_param_map = pdo.get_param_map_and_pdo('sinusoidal', bfield, kh)
+        inv_param_map = pdo.get_param_map_and_pdo('sinusoidal', bfield, kh, d=d)
         curved_domain=True
         
     elif (args.domain == 'annulus'):

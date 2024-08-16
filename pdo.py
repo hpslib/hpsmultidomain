@@ -63,98 +63,69 @@ def const(c=1):
 ################################################################################
 #################### parameter map for curved domains ##########################
 
-def c11_func(parameter_map,y1_d1, y1_d2):
+def cii_func(parameter_map,yi_d1, yi_d2, yi_d3=None):
 
-    if ((y1_d1 is None) and (y1_d2 is None)):
-        c11 = None
+    if ((yi_d1 is None) and (yi_d2 is None) and (yi_d3 is None)):
+        cii = None
     else:
 
-        def c11(xx):
+        def cii(xx):
             yy = parameter_map(xx)
 
             result = 0
-            if (y1_d1 is not None):
-                result += y1_d1(yy)**2
-            if (y1_d2 is not None):
-                result += y1_d2(yy)**2
+            if (yi_d1 is not None):
+                result += yi_d1(yy)**2
+            if (yi_d2 is not None):
+                result += yi_d2(yy)**2
+            if (yi_d3 is not None):
+                result += yi_d3(yy)**2
             return result
-    return c11
+    return cii
 
+def ci_func(parameter_map,yi_d1d1, yi_d2d2, yi_d3d3=None):
 
-def c22_func(parameter_map,y2_d1, y2_d2):
-
-    if ((y2_d1 is None) and (y2_d2 is None)):
-        c22 = None
+    if ((yi_d1d1 is None) and (yi_d2d2 is None) and (yi_d3d3 is None)):
+        ci = None
     else:
 
-        def c22(xx):
+        def ci(xx):
             yy = parameter_map(xx)
 
             result = 0
-            if (y2_d1 is not None):
-                result += y2_d1(yy)**2
-            if (y2_d2 is not None):
-                result += y2_d2(yy)**2
+            if (yi_d1d1 is not None):
+                result -= yi_d1d1(yy)
+            if (yi_d2d2 is not None):
+                result -= yi_d2d2(yy)
+            if (yi_d3d3 is not None):
+                result -= yi_d3d3(yy)
             return result
-    return c22
+    return ci
 
-def c1_func(parameter_map,y1_d1d1, y1_d2d2):
+def cij_func(parameter_map,yi_d1, yj_d1, yi_d2, yj_d2, yi_d3=None, yj_d3=None):
 
-    if ((y1_d1d1 is None) and (y1_d2d2 is None)):
-        c1 = None
+    bool_expr1 = (yi_d1 is not None) and (yj_d1 is not None)
+    bool_expr2 = (yi_d2 is not None) and (yj_d2 is not None)
+    bool_expr3 = (yi_d3 is not None) and (yj_d3 is not None)
+    if ((not bool_expr1) and (not bool_expr2) and (not bool_expr3)):
+        cij = None
     else:
 
-        def c1(xx):
-            yy = parameter_map(xx)
-
-            result = 0
-            if (y1_d1d1 is not None):
-                result -= y1_d1d1(yy)
-            if (y1_d2d2 is not None):
-                result -= y1_d2d2(yy)
-            return result
-    return c1
-
-
-def c2_func(parameter_map,y2_d1d1, y2_d2d2):
-
-    if ((y2_d1d1 is None) and (y2_d2d2 is None)):
-        c2 = None
-    else:
-
-        def c2(xx):
-            yy = parameter_map(xx)
-
-            result = 0
-            if (y2_d1d1 is not None):
-                result -= y2_d1d1(yy)
-            if (y2_d2d2 is not None):
-                result -= y2_d2d2(yy)
-            return result
-    return c2
-
-def c12_func(parameter_map,y1_d1, y1_d2, y2_d1, y2_d2):
-
-    bool_expr1 = (y1_d1 is not None) and (y2_d1 is not None)
-    bool_expr2 = (y1_d2 is not None) and (y2_d2 is not None) 
-    if ((not bool_expr1) and (not bool_expr2)):
-        c12 = None
-    else:
-
-        def c12(xx):
+        def cij(xx):
             yy = parameter_map(xx)
 
             result = 0
             if (bool_expr1):
-                result += torch.mul(y1_d1(yy),y2_d1(yy))
+                result += torch.mul(yi_d1(yy),yj_d1(yy))
             if (bool_expr2):
-                result += torch.mul(y1_d2(yy),y2_d2(yy))
+                result += torch.mul(yi_d2(yy),yj_d2(yy))
+            if (bool_expr3):
+                result += torch.mul(yi_d3(yy),yj_d3(yy))
             return result
-    return c12
+    return cij
 
 #####################################################################################
 
-def pdo_param(kh, bfield, z1, z2, y1, y2, y1_d1=None, y1_d2=None, y2_d1=None, y2_d2=None,\
+def pdo_param_2d(kh, bfield, z1, z2, y1, y2, y1_d1=None, y1_d2=None, y2_d1=None, y2_d2=None,\
        y1_d1d1=None, y1_d2d2=None, y2_d1d1=None, y2_d2d2=None):
 
     """
@@ -194,12 +165,11 @@ def pdo_param(kh, bfield, z1, z2, y1, y2, y1_d1=None, y1_d2=None, y2_d1=None, y2
         return YY
 
     
-    c11 = c11_func(parameter_map,y1_d1,y1_d2)
-    c22 = c22_func(parameter_map,y2_d1,y2_d2)
-    c1  = c1_func (parameter_map,y1_d1d1,y1_d2d2)
-    c2  = c2_func (parameter_map,y2_d1d1,y2_d2d2)
-    c12 = c12_func(parameter_map,y1_d1,y1_d2,\
-                   y2_d1,y2_d2)
+    c11 = cii_func(parameter_map,y1_d1,y1_d2)
+    c22 = cii_func(parameter_map,y2_d1,y2_d2)
+    c1  = ci_func (parameter_map,y1_d1d1,y1_d2d2)
+    c2  = ci_func (parameter_map,y2_d1d1,y2_d2d2)
+    c12 = cij_func(parameter_map,y1_d1,y2_d1,y1_d2,y2_d2)
     
     def c(xx):
         return bfield(parameter_map(xx),kh)
@@ -207,8 +177,67 @@ def pdo_param(kh, bfield, z1, z2, y1, y2, y1_d1=None, y1_d2=None, y2_d1=None, y2
     pdo = PDO_2d(c11=c11,c22=c22,c1=c1,c2=c2,c12=c12,c=c)
     return pdo, parameter_map, inv_parameter_map
 
+def pdo_param_3d(kh, bfield, z1, z2, z3, y1, y2, y3, y1_d1=None, y1_d2=None, y1_d3=None, y2_d1=None, y2_d2=None,
+       y2_d3=None, y3_d1=None, y3_d2=None, y3_d3=None, y1_d1d1=None, y1_d2d2=None, y1_d3d3=None, y2_d1d1=None,
+       y2_d2d2=None, y2_d3d3=None, y3_d1d1=None, y3_d2d2=None, y3_d3d3=None,):
 
-def get_param_helper(geom,bfield,kh):
+    """
+    Configures a 3D PDO for variable-coefficient PDEs on custom domains by specifying parameter maps
+    and their derivatives. This function sets up the PDO based on geometric transformations
+    from a reference domain to the target curved domain.
+
+    We solve variable-coefficient PDEs on curved domains Psi by solving
+    on a reference rectangle Omega.
+    parameter_map (z_func) : given point on Omega, maps to point on Psi
+    y_func is maps points on Psi to points on Omega
+    partial derivatives are taken with respect to y = (y_1,y_2)
+    
+    Parameters:
+    kh: Wave number or parameter related to the equation's physical properties.
+    bfield: Function defining the magnetic field or other spatially varying properties within the domain.
+    z1, z2: Functions defining the forward parameter map from the reference domain to the curved domain.
+    y1, y2: Functions defining the inverse parameter map from the curved domain to the reference domain.
+    y1_d1, y1_d2, y2_d1, y2_d2: First derivatives of the y mapping functions.
+    y1_d1d1, y1_d2d2, y2_d1d1, y2_d2d2: Second derivatives of the y mapping functions.
+    
+    Returns:
+    A configured PDO object along with the parameter map and inverse parameter map functions.
+    """
+    
+    
+    def parameter_map(xx):
+        ZZ = xx.clone()
+        ZZ[:,0] = z1(xx)
+        ZZ[:,1] = z2(xx)
+        ZZ[:,2] = z3(xx)
+        return ZZ
+    
+    def inv_parameter_map(xx):
+        YY = xx.clone()
+        YY[:,0] = y1(xx)
+        YY[:,1] = y2(xx)
+        YY[:,2] = y3(xx)
+        return YY
+
+    
+    c11 = cii_func(parameter_map,y1_d1,y1_d2,y1_d3)
+    c22 = cii_func(parameter_map,y2_d1,y2_d2,y2_d3)
+    c33 = cii_func(parameter_map,y3_d1,y3_d2,y3_d3)
+    c1  = ci_func (parameter_map,y1_d1d1,y1_d2d2,y1_d3d3)
+    c2  = ci_func (parameter_map,y2_d1d1,y2_d2d2,y2_d3d3)
+    c3  = ci_func (parameter_map,y3_d1d1,y3_d2d2,y3_d3d3)
+    c12 = cij_func(parameter_map,y1_d1,y2_d1,y1_d2,y2_d2,y1_d3,y2_d3)
+    c13 = cij_func(parameter_map,y1_d1,y3_d1,y1_d2,y3_d2,y1_d3,y3_d3)
+    c23 = cij_func(parameter_map,y2_d1,y3_d1,y2_d2,y3_d2,y2_d3,y3_d3)
+    
+    def c(xx):
+        return bfield(parameter_map(xx),kh)
+    
+    pdo = PDO_3d(c11=c11,c22=c22,c33=c33,c1=c1,c2=c2,c3=c3,c12=c12,c13=c13,c23=c23,c=c)
+    return pdo, parameter_map, inv_parameter_map
+
+
+def get_param_helper(geom,bfield,kh,d=2):
     """
     Helper function for configuring PDO and parameter mappings based on the specified geometry.
     Supports various predefined geometries like 'sinusoidal', 'annulus', and 'curvy_annulus'.
@@ -217,6 +246,7 @@ def get_param_helper(geom,bfield,kh):
     geom: String specifying the geometry type.
     bfield: Function defining the magnetic field or spatially varying properties within the domain.
     kh: Wave number or parameter related to the equation's physical properties.
+    d: dimension, 2 or 3.
     
     Returns:
     Configured PDO object, parameter map, and inverse parameter map functions for the specified geometry.
@@ -232,17 +262,27 @@ def get_param_helper(geom,bfield,kh):
         y1_d1  = lambda xx: torch.ones(xx[:,0].shape,device=xx.device)
         y2_d1  = lambda xx: torch.mul(xx[:,1], dpsi(xx[:,0]))
         y2_d2  = lambda xx: psi(xx[:,0])
+        if d==3:
+            y3_d3 = lambda xx: torch.ones(xx[:,2].shape,device=xx.device)
 
         y2_d1d1  = lambda xx: torch.mul(xx[:,1], ddpsi(xx[:,0]))
         
         z1   = lambda xx: xx[:,0]
         z2   = lambda xx: torch.div(xx[:,1],psi(xx[:,0]))
+        if d==3:
+            z3   = lambda xx: xx[:,2]
         
         y1   = lambda xx: xx[:,0]
         y2   = lambda xx: torch.mul(xx[:,1],psi(xx[:,0]))
+        if d==3:
+            y3   = lambda xx: xx[:,2]
         
-        return pdo_param(kh, bfield, z1, z2, y1, y2,\
-                       y1_d1=y1_d1, y2_d1=y2_d1, y2_d2=y2_d2, y2_d1d1=y2_d1d1)
+        if d==2:
+            return pdo_param_2d(kh, bfield, z1, z2, y1, y2,\
+                            y1_d1=y1_d1, y2_d1=y2_d1, y2_d2=y2_d2, y2_d1d1=y2_d1d1)
+        else:
+            return pdo_param_3d(kh, bfield, z1, z2, z3, y1, y2, y3,\
+                            y1_d1=y1_d1, y2_d1=y2_d1, y2_d2=y2_d2, y3_d3=y3_d3, y2_d1d1=y2_d1d1)
     
     
     elif (geom == 'annulus'):
@@ -268,7 +308,7 @@ def get_param_helper(geom,bfield,kh):
         y2_d1d1  = lambda zz: torch.div(zz[:,1]**2, r(zz)**3)
         y2_d2d2  = lambda zz: torch.div(zz[:,0]**2, r(zz)**3)
         
-        return pdo_param(kh, bfield, z1,z2,y1,y2,\
+        return pdo_param_2d(kh, bfield, z1,z2,y1,y2,\
                          y1_d1=y1_d1, y1_d2=y1_d2,\
                          y1_d1d1=y1_d1d1, y1_d2d2=y1_d2d2,\
                          y2_d1=y2_d1, y2_d2=y2_d2, y2_d1d1=y2_d1d1, y2_d2d2=y2_d2d2)
@@ -332,7 +372,7 @@ def get_param_helper(geom,bfield,kh):
                                            
             return result
         
-        return pdo_param(kh, bfield, z1,z2,y1,y2,\
+        return pdo_param_2d(kh, bfield, z1,z2,y1,y2,\
                          y1_d1=y1_d1, y1_d2=y1_d2,\
                          y1_d1d1=y1_d1d1, y1_d2d2=y1_d2d2,\
                          y2_d1=y2_d1, y2_d2=y2_d2, y2_d1d1=y2_d1d1, y2_d2d2=y2_d2d2)
@@ -362,7 +402,7 @@ def get_param_helper(geom,bfield,kh):
             result[bool_map] *= 2
             return result
         
-        return pdo_param(kh, bfield,z1,z2,y1,y2,\
+        return pdo_param_2d(kh, bfield,z1,z2,y1,y2,\
                          y1_d1=y1_d1, y2_d2=y2_d2)
         
     else:
@@ -371,7 +411,7 @@ def get_param_helper(geom,bfield,kh):
 
 #####################################################################################
 
-def get_param_map_and_pdo(geom, bfield, kh):
+def get_param_map_and_pdo(geom, bfield, kh, d=2):
     """
     Main function to obtain the PDO and parameter mappings for a given geometry and magnetic field configuration.
     Directly supports simple geometries like 'square' and uses `get_param_helper` for more complex geometries.
@@ -380,6 +420,7 @@ def get_param_map_and_pdo(geom, bfield, kh):
     geom: String specifying the geometry type.
     bfield: Function defining the magnetic field or spatially varying properties within the domain.
     kh: Wave number or parameter related to the equation's physical properties.
+    d: dimension, 2 or 3.
     
     Returns:
     Configured PDO object along with the parameter map and inverse parameter map functions for the specified geometry.
@@ -393,7 +434,9 @@ def get_param_map_and_pdo(geom, bfield, kh):
         def c_func(xx):
             return bfield(xx,kh)
         op = PDO_2d(const(1),const(1), c=c_func)
+        if d==3:
+            op = PDO_3d(const(1),const(1),const(1), c=c_func)
         
         return op,param_map,inv_param_map
     else:
-        return get_param_helper(geom,bfield,kh)
+        return get_param_helper(geom,bfield,kh,d=d)

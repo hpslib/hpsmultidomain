@@ -129,7 +129,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
     #print("Got local arrays for form_DtNs")
     if (mode == 'build'):
         
-        if (pdo.c12 is None):
+        if (pdo.c12 is None) or (d==3):
             #print(Acc.shape)
             #print(Aloc[:,Jc][...,Jx].shape)
             #print(Acc.device)
@@ -151,7 +151,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             
             Jtot    = torch.hstack((Jc,Jxun))
             DtN     = Nx[:,Jtot].unsqueeze(0) @ S_full
-            if d==3:
+            if d==4: # We do not want to use interpolation for now
                 DtN = Intmap_rev.unsqueeze(0) @ DtN
         #print("Assembled the DtN")
         return DtN

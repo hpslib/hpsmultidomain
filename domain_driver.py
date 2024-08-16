@@ -200,6 +200,16 @@ class Domain_Driver:
         
         ksp.getPC().setType('lu')
         ksp.getPC().setFactorSolverType(solvertype)
+
+        """
+        print("MUMPS parameters (Icntl)")
+        for i in range(1, 48):
+            print(ksp.getPC().getFactorMatrix().getMumpsIcntl(1))
+        #print("trying no static pivoting")
+        #ksp.getPC().getFactorMatrix().setMumpsCntl(4, -1.0) # This might improve speed a little...
+        #print("then")
+        #print(ksp.getPC().getFactorMatrix().getMumpsCntl(1))
+        """
         
         px = PETSc.Vec().createWithArray(np.ones(tmp.shape[0]),comm=PETSc.COMM_WORLD)
         pb = PETSc.Vec().createWithArray(np.ones(tmp.shape[0]),comm=PETSc.COMM_WORLD)
@@ -208,6 +218,12 @@ class Domain_Driver:
         tic = time()
         ksp.solve(pb, px)
         toc_build = time() - tic
+
+        """
+        print("MUMPS parameters after build (Icntl)")
+        for i in range(1, 48):
+            print(ksp.getPC().getFactorMatrix().getMumpsIcntl(1))
+        """
         if (verbose):
             print("\t--time for %s build through petsc = %5.2f seconds"\
                   % (solvertype,toc_build))

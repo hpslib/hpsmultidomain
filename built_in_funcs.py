@@ -142,16 +142,9 @@ def uu_dir_func_greens(d,xx,kh,center=torch.tensor([-1.1,+1.,+1.2])):
     return uu_exact.unsqueeze(-1)
 
 def uu_true_variable_helmholtz(d,xx,kh,center=torch.tensor([-1.1,+2.,+2.2])):
-    
-    dd0 = xx[:,0] - center[0]
-    dd1 = xx[:,1] - center[1]
-    dd2 = xx[:,2] - center[2]
-    ddsq = np.multiply(dd0,dd0) + np.multiply(dd1,dd1)
-
-
-    
-    dist_x = np.sqrt(ddsq)
-    uu_exact = np.sin(kh * xx[:,0]) * xx[:,1] * xx[:,1] * xx[:,2] * xx[:,2]
+    uu_exact = np.sin(kh * xx[:,0]) * xx[:,1] * xx[:,1]
+    if d==3:
+        uu_exact = uu_exact * xx[:,2] * xx[:,2]
     return uu_exact.unsqueeze(-1)
 
 def du_dir_func_greens(deriv,d,xx,kh,center=torch.tensor([-1.1,+1.,+1.2])):
@@ -188,8 +181,8 @@ def bfield_bumpy(xx,kh):
     
 def bfield_crystal(xx,kh,crystal_start=0.2,crystal_end=0.8,dist=0.05):
     
-    mag   = 1.0;
-    width = 1500;
+    mag   = 1.0
+    width = 1500
     
     b = torch.zeros(xx.shape[0],device=xx.device)
     
