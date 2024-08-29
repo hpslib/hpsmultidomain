@@ -89,7 +89,7 @@ elif ((args.pde == 'mixed') and (args.domain == 'square')):
     if d==2:
         raise ValueError
     def c(xx):
-        r = np.sqrt(xx[:,0]*xx[:,0] + xx[:,1]*xx[:,1] + xx[:,2]*xx[:,2])
+        r = torch.sqrt(xx[:,0]*xx[:,0] + xx[:,1]*xx[:,1] + xx[:,2]*xx[:,2])
         r4 = r * r * r * r
         return (xx[:,0]*xx[:,1] + xx[:,0]*xx[:,2] + xx[:,1]*xx[:,2]) / r4
 
