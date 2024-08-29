@@ -12,7 +12,7 @@ def run_test_via_argparse(domain, pde, bc, disc_n, p, box_xlim=1.0, box_ylim=1.0
     s += ' --p %d' % (p)    
     s += ' --domain %s' % (domain)
 
-    if pde == "bfield_constant":
+    if (pde == "bfield_constant") or (pde == "bfield_variable"):
         s += ' --ppw %d' % (ppw)
 
     s += ' --solver %s' % (solver)
