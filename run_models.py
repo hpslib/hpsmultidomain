@@ -10,7 +10,7 @@ p_list = [10, 12, 14, 16, 18, 20, 22]#, 24, 26]
 
 domain = "square"
 pde = "mixed"
-bc = "free_space"
+bc = "log_dist"
 ppw = 10
 
 for p in p_list:
