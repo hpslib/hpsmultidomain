@@ -5,12 +5,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import pickle
 
-mypath = "test_helmholtz"
+mypath = "test_curve"
 
 onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
 
 #p_list = [6, 8, 10, 12, 14, 18, 20, 22]
-p_list = [8, 10, 12, 14, 18, 22, 30]
+#p_list = [8, 10, 12, 14, 18, 22, 30]
+p_list = [10, 12, 14, 16, 18, 20, 22]
 
 p_results = []
 
@@ -49,17 +50,18 @@ def make_plot(field, title, xlabel, ylabel, type="plot"):
             plt.plot(p_results[i].index**3, p_results[i][field])
         if type=="semilogy":
             plt.semilogy(p_results[i].index**3, p_results[i][field])
+        if type=="loglog":
+            plt.loglog(p_results[i].index**3, p_results[i][field])
         legend.append("p = " + str(p_list[i]))
 
     plt.title(title)
     plt.legend(legend)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    plt.savefig("plots_helmholtz/" + field + ".png")
+    plt.savefig("plots_curve/" + field + ".png")
     plt.show()
 
-#total_title = "Poisson: "
-total_title = "Helmholtz with 10ppw: "
+total_title = "Curved domain with 10 ppw: "
 """
 legend = []
 for i in range(len(p_list)):
@@ -78,10 +80,10 @@ plt.show()
 """
 
 
-make_plot("toc_invert", total_title + "time to factorize sparse matrix", "N", "seconds")
-make_plot("toc_build_dtn", total_title + "time to assemble batched DtN maps", "N", "seconds")
-make_plot("toc_leaf_solve", total_title + "time to solve batched leaf operators", "N", "seconds")
+#make_plot("toc_invert", total_title + "time to factorize sparse matrix", "N", "seconds")
+#make_plot("toc_build_dtn", total_title + "time to assemble batched DtN maps", "N", "seconds")
+#make_plot("toc_leaf_solve", total_title + "time to solve batched leaf operators", "N", "seconds")
 
-make_plot("sparse_solve_res", total_title + "residual of sparse system solve for boundaries", "N", "relative error", type="semilogy")
-make_plot("true_res", total_title + "residual of total result", "N", "relative error", type="semilogy")
-make_plot("leaf_res", total_title + "residual of leaf computations", "N", "relative error", type="semilogy")
+make_plot("sparse_solve_res", total_title + "residual of sparse system solve for boundaries", "N", "relative error", type="loglog")
+make_plot("true_res", total_title + "residual of total result", "N", "relative error", type="loglog")
+make_plot("leaf_res", total_title + "residual of leaf computations", "N", "relative error", type="loglog")
