@@ -81,6 +81,35 @@ if ((args.pde == 'poisson') and (args.domain == 'square')):
     kh = 0
     curved_domain = False
 
+elif ((args.pde == 'mixed') and (args.domain == 'square')):
+    if (args.ppw is not None):
+        raise ValueError
+
+    # operator:
+    if d==2:
+        raise ValueError
+    def c(xx):
+        r = np.sqrt(xx[:,0]*xx[:,0] + xx[:,1]*xx[:,1] + xx[:,2]*xx[:,2])
+        r4 = r * r * r * r
+        return (xx[:,0]*xx[:,1] + xx[:,0]*xx[:,2] + xx[:,1]*xx[:,2]) / r4
+
+    op = pdo.PDO_3d(pdo.ones,pdo.ones,pdo.ones,
+                    c12=pdo.const(c=1/3),c13=pdo.const(c=1/3),c23=pdo.const(c=1/3),
+                    c=c)
+    kh = 0
+    curved_domain = False
+
+    print(op.c)
+    print(op.c1)
+    print(op.c2)
+    print(op.c3)
+    print(op.c11)
+    print(op.c22)
+    print(op.c33)
+    print(op.c12)
+    print(op.c13)
+    print(op.c23)
+
 elif ( (args.pde).startswith('bfield')):
     ppw_set = args.ppw is not None
     nwaves_set = args.nwaves is not None
@@ -237,7 +266,7 @@ elif (args.bc == 'ones'):
         
 elif (args.bc == 'log_dist'):
     
-    if (args.pde == 'poisson'):
+    if ((args.pde == 'poisson') or (args.pde == 'mixed')):
         assert kh == 0
         assert (not curved_domain)
 
@@ -255,7 +284,7 @@ if (args.solver == 'slabLU'):
     
 elif (args.solver == 'superLU'):
 
-    uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
+    #uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
     uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
 
     print("\t--SuperLU solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\
@@ -267,7 +296,7 @@ elif (args.solver == 'superLU'):
 
 else:
 
-    uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
+    #uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
     uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
 
     print("\t--Builtin solver %s solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\
@@ -297,7 +326,7 @@ if (args.pickle is not None):
 ################################# EVALUATING SYSTEM COMPONENTS ###################################
 # Evaluate certain parts of the 3D problem 
 
-if (d==3 and 1==0):
+if (d==3) and (1==0):
     # First we generate the arrays of Chebyshev and Gaussian nodes:
     cheb_ext  = torch.from_numpy(dom.hps.H.zz.T[dom.hps.H.JJ.Jxreorder])
     gauss_ext = torch.from_numpy(dom.hps.H.zzG)
