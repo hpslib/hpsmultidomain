@@ -99,16 +99,16 @@ elif ((args.pde == 'mixed') and (args.domain == 'square')):
     kh = 0
     curved_domain = False
 
-    print(op.c)
-    print(op.c1)
-    print(op.c2)
-    print(op.c3)
-    print(op.c11)
-    print(op.c22)
-    print(op.c33)
-    print(op.c12)
-    print(op.c13)
-    print(op.c23)
+    #print(op.c)
+    #print(op.c1)
+    #print(op.c2)
+    #print(op.c3)
+    #print(op.c11)
+    #print(op.c22)
+    #print(op.c33)
+    #print(op.c12)
+    #print(op.c13)
+    #print(op.c23)
 
 elif ( (args.pde).startswith('bfield')):
     ppw_set = args.ppw is not None
