@@ -5,13 +5,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import pickle
 
-mypath = "test_curve"
+mypath = "test_mumps"
 
 onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
 
-#p_list = [6, 8, 10, 12, 14, 18, 20, 22]
+p_list = [6, 8, 10, 12, 14, 18, 22]
 #p_list = [8, 10, 12, 14, 18, 22, 30]
-p_list = [10, 12, 14, 16, 18, 20, 22]
+#p_list = [10, 12, 14, 16, 18, 20, 22]
 
 p_results = []
 
@@ -58,10 +58,10 @@ def make_plot(field, title, xlabel, ylabel, type="plot"):
     plt.legend(legend)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    plt.savefig("plots_curve/" + field + ".png")
+    plt.savefig("plots_poisson/" + field + ".png")
     plt.show()
 
-total_title = "Curved domain with 10 ppw: "
+total_title = "Poisson: "
 """
 legend = []
 for i in range(len(p_list)):

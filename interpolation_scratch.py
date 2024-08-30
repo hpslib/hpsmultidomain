@@ -1,0 +1,147 @@
+import numpy as np
+
+from numpy.polynomial  import legendre
+from numpy.polynomial.polynomial import polyvander2d
+
+import matplotlib.pyplot as plt
+
+def cheb(p):
+    """
+    Computes the Chebyshev differentiation matrix and Chebyshev points for a given degree p.
+    
+    Parameters:
+    - p: The polynomial degree
+    
+    Returns:
+    - D: The Chebyshev differentiation matrix
+    - x: The Chebyshev points
+    """
+    x = np.cos(np.pi * np.arange(p+1) / p)
+    c = np.concatenate((np.array([2]), np.ones(p-1), np.array([2])))
+    c = np.multiply(c,np.power(np.ones(p+1) * -1, np.arange(p+1)))
+    X = x.repeat(p+1).reshape((-1,p+1))
+    dX = X - X.T
+    # create the off diagonal entries of D
+    D = np.divide(np.outer(c,np.divide(np.ones(p+1),c)), dX + np.eye(p+1))
+    D = D - np.diag(np.sum(D,axis=1))
+    return D,x
+
+# Ideas:
+# Do two Lagrange transfroms in 1D, first x then y
+# Or avoid interpolating to Gaussian altogether... mayber shift just edge nodes ever so slightly off the edges?
+# Try both of these
+
+def get_legendre_row(x, input_row):
+    output_row = np.zeros(len(input_row))
+    return output_row
+
+def get_loc_interp_3d(p, q, a):
+    """
+    Computes local interpolation matrices from Chebyshev points.
+    
+    Parameters:
+    - p: The degree of the Chebyshev polynomial for interpolation
+    - q: The degree of the Gaussian polynomial for interpolation
+    
+    Returns:
+    - Interp_loc: Local interpolation matrix
+    - err: Norm of the interpolation error
+    - cond: Condition number of the interpolation matrix
+    """
+    _, croots  = cheb(p-1)
+    croots     = a * np.flip(croots)
+    croots2d   = np.array([np.repeat(croots, p), np.hstack([croots]*p)])
+    lcoeff     = np.zeros(q+1)
+    lcoeff[-1] = 1
+
+    #print(get_legendre_row(0, croots))
+
+    lroots   = a * legendre.legroots(lcoeff)
+    #lroots[1:-1] = croots[1:-1]
+    lroots2d = np.array([np.repeat(lroots, q), np.hstack([lroots]*q)])
+
+    # Vandermonde-based approach:
+    Vc = polyvander2d(croots2d[0], croots2d[1], (p,p))
+    Vl = polyvander2d(lroots2d[0], lroots2d[1], (q,q))
+
+    Interp_loc_GtC = np.linalg.lstsq(Vl.T,Vc.T,rcond=None)[0].T
+    Interp_loc_CtG = np.linalg.lstsq(Vc.T,Vl.T,rcond=None)[0].T
+
+    # TODO: Manually replace rows corresponding to interior points with identity
+    #Interp_loc_GtC[np.abs(Interp_loc_GtC) < 1e-10] = 0
+    #Interp_loc_CtG[np.abs(Interp_loc_CtG) < 1e-10] = 0
+
+    condGtC = np.linalg.cond(Interp_loc_GtC)
+    condCtG = np.linalg.cond(Interp_loc_CtG)
+
+    return Interp_loc_GtC,Interp_loc_CtG,condGtC,condCtG,croots2d,lroots2d
+
+p = 4
+q = 4
+a = 1
+
+Interp_loc_GtC,Interp_loc_CtG,condGtC,condCtG,croots2d,lroots2d = get_loc_interp_3d(p, q, a)
+
+#print(Interp_loc_GtC.shape)
+#print(Interp_loc_CtG)
+#print(condGtC,condCtG)
+
+"""
+p_list = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+for p in p_list:
+    q_list = [p] #[p-4, p-3, p-2, p-1]
+    for q in q_list:
+        _,_,condGtC,condCtG = get_loc_interp_3d(p, q, a)
+        print(p, q, condGtC, condCtG)
+"""
+
+
+# Define a function:
+def known_function(xx):
+    return np.sin(np.pi * xx[0,:]) + xx[1,:]
+
+print("For a sample function sin(pi x) + y on domain [-1,1]^2:")
+
+p_list = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+q = 4
+a = 0.25
+
+cheb_error  = []
+gauss_error = []
+cheb_cond   = []
+gauss_cond  = []
+
+for p in p_list:
+    Interp_loc_GtC,Interp_loc_CtG,condGtC,condCtG,croots2d,lroots2d = get_loc_interp_3d(p, p, a)
+
+    true_cheb  = known_function(croots2d)
+    true_gauss = known_function(lroots2d)
+
+    interp_cheb  = Interp_loc_GtC @ true_gauss
+    interp_gauss = Interp_loc_CtG @ true_cheb
+    #print("\n p = " + str(p) + ":\n")
+    #print("The relative error between the true Chebyshev nodes and interpolated from Gaussian is:")
+    cheb_error.append(np.linalg.norm(interp_cheb - true_cheb) / np.linalg.norm(true_cheb))
+    #print("The relative error between the true Gaussian nodes and interpolated from Chebyshev is:")
+    gauss_error.append(np.linalg.norm(interp_gauss - true_gauss) / np.linalg.norm(true_gauss))
+    #print("And the condtion numbers are:")
+    cheb_cond.append(condGtC)
+    gauss_cond.append(condCtG)
+
+plt.semilogy(p_list, cheb_error)
+plt.semilogy(p_list, gauss_error)
+plt.title("Errors of interpolated vs true values for sin(pi x) + y on domain [-1,1]^2")
+plt.xlabel("p and q")
+plt.ylabel("relative error")
+plt.legend(["Gaussian-to-Chebyshev", "Chebyshev-to-Gaussian"])
+plt.savefig("plots_interpolation/2Derrors.png")
+plt.show()
+
+plt.semilogy(p_list, cheb_cond)
+plt.semilogy(p_list, gauss_cond)
+plt.title("Condition numbers of 2D interpolation operators")
+plt.xlabel("p and q")
+plt.ylabel("condition number")
+plt.legend(["Gaussian-to-Chebyshev", "Chebyshev-to-Gaussian"])
+plt.savefig("plots_interpolation/2Dcond.png")
+plt.show()

@@ -321,12 +321,13 @@ if (args.pickle is not None):
     build_info.update(solve_info)
     pickle.dump(build_info,f)
     #pickle.dump(solve_info,f)
-    f.close()  
+    f.close()
 
 ################################# EVALUATING SYSTEM COMPONENTS ###################################
 # Evaluate certain parts of the 3D problem 
 
-if (d==3) and (1==0):
+if (d==3):
+    interpolation_info = dict()
     # First we generate the arrays of Chebyshev and Gaussian nodes:
     cheb_ext  = torch.from_numpy(dom.hps.H.zz.T[dom.hps.H.JJ.Jxreorder])
     gauss_ext = torch.from_numpy(dom.hps.H.zzG)
@@ -338,19 +339,33 @@ if (d==3) and (1==0):
 
     print("Relative error of Gaussian-to-Chebyshev interpolation is:")
     print(torch.norm(uu_cheb - uu_interC) / torch.norm(uu_cheb))
+    print("With condition number:")
+    print(np.linalg.cond(dom.hps.H.Interp_mat))
     print("Relative error of Chebyshev-to-Gaussian interpolation is:")
     print(torch.norm(uu_gauss - uu_interG) / torch.norm(uu_gauss))
+    print(np.linalg.cond(dom.hps.H.Interp_mat_reverse))
 
-    """
+    
     # Check if edges / corners are equal as expected:
     u, c = np.unique(dom.hps.H.JJ.Jxreorder, return_counts=True)
     dup = u[c > 1]
     maxVar = 0
     for elem in dup:
-        variance = torch.std(uu_inter[dom.hps.H.JJ.Jxreorder == elem])
+        variance = torch.std(uu_interC[dom.hps.H.JJ.Jxreorder == elem])
         maxVar = np.max([maxVar, variance.item()])
     print("Largest variance between redundant values is " + str(maxVar))
-    """
+
+    interpolation_info["GtC_error"]     = torch.norm(uu_cheb - uu_interC) / torch.norm(uu_cheb)
+    interpolation_info["GtC_cond"]      = np.linalg.cond(dom.hps.H.Interp_mat)
+    interpolation_info["CtG_error"]     = torch.norm(uu_gauss - uu_interG) / torch.norm(uu_gauss)
+    interpolation_info["CtG_cond"]      = np.linalg.cond(dom.hps.H.Interp_mat_reverse)
+    interpolation_info["redundant_var"] = maxVar
+
+    file_loc = "test_interpolation_operator/test_results_p_" + str(p) + "_kh_" + str(kh) + ".pkl"
+    print("Pickling results to file %s"% (file_loc))
+    f = open(file_loc, "wb+")
+    pickle.dump(interpolation_info, f)
+    f.close()
 
 
 # Test the accuracy of I_copy1 and I_copy2:
