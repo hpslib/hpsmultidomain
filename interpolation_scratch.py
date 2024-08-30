@@ -61,15 +61,11 @@ def get_loc_interp_3d(p, q, a, l):
     lroots2d = np.array([np.repeat(lroots, q), np.hstack([lroots]*q)])
 
     # Vandermonde-based approach:
-    Vc = polyvander2d(croots2d[0], croots2d[1], (p+l,p+l))
-    Vl = polyvander2d(lroots2d[0], lroots2d[1], (q+l,q+l))
+    Vc = polyvander2d(croots2d[0], croots2d[1], (l,l))
+    Vl = polyvander2d(lroots2d[0], lroots2d[1], (l,l))
 
-    print(Vc.shape)
-    Vc = np.delete(Vc, np.s_[(p+l+1)*(p+l):], axis=1)
-    print(Vc.shape)
-    Vc = np.delete(Vc, np.s_[(p+l)::(p+l+1)], axis=1)
-
-    print(Vc.shape, Vl.shape)
+    print("p=%2.0d,q=%2.0d,cond(Vc)=%5.2e, cond(Vl)=%5.2e"\
+        %(p,q,np.linalg.cond(Vc),np.linalg.cond(Vl)))
 
     Interp_loc_GtC = np.linalg.lstsq(Vl.T,Vc.T,rcond=None)[0].T
     Interp_loc_CtG = np.linalg.lstsq(Vc.T,Vl.T,rcond=None)[0].T
@@ -85,72 +81,52 @@ def get_loc_interp_3d(p, q, a, l):
 
     return Interp_loc_GtC,Interp_loc_CtG,condGtC,condCtG,croots2d,lroots2d
 
-p = 4
-q = 4
-a = 1
-
-Interp_loc_GtC,Interp_loc_CtG,condGtC,condCtG,croots2d,lroots2d = get_loc_interp_3d(p, p-1, a, 0)
-#print(Interp_loc_GtC.shape)
-#print(Interp_loc_CtG)
-#print(condGtC,condCtG)
-
-"""
-p_list = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
-for p in p_list:
-    q_list = [p] #[p-4, p-3, p-2, p-1]
-    for q in q_list:
-        _,_,condGtC,condCtG = get_loc_interp_3d(p, q, a)
-        print(p, q, condGtC, condCtG)
-"""
-
-
 # Define a function:
 def known_function(xx):
     return np.sin(np.pi * xx[0,:]) + xx[1,:]
 
 print("For a sample function sin(pi x) + y on domain [-1,1]^2:")
 
-p_list = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-q = 4
+p_list = [4, 5, 6, 7, 8, 9, 10, 11, 12]
 a = 0.25
 
-l_list = [40]
-for l in l_list:
-    cheb_error  = []
-    gauss_error = []
-    cheb_cond   = []
-    gauss_cond  = []
-    for p in p_list:
-        Interp_loc_GtC,Interp_loc_CtG,condGtC,condCtG,croots2d,lroots2d = get_loc_interp_3d(p, p-1, a, l)
+cheb_error  = []
+gauss_error = []
+cheb_cond   = []
+gauss_cond  = []
+for p in p_list:
 
-        true_cheb  = known_function(croots2d)
-        true_gauss = known_function(lroots2d)
+    q = 8; l = min(p,q) + 10
+    Interp_loc_GtC,Interp_loc_CtG,condGtC,condCtG,croots2d,lroots2d = get_loc_interp_3d(p, q, a, l)
 
-        interp_cheb  = Interp_loc_GtC @ true_gauss
-        interp_gauss = Interp_loc_CtG @ true_cheb
-        #print("\n p = " + str(p) + ":\n")
-        #print("The relative error between the true Chebyshev nodes and interpolated from Gaussian is:")
-        cheb_error.append(np.linalg.norm(interp_cheb - true_cheb) / np.linalg.norm(true_cheb))
-        #print("The relative error between the true Gaussian nodes and interpolated from Chebyshev is:")
-        gauss_error.append(np.linalg.norm(interp_gauss - true_gauss) / np.linalg.norm(true_gauss))
-        #print("And the condtion numbers are:")
-        cheb_cond.append(condGtC)
-        gauss_cond.append(condCtG)
+    true_cheb  = known_function(croots2d)
+    true_gauss = known_function(lroots2d)
 
-    plt.semilogy(p_list, cheb_error)
-    plt.semilogy(p_list, gauss_error)
-    plt.title("Errors of interpolated vs true values, l=" + str(l))
-    plt.xlabel("p and q")
-    plt.ylabel("relative error")
-    plt.legend(["Gaussian-to-Chebyshev", "Chebyshev-to-Gaussian"])
-    plt.savefig("plots_interpolation/2Derrors_" + str(l) + "q_is_pm1.png")
-    plt.show()
+    interp_cheb  = Interp_loc_GtC @ true_gauss
+    interp_gauss = Interp_loc_CtG @ true_cheb
+    #print("\n p = " + str(p) + ":\n")
+    #print("The relative error between the true Chebyshev nodes and interpolated from Gaussian is:")
+    cheb_error.append(np.linalg.norm(interp_cheb - true_cheb) / np.linalg.norm(true_cheb))
+    #print("The relative error between the true Gaussian nodes and interpolated from Chebyshev is:")
+    gauss_error.append(np.linalg.norm(interp_gauss - true_gauss) / np.linalg.norm(true_gauss))
+    #print("And the condtion numbers are:")
+    cheb_cond.append(condGtC)
+    gauss_cond.append(condCtG)
 
-    plt.semilogy(p_list, cheb_cond)
-    plt.semilogy(p_list, gauss_cond)
-    plt.title("Condition numbers of 2D interpolation operators, l=" + str(l))
-    plt.xlabel("p and q")
-    plt.ylabel("condition number")
-    plt.legend(["Gaussian-to-Chebyshev", "Chebyshev-to-Gaussian"])
-    plt.savefig("plots_interpolation/2Dcond_" + str(l) + "q_is_pm1.png")
-    plt.show()
+plt.semilogy(p_list, cheb_error)
+plt.semilogy(p_list, gauss_error)
+plt.title("Errors of interpolated vs true values, l=" + str(l))
+plt.xlabel("p and q")
+plt.ylabel("relative error")
+plt.legend(["Gaussian-to-Chebyshev", "Chebyshev-to-Gaussian"])
+plt.savefig("plots_interpolation/2Derrors_" + str(l) + "q_is_pm1.png")
+plt.show()
+
+plt.semilogy(p_list, cheb_cond)
+plt.semilogy(p_list, gauss_cond)
+plt.title("Condition numbers of 2D interpolation operators, l=" + str(l))
+plt.xlabel("p and q")
+plt.ylabel("condition number")
+plt.legend(["Gaussian-to-Chebyshev", "Chebyshev-to-Gaussian"])
+plt.savefig("plots_interpolation/2Dcond_" + str(l) + "q_is_pm1.png")
+plt.show()
