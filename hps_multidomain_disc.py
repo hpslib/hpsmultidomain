@@ -49,13 +49,13 @@ class HPS_Multidomain:
         self.a      = a
         self.d      = d
 
-        self.q = p-2
+        self.q = p - 2
         
         n = (self.domain[:,1] - self.domain[:,0]) / (2*self.a)
         n = torch.round(n).int()
         nboxes = torch.prod(n)
         self.n = n; self.nboxes = nboxes
-        self.H = hps_disc.HPS_Disc(a,p,d)
+        self.H = hps_disc.HPS_Disc(a,p,self.q,d)
         self.hmin = self.H.hmin
         
         Dtmp  = self.H.Ds
@@ -115,7 +115,7 @@ class HPS_Multidomain:
             n0,n1 = self.n
             nprod = n0*n1
         else:
-            size_face = self.q**2; size_ext = 6*size_face
+            size_face = (self.p-2)**2; size_ext = 6*size_face
             n0,n1,n2 = self.n
             nprod=n0*n1*n2
         
@@ -338,6 +338,7 @@ class HPS_Multidomain:
             offset_unique += n1 * size_face
         else:
             # Assuming gaussian nodes with pxp nodes total
+            # FOW NOW we're assuming Chebyshev
             size_face = self.q**2
             n0,n1,n2  = self.n
 
@@ -401,9 +402,9 @@ class HPS_Multidomain:
         pdo = self.pdo
         
         # For Gaussian we might need p^2, not (p-2)^2:
-        size_face = (p-2)**(d-1)
+        size_face = (self.q)**(d-1)
         if d==3:
-            size_face = (p-2)**2
+            size_face = (self.q)**2
         #print("set size_face")
         if (mode == 'build'):
             DtNs = torch.zeros(nboxes,2*d*size_face,2*d*size_face)
@@ -464,7 +465,7 @@ class HPS_Multidomain:
     def solve(self,device,uu_sol,ff_body_func=None,uu_true=None):
         nrhs     = uu_sol.shape[-1] # almost always 1, guessing this if for solving multiple rhs in parallel
 
-        size_ext = 4*(self.p-2)
+        size_ext = 4*(self.q)
         if self.d==3:
             size_ext = 6*(self.q**2)
 

@@ -147,7 +147,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         else:
             S_tmp   = -torch.linalg.solve(Acc,Aloc[:,Jc][...,Jxun]) # Should append Identity here and not repeat Intmap
             Intmap_repeat = Intmap_unq.unsqueeze(0).repeat(box_end-box_start,1,1)
-            S_full        = torch.concat((S_tmp @ Intmap_unq.unsqueeze(0),Intmap_repeat),dim=1)
+            S_full        = torch.concat((S_tmp @ Intmap_unq.unsqueeze(0),Intmap_repeat),dim=1) # Applying interpolation to both identity and S
             
             Jtot    = torch.hstack((Jc,Jxun))
             DtN     = Nx[:,Jtot].unsqueeze(0) @ S_full

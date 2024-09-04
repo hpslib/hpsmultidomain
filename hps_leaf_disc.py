@@ -92,7 +92,7 @@ def get_loc_interp(x_cheb, x_cheb_nocorners, q):
     cond = np.linalg.cond(Interp_loc) 
     return Interp_loc,err,cond
 
-def get_loc_interp_3d(p, q, a):
+def get_loc_interp_3d(p, q, a, l):
     """
     Computes local interpolation matrices from Chebyshev points.
     
@@ -111,20 +111,25 @@ def get_loc_interp_3d(p, q, a):
     lcoeff     = np.zeros(q+1)
     lcoeff[-1] = 1
 
+    #print(get_legendre_row(0, croots))
+
     lroots   = a * legendre.legroots(lcoeff)
+    #lroots[1:-1] = croots[1:-1]
     lroots2d = np.array([np.repeat(lroots, q), np.hstack([lroots]*q)])
 
     # Vandermonde-based approach:
-    Vc = polyvander2d(croots2d[0], croots2d[1], (p,p))
-    Vl = polyvander2d(lroots2d[0], lroots2d[1], (q,q))
+    Vc = polyvander2d(croots2d[0], croots2d[1], (l,l))
+    Vl = polyvander2d(lroots2d[0], lroots2d[1], (l,l))
+
+    #print("p=%2.0d,q=%2.0d,cond(Vc)=%5.2e, cond(Vl)=%5.2e"\
+    #    %(p,q,np.linalg.cond(Vc),np.linalg.cond(Vl)))
 
     Interp_loc_GtC = np.linalg.lstsq(Vl.T,Vc.T,rcond=None)[0].T
     Interp_loc_CtG = np.linalg.lstsq(Vc.T,Vl.T,rcond=None)[0].T
 
-    cond = np.linalg.cond(Interp_loc_GtC)
-    # TODO: get err
-    err = 3.14159
-    return Interp_loc_GtC,Interp_loc_CtG,err,cond
+    condGtC = np.linalg.cond(Interp_loc_GtC)
+    condCtG = np.linalg.cond(Interp_loc_CtG)
+    return Interp_loc_GtC,Interp_loc_CtG,condGtC,condCtG
 
 #################################### 2D discretization ##########################################
 
@@ -289,10 +294,12 @@ def leaf_discretization_3d(a,p):
     zzG = zzG.T[Jxreorder,:]
     # Need to do a little surface cleaning to make sure the faces of our Gaussian box 
     # line up with the faces of our Chebyshev box:
-    zzCleanup = zz.T[Jxreorder,:]
-    zzG[:2*p**2,0] = zzCleanup[:2*p**2,0]
-    zzG[2*p**2:4*p**2,1] = zzCleanup[2*p**2:4*p**2,1]
-    zzG[4*p**2:,2] = zzCleanup[4*p**2:,2]
+    zzG[:p**2,0]         = -a
+    zzG[p**2:2*p**2,0]   =  a
+    zzG[2*p**2:3*p**2,1] = -a
+    zzG[3*p**2:4*p**2,1] =  a
+    zzG[4*p**2:5*p**2,2] = -a
+    zzG[5*p**2:,2]       =  a
 
     JJ    = JJ_3d(Jl= Jl, Jr= Jr, Ju= Ju, Jd= Jd, Jb= Jb, Jf=Jf, Jx=Jx,
                   Jlc=Jl_corner, Jrc=Jr_corner, Jdc=Jd_corner,
@@ -324,7 +331,7 @@ def get_diff_ops(Ds,JJ,d):
 #################################### HPS Object ##########################################
 
 class HPS_Disc:
-    def __init__(self,a,p,d):
+    def __init__(self,a,p,q,d):
         """
         Initializes the HPS discretization class.
         
@@ -334,7 +341,7 @@ class HPS_Disc:
         - d: Dimension of the problem (2 or 3)
         """
         self._discretize(a,p,d)
-        self.a = a; self.p = p; self.d = d
+        self.a = a; self.p = p; self.q = q; self.d = d
         self._get_interp_mat()
         
     def _discretize(self,a,p,d):
@@ -347,7 +354,7 @@ class HPS_Disc:
     ## Interpolation from data on Ix to Ix_reorder
     def _get_interp_mat(self):
         
-        p = self.p; a = self.a
+        p = self.p; q = p; a = self.a
         
         if self.d==2:
             x_cheb = self.zz[-1,:p-1] + a
@@ -388,7 +395,8 @@ class HPS_Disc:
                 % (q,cond,err,toc))
         else:
             tic = time()
-            Interp_loc_GtC,Interp_loc_CtG,err,cond = get_loc_interp_3d(p, p, a)
+            l = min(p,q) + 10
+            Interp_loc_GtC,Interp_loc_CtG,err,cond = get_loc_interp_3d(p, q, a, l)
             self.Interp_mat         = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_GtC,0),6,axis=0))
             self.Interp_mat_reverse = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_CtG,0),6,axis=0))
 

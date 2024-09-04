@@ -69,12 +69,6 @@ def get_loc_interp_3d(p, q, a, l):
 
     Interp_loc_GtC = np.linalg.lstsq(Vl.T,Vc.T,rcond=None)[0].T
     Interp_loc_CtG = np.linalg.lstsq(Vc.T,Vl.T,rcond=None)[0].T
-    #Interp_loc_GtC = np.linalg.lstsq(Vl.T,Vc[:,:Vl.shape[1]].T,rcond=None)[0].T
-    #Interp_loc_CtG = np.linalg.lstsq(Vc[:,:Vl.shape[1]].T,Vl.T,rcond=None)[0].T
-
-    # TODO: Manually replace rows corresponding to interior points with identity
-    #Interp_loc_GtC[np.abs(Interp_loc_GtC) < 1e-10] = 0
-    #Interp_loc_CtG[np.abs(Interp_loc_CtG) < 1e-10] = 0
 
     condGtC = np.linalg.cond(Interp_loc_GtC)
     condCtG = np.linalg.cond(Interp_loc_CtG)
