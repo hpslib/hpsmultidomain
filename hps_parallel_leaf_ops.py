@@ -129,7 +129,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
     #print("Got local arrays for form_DtNs")
     if (mode == 'build'):
         
-        if (pdo.c12 is None) or (d==3):
+        if (pdo.c12 is None) and (pdo.c13 is None) and (pdo.c23 is None):
             #print(Acc.shape)
             #print(Aloc[:,Jc][...,Jx].shape)
             #print(Acc.device)
@@ -146,14 +146,13 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             #print("Applied Nx")
         else:
             S_tmp   = -torch.linalg.solve(Acc,Aloc[:,Jc][...,Jxun]) # Should append Identity here and not repeat Intmap
+            # Might need to apply intmap_unq here:
             Intmap_repeat = Intmap_unq.unsqueeze(0).repeat(box_end-box_start,1,1)
             S_full        = torch.concat((S_tmp @ Intmap_unq.unsqueeze(0),Intmap_repeat),dim=1) # Applying interpolation to both identity and S
             
-            Jtot    = torch.hstack((Jc,Jxun))
-            DtN     = Nx[:,Jtot].unsqueeze(0) @ S_full
-            if d==4: # We do not want to use interpolation for now
-                DtN = Intmap_rev.unsqueeze(0) @ DtN
-        #print("Assembled the DtN")
+            Jtot = torch.hstack((Jc,Jxun))
+            DtN  = Nx[:,Jtot].unsqueeze(0) @ S_full
+            #DtN  = Intmap_rev.unsqueeze(0) @ DtN
         return DtN
     elif (mode == 'solve'):
         
@@ -169,19 +168,21 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         if d==2:
             uu_sol[:,Jxreo,:nrhs] = Intmap.unsqueeze(0) @ data[box_start:box_end]
         #elif d==3 and pdo.c12 is not None and pdo.c13 is not None and pdo.c23 is not None:
-          #  uu_sol[:,Jxun,:nrhs] = Intmap_unq.unsqueeze(0) @ data[box_start:box_end]
-        else:
-            uu_sol[:,Jx,:nrhs] = data[box_start:box_end]
+        #    uu_sol[:,Jxun,:nrhs] = Intmap_unq.unsqueeze(0) @ data[box_start:box_end]
+        #else:
+        #    uu_sol[:,Jx,:nrhs] = data[box_start:box_end]
 
-        if (pdo.c12 is None):
+        if (pdo.c12 is None) and (pdo.c13 is None) and (pdo.c23 is None):
             #print(nrhs)
             #print((f_body - Aloc[:,Jc][...,Jx] @ data[box_start:box_end]).shape)
             #print(Acc.shape)
             #print(Jc.shape)
+            uu_sol[:,Jx,:nrhs] = data[box_start:box_end]
             uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc][...,Jx] @ data[box_start:box_end])
             #print(uu_sol)#[:,Jc,:nrhs])
         else:
             # Need to make this Jxunique like here:
+            uu_sol[:,Jxun,:nrhs] = Intmap_unq.unsqueeze(0) @ data[box_start:box_end]
             uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc][...,Jxun] @ uu_sol[:,Jxun,:nrhs])
             
         # calculate residual
@@ -210,14 +211,14 @@ def get_DtN_chunksize(p,device):
     return int(chunk_max/4)
 
 
-def get_DtNs_helper(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,\
+def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,\
                     box_start,box_end,chunk_init,device,mode,data,ff_body_func,uu_true):
     nboxes = box_end - box_start
     size_face = (p-2)**(d-1)
     if d==3:
-        size_face = (p-2)**2
+        size_face = q**2
     if (mode == 'build'):
-        DtNs = torch.zeros(nboxes,2*d*size_face,2*d*size_face,device=device)
+        DtNs = torch.zeros(nboxes,2*d*p**2,2*d*size_face,device=device)
     elif (mode == 'solve'):
         DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1],device=device)
     elif (mode == 'reduce_body'):

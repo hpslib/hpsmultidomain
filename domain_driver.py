@@ -439,24 +439,24 @@ class Domain_Driver:
 
             # As a test, let's try multiplying the dense A_CC by the true solution:
             
-            #true_c_sol = uu_dir_func(self.hps.xx_active[self.I_Ctot])
+            true_c_sol = uu_dir_func(self.hps.xx_active[self.I_Ctot])
             #print("System X true solution:")
             #print(true_c_sol)
-            #print("Relative residual error for sparse A_CC X true solution - ff_body:")
+            print("Relative residual error for sparse A_CC X true solution - ff_body:")
             #print((self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()))
-            #print(np.linalg.norm(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body))
+            print(np.linalg.norm(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body))
 
             #print("Relative residual error for sparse A_CC X computed solution - ff_body:")
             #print(np.linalg.norm(self.A_CC @ sol - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body))
 
             
-            #print("Relative error on unique boundary is:")
+            print("Relative error on unique boundary is:")
             #print((sol - true_c_sol) / true_c_sol)
             #print("Real shared boundary is")
             #print(true_c_sol)
             #print("Computed is")
             #print(sol)
-            #print("With norm of " + str(torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)))
+            print("With norm error of " + str(torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)))
             
         resloc_hps = torch.tensor([float('nan')])
         if (self.sparse_assembly == 'reduced_gpu'):

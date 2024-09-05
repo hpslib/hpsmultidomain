@@ -236,12 +236,12 @@ def gauss_3d(a,p):
 
     return zz
 
-def leaf_discretization_3d(a,p):
+def leaf_discretization_3d(a,p,q):
     """
     Performs leaf-level discretization for a 3D domain.
     """
     zz,Ds = cheb_3d(a,p)
-    zzG   = gauss_3d(a,p)
+    zzG   = gauss_3d(a,q)
     hmin  = zz[2,1] - zz[2,0]
 
     # Jl, Jr, Jd, Ju are RLDU as expected, with no corners
@@ -291,15 +291,31 @@ def leaf_discretization_3d(a,p):
     Jtot  = np.concatenate((Jx,Jc))
 
     # Take only necessary surface values for Gaussian nodes:
-    zzG = zzG.T[Jxreorder,:]
+    a_gauss = np.max(np.concatenate((zzG[0,:], zzG[1,:], zzG[2,:])))
+    Jl_gauss = np.argwhere(zzG[0,:] < - a_gauss + 0.5 * hmin)
+    Jl_gauss = Jl_gauss.copy().reshape(q**2,)
+    Jr_gauss = np.argwhere(zzG[0,:] > + a_gauss - 0.5 * hmin)
+    Jr_gauss = Jr_gauss.copy().reshape(q**2,)
+    Jd_gauss = np.argwhere(zzG[1,:] < - a_gauss + 0.5 * hmin)
+    Jd_gauss = Jd_gauss.copy().reshape(q**2,)
+    Ju_gauss = np.argwhere(zzG[1,:] > + a_gauss - 0.5 * hmin)
+    Ju_gauss = Ju_gauss.copy().reshape(q**2,)
+    Jb_gauss = np.argwhere(zzG[2,:] < - a_gauss + 0.5 * hmin)
+    Jb_gauss = Jb_gauss.copy().reshape(q**2,)
+    Jf_gauss = np.argwhere(zzG[2,:] > + a_gauss - 0.5 * hmin)
+    Jf_gauss = Jf_gauss.copy().reshape(q**2,)
+    Jgauss = np.concatenate((Jl_gauss,Jr_gauss,Jd_gauss,Ju_gauss,Jb_gauss,Jf_gauss))
+    zzG = zzG.T[Jgauss,:]
     # Need to do a little surface cleaning to make sure the faces of our Gaussian box 
     # line up with the faces of our Chebyshev box:
-    zzG[:p**2,0]         = -a
-    zzG[p**2:2*p**2,0]   =  a
-    zzG[2*p**2:3*p**2,1] = -a
-    zzG[3*p**2:4*p**2,1] =  a
-    zzG[4*p**2:5*p**2,2] = -a
-    zzG[5*p**2:,2]       =  a
+    zzG[:q**2,0]         = -a
+    zzG[q**2:2*q**2,0]   =  a
+    zzG[2*q**2:3*q**2,1] = -a
+    zzG[3*q**2:4*q**2,1] =  a
+    zzG[4*q**2:5*q**2,2] = -a
+    zzG[5*q**2:,2]       =  a
+
+    print(zzG)
 
     JJ    = JJ_3d(Jl= Jl, Jr= Jr, Ju= Ju, Jd= Jd, Jb= Jb, Jf=Jf, Jx=Jx,
                   Jlc=Jl_corner, Jrc=Jr_corner, Jdc=Jd_corner,
@@ -315,9 +331,9 @@ def get_diff_ops(Ds,JJ,d):
         Nd = Ds.D2[JJ.Jd]
         Nu = Ds.D2[JJ.Ju]
 
-        Nx = np.concatenate((-Nl,+Nr,-Nd,+Nu))
+        Nx  = np.concatenate((-Nl,+Nr,-Nd,+Nu))
+        Nxc = Nx
     else: # Need to include corners here...
-        Jtot = np.hstack((JJ.Jc,JJ.Jxreorder))
         Nl = Ds.D1[JJ.Jl]
         Nr = Ds.D1[JJ.Jr]
         Nd = Ds.D2[JJ.Jd]
@@ -325,8 +341,16 @@ def get_diff_ops(Ds,JJ,d):
         Nb = Ds.D3[JJ.Jb]
         Nf = Ds.D3[JJ.Jf]
 
-        Nx = np.concatenate((-Nl,+Nr,-Nd,+Nu,-Nb,+Nf))
-    return Nx
+        Nlc = Ds.D1[JJ.Jlc]
+        Nrc = Ds.D1[JJ.Jrc]
+        Ndc = Ds.D2[JJ.Jdc]
+        Nuc = Ds.D2[JJ.Juc]
+        Nbc = Ds.D3[JJ.Jbc]
+        Nfc = Ds.D3[JJ.Jfc]
+
+        Nx  = np.concatenate((-Nl,+Nr,-Nd,+Nu,-Nb,+Nf))
+        Nxc = np.concatenate((-Nlc,+Nrc,-Ndc,+Nuc,-Nbc,+Nfc))
+    return Nx, Nxc
 
 #################################### HPS Object ##########################################
 
@@ -340,21 +364,22 @@ class HPS_Disc:
         - p: The polynomial degree for Chebyshev discretization
         - d: Dimension of the problem (2 or 3)
         """
-        self._discretize(a,p,d)
+        self._discretize(a,p,q,d)
         self.a = a; self.p = p; self.q = q; self.d = d
         self._get_interp_mat()
         
-    def _discretize(self,a,p,d):
+    def _discretize(self,a,p,q,d):
         if d == 2:
             self.zz, self.Ds, self.JJ, self.hmin = leaf_discretization_2d(a, p)
         else:
-            self.zz, self.Ds, self.JJ, self.hmin, self.zzG = leaf_discretization_3d(a, p)
-        self.Nx = get_diff_ops(self.Ds, self.JJ, d)
+            self.zz, self.Ds, self.JJ, self.hmin, self.zzG = leaf_discretization_3d(a, p, q)
+        Nx, Nxc = get_diff_ops(self.Ds, self.JJ, d)
+        self.Nx = Nx; self.Nxc = Nxc
         
     ## Interpolation from data on Ix to Ix_reorder
     def _get_interp_mat(self):
         
-        p = self.p; q = p; a = self.a
+        p = self.p; q = self.q; a = self.a
         
         if self.d==2:
             x_cheb = self.zz[-1,:p-1] + a
@@ -406,12 +431,9 @@ class HPS_Disc:
                 elem = self.JJ.Jxreorder[i]
                 where = np.argwhere(self.JJ.Jxreorder == elem)
                 P[i,where] = 1 / len(where)
-
-            # Delete rows of P corresponding to duplicate entries in Jxreorder:
-            Pnew = P[self.JJ.unique_in_reorder,:]
             
             # Apply this to our interpolation matrix to ensure continuity at corner nodes:
-            self.Interp_mat_unique = Pnew @ self.Interp_mat # without redundant corners
+            self.Interp_mat_unique = self.Interp_mat[self.JJ.unique_in_reorder,:] # without redundant corners
             self.Interp_mat        = P @ self.Interp_mat    # with
 
             toc = time() - tic

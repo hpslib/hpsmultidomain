@@ -49,7 +49,9 @@ class HPS_Multidomain:
         self.a      = a
         self.d      = d
 
-        self.q = p - 2
+        self.q = 8
+        if (pdo.c12 is None) and (pdo.c13 is None) and (pdo.c23 is None):
+            self.q = self.p - 2
         
         n = (self.domain[:,1] - self.domain[:,0]) / (2*self.a)
         n = torch.round(n).int()
@@ -87,8 +89,10 @@ class HPS_Multidomain:
             self.gauss_xx = self.get_gaussian_nodes()
             self.gauss_xx = self.gauss_xx.flatten(start_dim=0,end_dim=-2)
             self.I_unique, self.I_copy1, self.I_copy2 = self.get_unique_inds()
-            # I think you want xx_ext to be based on Gaussian nodes:
-            self.xx_ext = self.grid_xx[:,Jx,:].flatten(start_dim=0,end_dim=-2)#self.gauss_xx
+            # We want xx_ext to be based on Gaussian nodes unless there are no mixed terms:
+            self.xx_ext = self.gauss_xx
+            if (pdo.c12 is None) and (pdo.c13 is None) and (pdo.c23 is None):
+                self.xx_ext = self.grid_xx[:,Jx,:].flatten(start_dim=0,end_dim=-2)
             self.xx_active = self.xx_ext[self.I_unique,:]
         
         self.xx_tot = self.grid_xx.flatten(start_dim=0,end_dim=-2)
@@ -107,7 +111,7 @@ class HPS_Multidomain:
         """
         #print("Building DtNs")
         tic = time()
-        DtN_loc = self.get_DtNs(device,'build') # Tentatively think this is already good
+        DtN_loc = self.get_DtNs(device,'build')
         toc_DtN = time() - tic
         #print("Built DtNs")
         if self.d==2:
@@ -115,7 +119,7 @@ class HPS_Multidomain:
             n0,n1 = self.n
             nprod = n0*n1
         else:
-            size_face = (self.p-2)**2; size_ext = 6*size_face
+            size_face = self.q**2; size_ext = 6*size_face
             n0,n1,n2 = self.n
             nprod=n0*n1*n2
         
@@ -256,7 +260,7 @@ class HPS_Multidomain:
         zzG = torch.tensor(self.H.zzG)
         #print(zzG.shape)
         n   = self.n
-        xxG = torch.zeros(self.nboxes, 6*self.p**2, self.d)
+        xxG = torch.zeros(self.nboxes, 6*self.q**2, self.d)
         for i in range(n[0]):
             for j in range(n[1]):
                 if self.d==2:
@@ -338,7 +342,7 @@ class HPS_Multidomain:
             offset_unique += n1 * size_face
         else:
             # Assuming gaussian nodes with pxp nodes total
-            # FOW NOW we're assuming Chebyshev
+            # FOR NOW we're assuming Chebyshev
             size_face = self.q**2
             n0,n1,n2  = self.n
 
@@ -398,16 +402,13 @@ class HPS_Multidomain:
     ########################################## DtN multidomain build and solve ###################################
         
     def get_DtNs(self,device,mode='build',data=0,ff_body_func=None,uu_true=None):
-        a = self.a; p = self.p; nboxes = self.nboxes; d = self.d
+        a = self.a; p = self.p; q = self.q; nboxes = self.nboxes; d = self.d
         pdo = self.pdo
         
         # For Gaussian we might need p^2, not (p-2)^2:
-        size_face = (self.q)**(d-1)
-        if d==3:
-            size_face = (self.q)**2
-        #print("set size_face")
+        size_face = q**(d-1)
         if (mode == 'build'):
-            DtNs = torch.zeros(nboxes,2*d*size_face,2*d*size_face)
+            DtNs = torch.zeros(nboxes,2*d*p**2,2*d*size_face)
             data = torch.zeros(nboxes,2*d*size_face,1)
             #print("Initialized arrays of zeros")
         elif (mode == 'solve'):
@@ -416,7 +417,9 @@ class HPS_Multidomain:
             DtNs = torch.zeros(nboxes,2*d*size_face,1)
         
         xxloc = self.grid_xx.to(device)
-        Nxtot = torch.tensor(self.H.Nx).to(device)
+        Nxtot = torch.tensor(self.H.Nxc).to(device)
+        if (d==3) and (pdo.c12 is None) and (pdo.c13 is None) and (pdo.c23 is None):
+            Nxtot = torch.tensor(self.H.Nx).to(device)
         Jx    = torch.tensor(self.H.JJ.Jx).to(device)
         Jc    = torch.tensor(self.H.JJ.Jc).to(device)
         Jxreo = torch.tensor(self.H.JJ.Jxreorder).to(device)
@@ -433,9 +436,9 @@ class HPS_Multidomain:
 
         # Only need Jxun for 3D case:
         if d==2:    
-            args = p,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxreo,Ds,Intmap,Intmap,Intmap,pdo
+            args = p,q,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxreo,Ds,Intmap,Intmap,Intmap,pdo
         else:
-            args = p,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
+            args = p,q,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
         
         # reserve at most 1GB memory for stored DtNs at a time
         f = 0.8e9 # 0.8 GB in bytes

@@ -203,7 +203,7 @@ print(inspect.getsource(bfield))
 
 ################################# BUILD OPERATOR #########################
 # Build operator based on specified parameters and solver information
-
+"""
 print(args.sparse_assembly)
 
 build_info = dom.build(sparse_assembly=args.sparse_assembly,\
@@ -221,8 +221,7 @@ build_info['kh']   = kh
 build_info['periodic_bc'] = args.periodic_bc
 build_info['a'] = a
 build_info['p'] = p
-    
-    
+"""
 ################################# SOLVE PDE ###################################
 # Solve the PDE with specified configurations and print results
 print("SOLVE RESULTS")
@@ -278,6 +277,8 @@ elif (args.bc == 'log_dist'):
 else:
     raise ValueError("invalid bc")
 
+"""
+
 if (args.solver == 'slabLU'):
     
     raise ValueError("this code is not included in this version")
@@ -322,7 +323,7 @@ if (args.pickle is not None):
     pickle.dump(build_info,f)
     #pickle.dump(solve_info,f)
     f.close()
-
+"""
 ################################# EVALUATING SYSTEM COMPONENTS ###################################
 # Evaluate certain parts of the 3D problem 
 
@@ -339,11 +340,12 @@ if (d==3):
 
     print("Relative error of Gaussian-to-Chebyshev interpolation is:")
     print(torch.norm(uu_cheb - uu_interC) / torch.norm(uu_cheb))
-    print("With condition number:")
-    print(np.linalg.cond(dom.hps.H.Interp_mat))
+    print("With condition number and shape:")
+    print(np.linalg.cond(dom.hps.H.Interp_mat), dom.hps.H.Interp_mat.shape)
     print("Relative error of Chebyshev-to-Gaussian interpolation is:")
     print(torch.norm(uu_gauss - uu_interG) / torch.norm(uu_gauss))
-    print(np.linalg.cond(dom.hps.H.Interp_mat_reverse))
+    print("With condition number and shape:")
+    print(np.linalg.cond(dom.hps.H.Interp_mat_reverse), dom.hps.H.Interp_mat_reverse.shape)
 
     
     # Check if edges / corners are equal as expected:
@@ -362,10 +364,10 @@ if (d==3):
     interpolation_info["redundant_var"] = maxVar
 
     file_loc = "test_interpolation_operator/test_results_p_" + str(p) + "_kh_" + str(kh) + ".pkl"
-    print("Pickling results to file %s"% (file_loc))
-    f = open(file_loc, "wb+")
-    pickle.dump(interpolation_info, f)
-    f.close()
+    #print("Pickling results to file %s"% (file_loc))
+    #f = open(file_loc, "wb+")
+    #pickle.dump(interpolation_info, f)
+    #f.close()
 
 
 # Test the accuracy of I_copy1 and I_copy2:
@@ -387,7 +389,7 @@ if (d==3 and 1==0):
     print("Number of I_copy entries on domain boundary (should be 0): " + str(len(I_dir)))
 
 # Test DtN_loc accuracy:
-if (d==3 and 1==0):
+if d==3:
     # Here we'll test our DtN operators on a known function. First we define the known function and its
     # first order derivatives (this test is for Laplace only):
     def u_true(xx):
@@ -416,8 +418,8 @@ if (d==3 and 1==0):
     # Here we get our dirichlet data, reshape it, and then multiply with DtNs to get our Neumann data
     uu_dir_gauss = u_true(dom.hps.xx_ext)
 
-    uu_neumann_from_A = torch.from_numpy(dom.A @ uu_dir_gauss)
-    uu_neumann_from_A = torch.reshape(uu_neumann_from_A, (DtN_loc.shape[0],-1))
+    #uu_neumann_from_A = torch.from_numpy(dom.A @ uu_dir_gauss)
+    #uu_neumann_from_A = torch.reshape(uu_neumann_from_A, (DtN_loc.shape[0],-1))
 
     uu_dir_gauss = torch.reshape(uu_dir_gauss, (DtN_loc.shape[0],-1))
     uu_dir_gauss = torch.unsqueeze(uu_dir_gauss, -1)
@@ -426,7 +428,13 @@ if (d==3 and 1==0):
     uu_neumann_approx = torch.squeeze(uu_neumann_approx)
 
     # Next we fold our spatial inputs and compute our actual neumann data:
-    xx_folded = torch.reshape(dom.hps.xx_ext, (DtN_loc.shape[0],DtN_loc.shape[1], -1))
+    #xx_folded = torch.reshape(dom.hps.xx_ext, (DtN_loc.shape[0],DtN_loc.shape[1], -1))
+
+    # Trying xx_folded with Chebyshev instead:
+    size_face = dom.hps.p**2
+    size_ext  = 6 * size_face
+    xx_folded = dom.hps.grid_xx[:,torch.tensor(dom.hps.H.JJ.Jxreorder),:].flatten(start_dim=0,end_dim=-2)
+    xx_folded = torch.reshape(xx_folded, (DtN_loc.shape[0],DtN_loc.shape[1], -1))
 
     uu_neumann = torch.zeros((xx_folded.shape[0], xx_folded.shape[1]))
     for i in range(xx_folded.shape[0]):
@@ -437,10 +445,20 @@ if (d==3 and 1==0):
         uu_neumann[i,4*size_face:5*size_face] = -du3_true(xx_folded[i,4*size_face:5*size_face,:])
         uu_neumann[i,5*size_face:6*size_face] =  du3_true(xx_folded[i,5*size_face:6*size_face,:])
 
-    print("Relative error of Neumann computation using tensor DtNs is")
+    #print(torch.abs(uu_neumann_approx[0] - uu_neumann[0]) / torch.abs(uu_neumann[0]))
+
+    print(torch.abs(uu_neumann_approx[1] - uu_neumann[1]) / torch.abs(uu_neumann[1]))
+
+    print("\nRelative error of Neumann computation using tensor DtNs is")
     print(torch.linalg.norm(uu_neumann_approx - uu_neumann) / torch.linalg.norm(uu_neumann))
-    print("Relative error of Neumann computation using sparse matrix A is")
-    print(torch.linalg.norm(uu_neumann_from_A - uu_neumann) / torch.linalg.norm(uu_neumann))
+    #print("Relative error of Neumann computation using sparse matrix A is")
+    #print(torch.linalg.norm(uu_neumann_from_A - uu_neumann) / torch.linalg.norm(uu_neumann))
+
+    Jtot = np.hstack((dom.hps.H.JJ.Jc,dom.hps.H.JJ.Jxunique))
+    #import sys
+    #np.set_printoptions(threshold=sys.maxsize)
+    #print(dom.hps.H.Nxc[...,dom.hps.H.JJ.Jc])
+    #print(dom.hps.H.JJ.Jc)
 
 if (d==3 and 1==0):
     I_copy1  = dom.hps.I_copy1
