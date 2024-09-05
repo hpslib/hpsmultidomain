@@ -88,10 +88,13 @@ elif ((args.pde == 'mixed') and (args.domain == 'square')):
     # operator:
     if d==2:
         raise ValueError
-    def c(xx):
-        r = torch.sqrt(xx[:,0]*xx[:,0] + xx[:,1]*xx[:,1] + xx[:,2]*xx[:,2])
-        r4 = r * r * r * r
-        return (xx[:,0]*xx[:,1] + xx[:,0]*xx[:,2] + xx[:,1]*xx[:,2]) / r4
+    def c(xx, center=torch.tensor([-1.1,+1.,+1.2])):
+        dd0  = xx[:,0] - center[0]
+        dd1  = xx[:,1] - center[1]
+        dd2  = xx[:,2] - center[2]
+        ddsq = dd0*dd0 + dd1*dd1 + dd2*dd2 # r^2
+        r4   = ddsq * ddsq
+        return (dd0*dd1 + dd0*dd2 + dd1*dd2) / r4
 
     op = pdo.PDO_3d(pdo.ones,pdo.ones,pdo.ones,
                     c12=pdo.const(c=1/3),c13=pdo.const(c=1/3),c23=pdo.const(c=1/3),
@@ -99,16 +102,24 @@ elif ((args.pde == 'mixed') and (args.domain == 'square')):
     kh = 0
     curved_domain = False
 
-    #print(op.c)
-    #print(op.c1)
-    #print(op.c2)
-    #print(op.c3)
-    #print(op.c11)
-    #print(op.c22)
-    #print(op.c33)
-    #print(op.c12)
-    #print(op.c13)
-    #print(op.c23)
+# TODO
+elif ((args.pde == 'mixed_constant') and (args.domain == 'square')):
+    if (args.ppw is not None):
+        raise ValueError
+
+    # operator:
+    if d==2:
+        raise ValueError
+    def c(xx):
+        r = torch.sqrt(xx[:,0]*xx[:,0] + xx[:,1]*xx[:,1] + xx[:,2]*xx[:,2])
+        r4 = r * r * r * r
+        return (xx[:,0]*xx[:,1] + xx[:,0]*xx[:,2] + xx[:,1]*xx[:,2]) / r4
+
+    op = pdo.PDO_3d(pdo.ones,pdo.ones,pdo.ones,
+                    c12=pdo.const(c=1/4),c13=pdo.const(c=1/4),c23=pdo.const(c=1/4),
+                    c=c)
+    kh = 0
+    curved_domain = False
 
 elif ( (args.pde).startswith('bfield')):
     ppw_set = args.ppw is not None
@@ -439,19 +450,13 @@ if d==3:
         uu_neumann[i,4*size_face:5*size_face] = -du3_true(xx_folded[i,4*size_face:5*size_face,:])
         uu_neumann[i,5*size_face:6*size_face] =  du3_true(xx_folded[i,5*size_face:6*size_face,:])
 
-    print(torch.abs(uu_neumann_approx[0] - uu_neumann[0]) / torch.abs(uu_neumann[0]))
-
-    print(torch.abs(uu_neumann_approx[1] - uu_neumann[1]) / torch.abs(uu_neumann[1]))
+    #print(torch.abs(uu_neumann_approx[0] - uu_neumann[0]) / torch.abs(uu_neumann[0]))
+    #print(torch.abs(uu_neumann_approx[1] - uu_neumann[1]) / torch.abs(uu_neumann[1]))
 
     print("\nRelative error of Neumann computation using tensor DtNs is")
     print(torch.linalg.norm(uu_neumann_approx - uu_neumann) / torch.linalg.norm(uu_neumann))
     #print("Relative error of Neumann computation using sparse matrix A is")
     #print(torch.linalg.norm(uu_neumann_from_A - uu_neumann) / torch.linalg.norm(uu_neumann))
-
-    #import sys
-    #np.set_printoptions(threshold=sys.maxsize)
-    #print(dom.hps.H.Nxc[...,dom.hps.H.JJ.Jc])
-    #print(dom.hps.H.JJ.Jc)
 
 if (d==3 and 1==0):
     I_copy1  = dom.hps.I_copy1

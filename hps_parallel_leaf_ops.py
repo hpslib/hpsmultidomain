@@ -77,12 +77,12 @@ def get_Aloc_3d(p, xxloc, Ds, pdo, box_start, box_end, device):
     Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c11, Ds[0], c=-1.)
     Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c22, Ds[1], c=-1.)
     Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c33, Ds[2], c=-1.)
-    """if pdo.c12 is not None:
-        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c12, Ds[3], c=-2.)
+    if pdo.c12 is not None:
+        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c12, Ds[3], c=-1.)
     if pdo.c13 is not None:
-        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c13, Ds[4], c=-2.)
+        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c13, Ds[4], c=-1.)
     if pdo.c23 is not None:
-        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c23, Ds[5], c=-2.)
+        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c23, Ds[5], c=-1.)
     if pdo.c1 is not None:
         Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c1, Ds[6])
     if pdo.c2 is not None:
@@ -91,7 +91,7 @@ def get_Aloc_3d(p, xxloc, Ds, pdo, box_start, box_end, device):
         Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c3, Ds[8])
     if pdo.c is not None:
         I = torch.eye(p**3, device=device)
-        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c, I)"""
+        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c, I)
     return Aloc
 
 # Helper function to accumulate the contribution of each coefficient function to the local blocks
