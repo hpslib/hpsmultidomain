@@ -151,8 +151,8 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             S_full        = torch.concat((S_tmp @ Intmap_unq.unsqueeze(0),Intmap_repeat),dim=1) # Applying interpolation to both identity and S
             
             Jtot = torch.hstack((Jc,Jxun))
-            DtN  = S_full #Nx[:,Jtot].unsqueeze(0) @ S_full
-            #DtN  = Intmap_rev.unsqueeze(0) @ DtN
+            DtN  = Nx[:,Jtot].unsqueeze(0) @ S_full
+            DtN  = Intmap_rev.unsqueeze(0) @ DtN
         return DtN
     elif (mode == 'solve'):
         
@@ -218,7 +218,7 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_
     if d==3:
         size_face = q**2
     if (mode == 'build'):
-        DtNs = torch.zeros(nboxes,p**3,2*d*size_face,device=device)
+        DtNs = torch.zeros(nboxes,2*d*size_face,2*d*size_face,device=device)
     elif (mode == 'solve'):
         DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1],device=device)
     elif (mode == 'reduce_body'):
