@@ -408,7 +408,7 @@ class HPS_Multidomain:
         # For Gaussian we might need p^2, not (p-2)^2:
         size_face = q**(d-1)
         if (mode == 'build'):
-            DtNs = torch.zeros(nboxes,2*d*p**2,2*d*size_face)
+            DtNs = torch.zeros(nboxes,p**3,2*d*size_face)
             data = torch.zeros(nboxes,2*d*size_face,1)
             #print("Initialized arrays of zeros")
         elif (mode == 'solve'):

@@ -431,30 +431,40 @@ if d==3:
     #xx_folded = torch.reshape(dom.hps.xx_ext, (DtN_loc.shape[0],DtN_loc.shape[1], -1))
 
     # Trying xx_folded with Chebyshev instead:
-    size_face = dom.hps.p**2
-    size_ext  = 6 * size_face
-    xx_folded = dom.hps.grid_xx[:,torch.tensor(dom.hps.H.JJ.Jxreorder),:].flatten(start_dim=0,end_dim=-2)
-    xx_folded = torch.reshape(xx_folded, (DtN_loc.shape[0],DtN_loc.shape[1], -1))
+    #size_face = dom.hps.p**2
+    #size_ext  = 6 * size_face
+    #xx_folded = dom.hps.grid_xx[:,torch.tensor(dom.hps.H.JJ.Jxreorder),:].flatten(start_dim=0,end_dim=-2)
+    #xx_folded = torch.reshape(xx_folded, (DtN_loc.shape[0],DtN_loc.shape[1], -1))
 
-    uu_neumann = torch.zeros((xx_folded.shape[0], xx_folded.shape[1]))
+    """uu_neumann = torch.zeros((xx_folded.shape[0], xx_folded.shape[1]))
     for i in range(xx_folded.shape[0]):
         uu_neumann[i,:size_face]              = -du1_true(xx_folded[i,:size_face,:])
         uu_neumann[i,size_face:2*size_face]   =  du1_true(xx_folded[i,size_face:2*size_face,:])
         uu_neumann[i,2*size_face:3*size_face] = -du2_true(xx_folded[i,2*size_face:3*size_face,:])
         uu_neumann[i,3*size_face:4*size_face] =  du2_true(xx_folded[i,3*size_face:4*size_face,:])
         uu_neumann[i,4*size_face:5*size_face] = -du3_true(xx_folded[i,4*size_face:5*size_face,:])
-        uu_neumann[i,5*size_face:6*size_face] =  du3_true(xx_folded[i,5*size_face:6*size_face,:])
+        uu_neumann[i,5*size_face:6*size_face] =  du3_true(xx_folded[i,5*size_face:6*size_face,:])"""
+
+    Jtot = np.hstack((dom.hps.H.JJ.Jc,dom.hps.H.JJ.Jxunique))
+    uu_interior = dom.hps.grid_xx[:,Jtot,:].flatten(start_dim=0,end_dim=-2)
+    uu_interior = u_true(uu_interior)
+    uu_interior = torch.reshape(uu_interior, (DtN_loc.shape[0],DtN_loc.shape[1]))
+
+    lenJc = len(dom.hps.H.JJ.Jc); lenJxun = lenJc + len(dom.hps.H.JJ.Jxunique)
+    print(torch.abs(uu_neumann_approx[0,:lenJc] - uu_interior[0,:lenJc]) / torch.abs(uu_interior[0,:lenJc]))
+
+    print("\nRelative error of interior computation using tensor DtNs is")
+    print(torch.linalg.norm(uu_neumann_approx[:,:lenJc] - uu_interior[:,:lenJc]) / torch.linalg.norm(uu_interior[:,:lenJc]))
 
     #print(torch.abs(uu_neumann_approx[0] - uu_neumann[0]) / torch.abs(uu_neumann[0]))
 
-    print(torch.abs(uu_neumann_approx[1] - uu_neumann[1]) / torch.abs(uu_neumann[1]))
+    #print(torch.abs(uu_neumann_approx[1] - uu_neumann[1]) / torch.abs(uu_neumann[1]))
 
-    print("\nRelative error of Neumann computation using tensor DtNs is")
-    print(torch.linalg.norm(uu_neumann_approx - uu_neumann) / torch.linalg.norm(uu_neumann))
+    #print("\nRelative error of Neumann computation using tensor DtNs is")
+    #print(torch.linalg.norm(uu_neumann_approx - uu_neumann) / torch.linalg.norm(uu_neumann))
     #print("Relative error of Neumann computation using sparse matrix A is")
     #print(torch.linalg.norm(uu_neumann_from_A - uu_neumann) / torch.linalg.norm(uu_neumann))
 
-    Jtot = np.hstack((dom.hps.H.JJ.Jc,dom.hps.H.JJ.Jxunique))
     #import sys
     #np.set_printoptions(threshold=sys.maxsize)
     #print(dom.hps.H.Nxc[...,dom.hps.H.JJ.Jc])

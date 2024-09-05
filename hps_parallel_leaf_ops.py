@@ -77,7 +77,7 @@ def get_Aloc_3d(p, xxloc, Ds, pdo, box_start, box_end, device):
     Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c11, Ds[0], c=-1.)
     Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c22, Ds[1], c=-1.)
     Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c33, Ds[2], c=-1.)
-    if pdo.c12 is not None:
+    """if pdo.c12 is not None:
         Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c12, Ds[3], c=-2.)
     if pdo.c13 is not None:
         Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c13, Ds[4], c=-2.)
@@ -91,7 +91,7 @@ def get_Aloc_3d(p, xxloc, Ds, pdo, box_start, box_end, device):
         Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c3, Ds[8])
     if pdo.c is not None:
         I = torch.eye(p**3, device=device)
-        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c, I)
+        Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c, I)"""
     return Aloc
 
 # Helper function to accumulate the contribution of each coefficient function to the local blocks
@@ -151,7 +151,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             S_full        = torch.concat((S_tmp @ Intmap_unq.unsqueeze(0),Intmap_repeat),dim=1) # Applying interpolation to both identity and S
             
             Jtot = torch.hstack((Jc,Jxun))
-            DtN  = Nx[:,Jtot].unsqueeze(0) @ S_full
+            DtN  = S_full #Nx[:,Jtot].unsqueeze(0) @ S_full
             #DtN  = Intmap_rev.unsqueeze(0) @ DtN
         return DtN
     elif (mode == 'solve'):
@@ -218,7 +218,7 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_
     if d==3:
         size_face = q**2
     if (mode == 'build'):
-        DtNs = torch.zeros(nboxes,2*d*p**2,2*d*size_face,device=device)
+        DtNs = torch.zeros(nboxes,p**3,2*d*size_face,device=device)
     elif (mode == 'solve'):
         DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1],device=device)
     elif (mode == 'reduce_body'):
