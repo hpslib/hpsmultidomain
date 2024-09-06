@@ -214,7 +214,7 @@ print(inspect.getsource(bfield))
 
 ################################# BUILD OPERATOR #########################
 # Build operator based on specified parameters and solver information
-"""
+
 print(args.sparse_assembly)
 
 build_info = dom.build(sparse_assembly=args.sparse_assembly,\
@@ -232,7 +232,7 @@ build_info['kh']   = kh
 build_info['periodic_bc'] = args.periodic_bc
 build_info['a'] = a
 build_info['p'] = p
-"""
+
 ################################# SOLVE PDE ###################################
 # Solve the PDE with specified configurations and print results
 print("SOLVE RESULTS")
@@ -288,7 +288,7 @@ elif (args.bc == 'log_dist'):
 else:
     raise ValueError("invalid bc")
 
-"""
+
 
 if (args.solver == 'slabLU'):
     
@@ -297,7 +297,7 @@ if (args.solver == 'slabLU'):
 elif (args.solver == 'superLU'):
 
     #uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
-    uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
+    uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body,known_sol=known_sol)
 
     print("\t--SuperLU solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\
           %(res,true_res,resloc_hps,toc_solve))
@@ -306,10 +306,13 @@ elif (args.solver == 'superLU'):
     solve_info['resloc_hps_solve_superLU']     = resloc_hps
     solve_info['toc_solve_superLU']            = toc_solve
 
+    solve_info['forward_bdry_error'] = forward_bdry_error
+    solve_info['reverse_bdry_error'] = reverse_bdry_error
+
 else:
 
     #uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
-    uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
+    uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body,known_sol=known_sol)
 
     print("\t--Builtin solver %s solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\
           %(args.solver,res,true_res,resloc_hps,toc_solve))
@@ -317,6 +320,9 @@ else:
     solve_info['trueres_solve_petsc']        = true_res
     solve_info['resloc_hps_solve_petsc']     = resloc_hps
     solve_info['toc_solve_petsc']            = toc_solve
+
+    solve_info['forward_bdry_error'] = forward_bdry_error
+    solve_info['reverse_bdry_error'] = reverse_bdry_error
     
 
 # Optional: Store solution and/or pickle results for later use
@@ -325,16 +331,7 @@ if (args.store_sol):
     XX = dom.hps.xx_tot
     solve_info['xx']        = XX
     solve_info['sol']       = uu_sol
-    
-if (args.pickle is not None):
-    file_loc = args.pickle
-    print("Pickling results to file %s"% (file_loc))
-    f = open(file_loc,"wb+")
-    build_info.update(solve_info)
-    pickle.dump(build_info,f)
-    #pickle.dump(solve_info,f)
-    f.close()
-"""
+
 ################################# EVALUATING SYSTEM COMPONENTS ###################################
 # Evaluate certain parts of the 3D problem 
 
@@ -349,14 +346,21 @@ if (d==3):
     uu_interC = torch.from_numpy(dom.hps.H.Interp_mat) @ uu_gauss
     uu_interG = torch.from_numpy(dom.hps.H.Interp_mat_reverse) @ uu_cheb
 
+    GtC_error = torch.norm(uu_cheb - uu_interC) / torch.norm(uu_cheb)
+    GtC_error = GtC_error.item()
+    GtC_cond  = np.linalg.cond(dom.hps.H.Interp_mat)
+    CtG_error = torch.norm(uu_gauss - uu_interG) / torch.norm(uu_gauss)
+    CtG_error = CtG_error.item()
+    CtG_cond  = np.linalg.cond(dom.hps.H.Interp_mat_reverse)
+
     print("Relative error of Gaussian-to-Chebyshev interpolation is:")
-    print(torch.norm(uu_cheb - uu_interC) / torch.norm(uu_cheb))
+    print(GtC_error)
     print("With condition number and shape:")
-    print(np.linalg.cond(dom.hps.H.Interp_mat), dom.hps.H.Interp_mat.shape)
+    print(GtC_cond, dom.hps.H.Interp_mat.shape)
     print("Relative error of Chebyshev-to-Gaussian interpolation is:")
-    print(torch.norm(uu_gauss - uu_interG) / torch.norm(uu_gauss))
+    print(CtG_error)
     print("With condition number and shape:")
-    print(np.linalg.cond(dom.hps.H.Interp_mat_reverse), dom.hps.H.Interp_mat_reverse.shape)
+    print(CtG_cond, dom.hps.H.Interp_mat_reverse.shape)
 
     
     # Check if edges / corners are equal as expected:
@@ -368,10 +372,10 @@ if (d==3):
         maxVar = np.max([maxVar, variance.item()])
     print("Largest variance between redundant values is " + str(maxVar))
 
-    interpolation_info["GtC_error"]     = torch.norm(uu_cheb - uu_interC) / torch.norm(uu_cheb)
-    interpolation_info["GtC_cond"]      = np.linalg.cond(dom.hps.H.Interp_mat)
-    interpolation_info["CtG_error"]     = torch.norm(uu_gauss - uu_interG) / torch.norm(uu_gauss)
-    interpolation_info["CtG_cond"]      = np.linalg.cond(dom.hps.H.Interp_mat_reverse)
+    interpolation_info["GtC_error"]     = GtC_error
+    interpolation_info["GtC_cond"]      = GtC_cond
+    interpolation_info["CtG_error"]     = CtG_error
+    interpolation_info["CtG_cond"]      = CtG_cond
     interpolation_info["redundant_var"] = maxVar
 
     file_loc = "test_interpolation_operator/test_results_p_" + str(p) + "_kh_" + str(kh) + ".pkl"
@@ -429,8 +433,8 @@ if d==3:
     # Here we get our dirichlet data, reshape it, and then multiply with DtNs to get our Neumann data
     uu_dir_gauss = u_true(dom.hps.xx_ext)
 
-    #uu_neumann_from_A = torch.from_numpy(dom.A @ uu_dir_gauss)
-    #uu_neumann_from_A = torch.reshape(uu_neumann_from_A, (DtN_loc.shape[0],-1))
+    uu_neumann_from_A = torch.from_numpy(dom.A @ uu_dir_gauss)
+    uu_neumann_from_A = torch.reshape(uu_neumann_from_A, (DtN_loc.shape[0],-1))
 
     uu_dir_gauss = torch.reshape(uu_dir_gauss, (DtN_loc.shape[0],-1))
     uu_dir_gauss = torch.unsqueeze(uu_dir_gauss, -1)
@@ -453,10 +457,24 @@ if d==3:
     #print(torch.abs(uu_neumann_approx[0] - uu_neumann[0]) / torch.abs(uu_neumann[0]))
     #print(torch.abs(uu_neumann_approx[1] - uu_neumann[1]) / torch.abs(uu_neumann[1]))
 
+    neumann_tensor_error = torch.linalg.norm(uu_neumann_approx - uu_neumann) / torch.linalg.norm(uu_neumann)
+    neumann_tensor_error = neumann_tensor_error.item()
+    neumann_sparse_error = torch.linalg.norm(uu_neumann_from_A - uu_neumann) / torch.linalg.norm(uu_neumann)
+    neumann_sparse_error = neumann_sparse_error.item()
+    dtn_cond = torch.linalg.cond(DtN_loc[0])
+    dtn_cond = dtn_cond.item()
+
+    print("DtN Condition number:")
+    print(dtn_cond)
     print("\nRelative error of Neumann computation using tensor DtNs is")
-    print(torch.linalg.norm(uu_neumann_approx - uu_neumann) / torch.linalg.norm(uu_neumann))
-    #print("Relative error of Neumann computation using sparse matrix A is")
-    #print(torch.linalg.norm(uu_neumann_from_A - uu_neumann) / torch.linalg.norm(uu_neumann))
+    print(neumann_tensor_error)
+    print("Relative error of Neumann computation using sparse matrix A is")
+    print(neumann_sparse_error)
+
+    dtn_info = dict()
+    dtn_info["neumann_tensor_error"] = neumann_tensor_error
+    dtn_info["neumann_sparse_error"] = neumann_sparse_error
+    dtn_info["dtn_cond"] = dtn_cond
 
 if (d==3 and 1==0):
     I_copy1  = dom.hps.I_copy1
@@ -471,3 +489,15 @@ if (d==3 and 1==0):
             error = error + np.abs(A_CC_add[i,j] - dom.A[I_copy2[i], I_copy2[j]])
 
     print("Error in copies of A going into A_CC is " + str(error))
+
+if (args.pickle is not None):
+    file_loc = args.pickle
+    print("Pickling results to file %s"% (file_loc))
+    f = open(file_loc,"wb+")
+    build_info.update(solve_info)
+    build_info.update(interpolation_info)
+    build_info.update(dtn_info)
+    #print(build_info)
+    pickle.dump(build_info,f)
+    #pickle.dump(solve_info,f)
+    f.close()

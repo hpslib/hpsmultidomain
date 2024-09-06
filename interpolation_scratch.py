@@ -2,6 +2,8 @@ import numpy as np
 
 from numpy.polynomial  import legendre
 from numpy.polynomial.polynomial import polyvander2d
+from numpy.polynomial.chebyshev import chebvander2d
+from numpy.polynomial.legendre import legvander2d
 
 import matplotlib.pyplot as plt
 
@@ -60,15 +62,16 @@ def get_loc_interp_3d(p, q, a, l):
     #lroots[1:-1] = croots[1:-1]
     lroots2d = np.array([np.repeat(lroots, q), np.hstack([lroots]*q)])
 
-    # Vandermonde-based approach:
-    Vc = polyvander2d(croots2d[0], croots2d[1], (l,l))
-    Vl = polyvander2d(lroots2d[0], lroots2d[1], (l,l))
+    # Vandermonde-based approach with Chebyshev expansion coefficients:
+    ChebVc = chebvander2d(croots2d[0], croots2d[1], (l,l))
+    ChebVl = chebvander2d(lroots2d[0], lroots2d[1], (l,l))
 
-    print("p=%2.0d,q=%2.0d,cond(Vc)=%5.2e, cond(Vl)=%5.2e"\
-        %(p,q,np.linalg.cond(Vc),np.linalg.cond(Vl)))
+    # Vandermonde-based approach with Gaussian expansion coefficients:
+    GaussVc = legvander2d(croots2d[0], croots2d[1], (l,l))
+    GaussVl = legvander2d(lroots2d[0], lroots2d[1], (l,l))
 
-    Interp_loc_GtC = np.linalg.lstsq(Vl.T,Vc.T,rcond=None)[0].T
-    Interp_loc_CtG = np.linalg.lstsq(Vc.T,Vl.T,rcond=None)[0].T
+    Interp_loc_CtG = np.linalg.lstsq(ChebVc.T,ChebVl.T,rcond=None)[0].T
+    Interp_loc_GtC = np.linalg.lstsq(GaussVl.T,GaussVc.T,rcond=None)[0].T
 
     condGtC = np.linalg.cond(Interp_loc_GtC)
     condCtG = np.linalg.cond(Interp_loc_CtG)
@@ -81,7 +84,7 @@ def known_function(xx):
 
 print("For a sample function sin(pi x) + y on domain [-1,1]^2:")
 
-p_list = [4, 5, 6, 7, 8, 9, 10, 11, 12]
+p_list = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
 a = 0.25
 
 cheb_error  = []
@@ -90,7 +93,7 @@ cheb_cond   = []
 gauss_cond  = []
 for p in p_list:
 
-    q = 8; l = min(p,q) + 10
+    q = p-4; l = min(p,q) + 20
     Interp_loc_GtC,Interp_loc_CtG,condGtC,condCtG,croots2d,lroots2d = get_loc_interp_3d(p, q, a, l)
 
     true_cheb  = known_function(croots2d)

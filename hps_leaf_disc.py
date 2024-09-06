@@ -118,6 +118,8 @@ def get_loc_interp_3d(p, q, a, l):
     lroots2d = np.array([np.repeat(lroots, q), np.hstack([lroots]*q)])
 
     # Vandermonde-based approach:
+
+    # MAP TO LEGENDRE BASIS NOT MONOMIAL BASIS
     Vc = polyvander2d(croots2d[0], croots2d[1], (l,l))
     Vl = polyvander2d(lroots2d[0], lroots2d[1], (l,l))
 

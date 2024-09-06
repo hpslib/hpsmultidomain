@@ -451,13 +451,19 @@ class Domain_Driver:
 
             
             print("Relative error on unique boundary is:")
+            #torch.set_printoptions(threshold=10_000)
             #print((sol - true_c_sol) / true_c_sol)
             #print("Real shared boundary is")
             #print(true_c_sol)
             #print("Computed is")
             #print(sol)
             print("With norm error of " + str(torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)))
-            
+
+            forward_bdry_error = np.linalg.norm(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body)
+            forward_bdry_error = forward_bdry_error.item()
+            reverse_bdry_error = torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)
+            reverse_bdry_error = reverse_bdry_error.item()
+
         resloc_hps = torch.tensor([float('nan')])
         if (self.sparse_assembly == 'reduced_gpu'):
             device=torch.device('cuda')
@@ -494,4 +500,4 @@ class Domain_Driver:
             del uu_true
             true_err = true_err.item()
 
-        return sol_tot,rel_err,true_err,resloc_hps,toc_solve
+        return sol_tot,rel_err,true_err,resloc_hps,toc_solve, forward_bdry_error, reverse_bdry_error
