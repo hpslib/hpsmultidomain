@@ -1,6 +1,6 @@
 import numpy as np
 from collections import namedtuple
-import scipy
+#import scipy
 from time import time
 import numpy.polynomial.chebyshev as cheb_py
 import scipy.linalg
@@ -10,6 +10,8 @@ from numpy.polynomial.polynomial import polyvander2d
 from numpy.polynomial.chebyshev import chebvander2d
 from numpy.polynomial.legendre import legvander2d
 from scipy.interpolate import interpn
+
+from scipy.linalg import null_space
 
 # Define named tuples for storing partial differential operators (PDOs) and differential schemes (Ds)
 # for both 2D and 3D problems, along with indices (JJ) for domain decomposition.
@@ -320,8 +322,6 @@ def leaf_discretization_3d(a,p,q):
     zzG[4*q**2:5*q**2,2] = -a
     zzG[5*q**2:,2]       =  a
 
-    print(zzG)
-
     JJ    = JJ_3d(Jl= Jl, Jr= Jr, Ju= Ju, Jd= Jd, Jb= Jb, Jf=Jf, Jx=Jx,
                   Jlc=Jl_corner, Jrc=Jr_corner, Jdc=Jd_corner,
                   Juc=Ju_corner, Jbc=Jb_corner, Jfc=Jf_corner,
@@ -432,13 +432,38 @@ class HPS_Disc:
 
             # Form averaging operator P
             P = np.eye(self.Interp_mat.shape[0])
+            B = np.eye(self.Interp_mat.shape[0])
             for i in range(self.Interp_mat.shape[0]):
                 elem = self.JJ.Jxreorder[i]
                 where = np.argwhere(self.JJ.Jxreorder == elem)
                 P[i,where] = 1 / len(where)
+                B[i,where] = 1
+
+            B = B[self.JJ.unique_in_reorder,:]
+            Bsum = np.sum(B, axis=1)
+            indexer = np.argwhere(Bsum > 1)
+
+            B = B[indexer.T[0]]
+
+            # PROBLEM WITH B: CORNERS. CORNERS ARE CURRENTLY UNDERDETERMINED... THEY NEED TWO ROWS EACH, NOT ONE
+            # BACK TO BUILDING IT ROW BY ROW
+
+            # Pretty sure this B is right... next is finding its null space
+            """_, _, Vh = np.linalg.svd(B, full_matrices=True)
+            V = np.transpose(Vh)
+            # The nullspace of B is the last _ columns of V:
+            null_rank = 6*p**2 - 12*p + 8
+            V_tilde = V[:,-null_rank:]
+            Pnew = V_tilde @ np.transpose(V_tilde)"""
+
+            # Try this instead:
+            V_null = null_space(B)
+            Pnew = V_null @ np.transpose(V_null)
+
+            print(V_null.shape, Pnew.shape)
             
             # Apply this to our interpolation matrix to ensure continuity at corner nodes:
-            self.Interp_mat        = P @ self.Interp_mat    # with redundant corners
+            self.Interp_mat        = Pnew @ self.Interp_mat    # with redundant corners
             self.Interp_mat_unique = self.Interp_mat[self.JJ.unique_in_reorder,:] # without redundant corners
 
             toc = time() - tic

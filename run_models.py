@@ -20,6 +20,6 @@ for p in p_list:
     n_list = [2*(p-2), 3*(p-2), 4*(p-2), 5*(p-2)]
     
     for n in n_list:
-        print(str(p) + ", " + str(n) + " done")
+        print("\nRunning " + str(p) + ", " + str(n) + "\n")
         test_file = "test_mixed_improved/test_results_p_" + str(p) + "_n_" + str(n) + ".pkl"
         run_test_via_argparse(domain, pde, bc, n, p, ppw=ppw, kh=kh, box_xlim=1.0, box_ylim=1.0, periodic_bc=False, components=False, solver="mumps", assembly_type="reduced_gpu", pickle_loc=test_file)
