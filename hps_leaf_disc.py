@@ -7,6 +7,8 @@ import scipy.linalg
 
 from numpy.polynomial  import legendre
 from numpy.polynomial.polynomial import polyvander2d
+from numpy.polynomial.chebyshev import chebvander2d
+from numpy.polynomial.legendre import legvander2d
 from scipy.interpolate import interpn
 
 # Define named tuples for storing partial differential operators (PDOs) and differential schemes (Ds)
@@ -119,15 +121,16 @@ def get_loc_interp_3d(p, q, a, l):
 
     # Vandermonde-based approach:
 
-    # MAP TO LEGENDRE BASIS NOT MONOMIAL BASIS
-    Vc = polyvander2d(croots2d[0], croots2d[1], (l,l))
-    Vl = polyvander2d(lroots2d[0], lroots2d[1], (l,l))
+    # Vandermonde-based approach with Chebyshev expansion coefficients:
+    ChebVc = chebvander2d(croots2d[0], croots2d[1], (l,l))
+    ChebVl = chebvander2d(lroots2d[0], lroots2d[1], (l,l))
 
-    #print("p=%2.0d,q=%2.0d,cond(Vc)=%5.2e, cond(Vl)=%5.2e"\
-    #    %(p,q,np.linalg.cond(Vc),np.linalg.cond(Vl)))
+    # Vandermonde-based approach with Gaussian expansion coefficients:
+    GaussVc = legvander2d(croots2d[0], croots2d[1], (l,l))
+    GaussVl = legvander2d(lroots2d[0], lroots2d[1], (l,l))
 
-    Interp_loc_GtC = np.linalg.lstsq(Vl.T,Vc.T,rcond=None)[0].T
-    Interp_loc_CtG = np.linalg.lstsq(Vc.T,Vl.T,rcond=None)[0].T
+    Interp_loc_CtG = np.linalg.lstsq(ChebVc.T,ChebVl.T,rcond=None)[0].T
+    Interp_loc_GtC = np.linalg.lstsq(GaussVl.T,GaussVc.T,rcond=None)[0].T
 
     condGtC = np.linalg.cond(Interp_loc_GtC)
     condCtG = np.linalg.cond(Interp_loc_CtG)
@@ -422,7 +425,7 @@ class HPS_Disc:
                 % (q,cond,err,toc))
         else:
             tic = time()
-            l = min(p,q) + 10
+            l = min(p,q) + 20
             Interp_loc_GtC,Interp_loc_CtG,err,cond = get_loc_interp_3d(p, q, a, l)
             self.Interp_mat         = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_GtC,0),6,axis=0))
             self.Interp_mat_reverse = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_CtG,0),6,axis=0))
@@ -435,9 +438,9 @@ class HPS_Disc:
                 P[i,where] = 1 / len(where)
             
             # Apply this to our interpolation matrix to ensure continuity at corner nodes:
+            self.Interp_mat        = P @ self.Interp_mat    # with redundant corners
             self.Interp_mat_unique = self.Interp_mat[self.JJ.unique_in_reorder,:] # without redundant corners
-            self.Interp_mat        = P @ self.Interp_mat    # with
 
             toc = time() - tic
-            print ("--Interp_mat has condition number %5.5f with error %5.5e and time to calculate %12.5f"\
+            print ("--Interp_mat has GtC condition number %5.5f, CtG condition number %5.5e, and time to calculate %12.5f"\
                 % (cond,err,toc))

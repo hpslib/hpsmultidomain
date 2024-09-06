@@ -17,7 +17,7 @@ kh = 0
 
 for p in p_list:
     #n_list = list(range(2*(p-2), 100, p-2))
-    n_list = [2*p-4, 3*p-6, 4*p-8]
+    n_list = [2*(p-2), 3*(p-2), 4*(p-2), 5*(p-2)]
     
     for n in n_list:
         print(str(p) + ", " + str(n) + " done")
