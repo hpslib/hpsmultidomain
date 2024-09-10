@@ -51,14 +51,14 @@ def get_loc_interp_3d(p, q, a, l):
     - cond: Condition number of the interpolation matrix
     """
     _, croots  = cheb(p-1)
-    croots     = a * np.flip(croots)
+    croots     = np.flip(croots)
     croots2d   = np.array([np.repeat(croots, p), np.hstack([croots]*p)])
     lcoeff     = np.zeros(q+1)
     lcoeff[-1] = 1
 
     #print(get_legendre_row(0, croots))
 
-    lroots   = a * legendre.legroots(lcoeff)
+    lroots   = legendre.legroots(lcoeff)
     #lroots[1:-1] = croots[1:-1]
     lroots2d = np.array([np.repeat(lroots, q), np.hstack([lroots]*q)])
 
@@ -76,6 +76,8 @@ def get_loc_interp_3d(p, q, a, l):
     condGtC = np.linalg.cond(Interp_loc_GtC)
     condCtG = np.linalg.cond(Interp_loc_CtG)
 
+    print(np.linalg.cond(ChebVc), np.linalg.cond(ChebVl), np.linalg.cond(GaussVc), np.linalg.cond(GaussVl))
+
     return Interp_loc_GtC,Interp_loc_CtG,condGtC,condCtG,croots2d,lroots2d
 
 # Define a function:
@@ -83,6 +85,7 @@ def known_function(xx):
     return np.sin(np.pi * xx[0,:]) + xx[1,:]
 
 print("For a sample function sin(pi x) + y on domain [-1,1]^2:")
+
 
 p_list = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
 a = 0.25
@@ -93,7 +96,7 @@ cheb_cond   = []
 gauss_cond  = []
 for p in p_list:
 
-    q = p-4; l = min(p,q) + 20
+    q = p-4; l = p#min(p,q) + 20
     Interp_loc_GtC,Interp_loc_CtG,condGtC,condCtG,croots2d,lroots2d = get_loc_interp_3d(p, q, a, l)
 
     true_cheb  = known_function(croots2d)
@@ -127,3 +130,42 @@ plt.ylabel("condition number")
 plt.legend(["Gaussian-to-Chebyshev", "Chebyshev-to-Gaussian"])
 plt.savefig("plots_interpolation/2Dcond_" + str(l) + "q_is_pm1.png")
 plt.show()
+
+
+"""
+# Let's do 1D then extend to 2D:
+
+from numpy.polynomial.chebyshev import chebfit, chebval
+p = 10
+a = 0.25
+q = 8
+
+_, croots = cheb(p-1)
+croots    = np.flip(croots)
+
+lcoeff     = np.zeros(q)
+lcoeff[-1] = 1
+lroots   = legendre.legroots(lcoeff)
+
+# We'll avoid vandermonde matrices altogether, building a Chebyshev-to-Gaussian
+# interpolation directly, column by column:
+legvals = []
+
+for i in range(croots.shape[0]):
+    y       = np.zeros(croots.shape)
+    y[i]    = 1
+    coeffs  = chebfit(croots, y, p-1)
+    legvals.append(chebval(lroots, coeffs))
+
+CtG1D = np.vstack(legvals).T
+
+print(np.linalg.cond(CtG1D))
+
+# Now let's test this with a couple functions:
+def sq(x):
+    return x*x
+
+print(sq(a*croots))
+print(sq(a*lroots))
+print(CtG1D @ sq(a*croots))
+"""

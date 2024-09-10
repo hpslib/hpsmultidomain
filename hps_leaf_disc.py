@@ -110,14 +110,14 @@ def get_loc_interp_3d(p, q, a, l):
     - cond: Condition number of the interpolation matrix
     """
     _, croots  = cheb(p-1)
-    croots     = a * np.flip(croots)
+    croots     = np.flip(croots)
     croots2d   = np.array([np.repeat(croots, p), np.hstack([croots]*p)])
     lcoeff     = np.zeros(q+1)
     lcoeff[-1] = 1
 
     #print(get_legendre_row(0, croots))
 
-    lroots   = a * legendre.legroots(lcoeff)
+    lroots   = legendre.legroots(lcoeff)
     #lroots[1:-1] = croots[1:-1]
     lroots2d = np.array([np.repeat(lroots, q), np.hstack([lroots]*q)])
 
@@ -128,8 +128,8 @@ def get_loc_interp_3d(p, q, a, l):
     ChebVl = chebvander2d(lroots2d[0], lroots2d[1], (l,l))
 
     # Vandermonde-based approach with Gaussian expansion coefficients:
-    GaussVc = legvander2d(croots2d[0], croots2d[1], (l,l))
-    GaussVl = legvander2d(lroots2d[0], lroots2d[1], (l,l))
+    GaussVc = legvander2d(croots2d[0], croots2d[1], (q,q))
+    GaussVl = legvander2d(lroots2d[0], lroots2d[1], (q,q))
 
     Interp_loc_CtG = np.linalg.lstsq(ChebVc.T,ChebVl.T,rcond=None)[0].T
     Interp_loc_GtC = np.linalg.lstsq(GaussVl.T,GaussVc.T,rcond=None)[0].T
@@ -425,7 +425,7 @@ class HPS_Disc:
                 % (q,cond,err,toc))
         else:
             tic = time()
-            l = min(p,q) + 10
+            l = p #min(p,q) + 10
             Interp_loc_GtC,Interp_loc_CtG,err,cond = get_loc_interp_3d(p, q, a, l)
             self.Interp_mat         = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_GtC,0),6,axis=0))
             self.Interp_mat_reverse = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_CtG,0),6,axis=0))

@@ -49,7 +49,7 @@ class HPS_Multidomain:
         self.a      = a
         self.d      = d
 
-        self.q = self.p - 4
+        self.q = self.p - 3
         if (pdo.c12 is None) and (pdo.c13 is None) and (pdo.c23 is None):
             self.q = self.p - 2
         
