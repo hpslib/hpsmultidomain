@@ -88,7 +88,7 @@ def make_plot(field, title, xlabel, ylabel, type="plot"):
     plt.savefig("plots_mixed/" + field + ".png")
     plt.show()
 
-total_title = "Mixed derivatives, interpolation with q=p-4:\n"
+total_title = "Mixed derivatives, interpolation with q=p-2:\n"
 """
 legend = []
 for i in range(len(p_list)):
