@@ -425,12 +425,13 @@ class HPS_Disc:
                 % (q,cond,err,toc))
         else:
             tic = time()
-            l = min(p,q) + 20
+            l = min(p,q) + 10
             Interp_loc_GtC,Interp_loc_CtG,err,cond = get_loc_interp_3d(p, q, a, l)
             self.Interp_mat         = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_GtC,0),6,axis=0))
             self.Interp_mat_reverse = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_CtG,0),6,axis=0))
 
-            # Form averaging operator P
+            # Form averaging operator P. Currently we have two approaches, one is local averaging (P)
+            # and the other is orthogonal projection (Pnew):
             P = np.eye(self.Interp_mat.shape[0])
             B = np.eye(self.Interp_mat.shape[0])
             for i in range(self.Interp_mat.shape[0]):
@@ -439,16 +440,34 @@ class HPS_Disc:
                 P[i,where] = 1 / len(where)
                 B[i,where] = 1
 
-            B = B[self.JJ.unique_in_reorder,:]
-            Bsum = np.sum(B, axis=1)
+            B       = B[self.JJ.unique_in_reorder,:]
+            Bsum    = np.sum(B, axis=1)
             indexer = np.argwhere(Bsum > 1)
+            B       = B[indexer.T[0]]
 
-            B = B[indexer.T[0]]
+            # Identify the corner points:
+            Bsum = np.sum(B, axis=1)
+            indexer = np.argwhere(Bsum > 2)
+            indexer = indexer.T[0]
 
-            # PROBLEM WITH B: CORNERS. CORNERS ARE CURRENTLY UNDERDETERMINED... THEY NEED TWO ROWS EACH, NOT ONE
-            # BACK TO BUILDING IT ROW BY ROW
+            # Convert the corner points into two rows each:
+            for index in indexer:
+                where = np.argwhere(B[index] > 0)
+                where = where.T[0]
+                # Add an extra row to B:
+                B = np.vstack((B, np.zeros((1, B.shape[1]))))
+                # Now set the new row to two entries, and zero out one of the entries in the first corner row:
+                B[-1, where[0]] = 1
+                B[-1, where[2]] = 1
+                B[index, where[1]] = 0
 
-            # Pretty sure this B is right... next is finding its null space
+            # And lastly... convert the second nonzero of every row to -1 so it makes sense:
+            for index in range(B.shape[0]):
+                where = np.argwhere(B[index] > 0)
+                where = where.T[0]
+                B[index, where[1]] = -1
+
+
             """_, _, Vh = np.linalg.svd(B, full_matrices=True)
             V = np.transpose(Vh)
             # The nullspace of B is the last _ columns of V:
@@ -459,8 +478,6 @@ class HPS_Disc:
             # Try this instead:
             V_null = null_space(B)
             Pnew = V_null @ np.transpose(V_null)
-
-            print(V_null.shape, Pnew.shape)
             
             # Apply this to our interpolation matrix to ensure continuity at corner nodes:
             self.Interp_mat        = Pnew @ self.Interp_mat    # with redundant corners
