@@ -501,3 +501,4 @@ if (args.pickle is not None):
     pickle.dump(build_info,f)
     #pickle.dump(solve_info,f)
     f.close()
+

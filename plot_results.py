@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import pickle
 
-mypath = "test_mixed_improved"
+mypath = "test_poisson"
 
 onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
 
@@ -85,10 +85,10 @@ def make_plot(field, title, xlabel, ylabel, type="plot"):
     plt.legend(legend)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    plt.savefig("plots_mixed/" + field + ".png")
+    plt.savefig("plots_poisson_new/" + field + ".png")
     plt.show()
 
-total_title = "Mixed derivatives, interpolation with q=p-2:\n"
+total_title = "Poisson:\n"
 """
 legend = []
 for i in range(len(p_list)):
