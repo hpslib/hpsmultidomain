@@ -15,7 +15,7 @@ bc = "log_dist"
 ppw = 0
 kh = 0
 
-output_path = "output/test_poisson"
+output_path = "output/test_poisson_with_interpolation"
 
 for p in p_list:
     #n_list = list(range(2*(p-2), 100, p-2))

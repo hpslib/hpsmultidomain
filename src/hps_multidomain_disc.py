@@ -49,8 +49,12 @@ class HPS_Multidomain:
         self.a      = a
         self.d      = d
 
+        # For interpolation:
+        self.interpolate = True
         self.q = self.p - 2
+
         if (pdo.c12 is None) and (pdo.c13 is None) and (pdo.c23 is None):
+            self.interpolate = False
             self.q = self.p - 2
         
         n = (self.domain[:,1] - self.domain[:,0]) / (2*self.a)
@@ -91,7 +95,7 @@ class HPS_Multidomain:
             self.I_unique, self.I_copy1, self.I_copy2 = self.get_unique_inds()
             # We want xx_ext to be based on Gaussian nodes unless there are no mixed terms:
             self.xx_ext = self.gauss_xx
-            if (pdo.c12 is None) and (pdo.c13 is None) and (pdo.c23 is None):
+            if self.interpolate == False:
                 self.xx_ext = self.grid_xx[:,Jx,:].flatten(start_dim=0,end_dim=-2)
             self.xx_active = self.xx_ext[self.I_unique,:]
         
@@ -418,7 +422,7 @@ class HPS_Multidomain:
         
         xxloc = self.grid_xx.to(device)
         Nxtot = torch.tensor(self.H.Nxc).to(device)
-        if (d==3) and (pdo.c12 is None) and (pdo.c13 is None) and (pdo.c23 is None):
+        if (d==3) and (self.interpolate == False):
             Nxtot = torch.tensor(self.H.Nx).to(device)
         Jx    = torch.tensor(self.H.JJ.Jx).to(device)
         Jc    = torch.tensor(self.H.JJ.Jc).to(device)
@@ -452,7 +456,7 @@ class HPS_Multidomain:
             #print("Indices: " + str(j*chunk_size) + " to " + str((j+1)*chunk_size))
             DtNs[j*chunk_size:(j+1)*chunk_size],Aloc_chunklist = \
             leaf_ops.get_DtNs_helper(*args,j*chunk_size,(j+1)*chunk_size, Aloc_chunkinit,device,\
-                                    mode,data,ff_body_func,uu_true)
+                                    mode,self.interpolate,data,ff_body_func,uu_true)
 
             #print("Did chunk " + str(j))
             if Aloc_chunklist.shape[0] > 2:

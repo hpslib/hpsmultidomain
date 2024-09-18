@@ -102,25 +102,6 @@ elif ((args.pde == 'mixed') and (args.domain == 'square')):
     kh = 0
     curved_domain = False
 
-# TODO
-elif ((args.pde == 'mixed_constant') and (args.domain == 'square')):
-    if (args.ppw is not None):
-        raise ValueError
-
-    # operator:
-    if d==2:
-        raise ValueError
-    def c(xx):
-        r = torch.sqrt(xx[:,0]*xx[:,0] + xx[:,1]*xx[:,1] + xx[:,2]*xx[:,2])
-        r4 = r * r * r * r
-        return (xx[:,0]*xx[:,1] + xx[:,0]*xx[:,2] + xx[:,1]*xx[:,2]) / r4
-
-    op = pdo.PDO_3d(pdo.ones,pdo.ones,pdo.ones,
-                    c12=pdo.const(c=1/4),c13=pdo.const(c=1/4),c23=pdo.const(c=1/4),
-                    c=c)
-    kh = 0
-    curved_domain = False
-
 elif ( (args.pde).startswith('bfield')):
     ppw_set = args.ppw is not None
     nwaves_set = args.nwaves is not None

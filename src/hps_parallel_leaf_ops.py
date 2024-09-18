@@ -116,7 +116,7 @@ def Aloc_acc(p, d, nboxes, xx_flat, Aloc, func, D, c=1.):
 
     
 def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
-          box_start,box_end,device,mode,data,ff_body_func,uu_true):
+          box_start,box_end,device,mode,interpolate,data,ff_body_func,uu_true):
     args = p,xxloc,Ds,pdo,box_start,box_end
     if (d == 2):
         Aloc = get_Aloc_2d(*args,device)
@@ -129,7 +129,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
     #print("Got local arrays for form_DtNs")
     if (mode == 'build'):
         
-        if (pdo.c12 is None) and (pdo.c13 is None) and (pdo.c23 is None):
+        if interpolate == False:
             #print(Acc.shape)
             #print(Aloc[:,Jc][...,Jx].shape)
             #print(Acc.device)
@@ -172,7 +172,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         #else:
         #    uu_sol[:,Jx,:nrhs] = data[box_start:box_end]
 
-        if (pdo.c12 is None) and (pdo.c13 is None) and (pdo.c23 is None):
+        if interpolate == False:
             #print(nrhs)
             #print((f_body - Aloc[:,Jc][...,Jx] @ data[box_start:box_end]).shape)
             #print(Acc.shape)
@@ -212,7 +212,7 @@ def get_DtN_chunksize(p,device):
 
 
 def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,\
-                    box_start,box_end,chunk_init,device,mode,data,ff_body_func,uu_true):
+                    box_start,box_end,chunk_init,device,mode,interpolate,data,ff_body_func,uu_true):
     nboxes = box_end - box_start
     size_face = (p-2)**(d-1)
     if d==3:
@@ -235,7 +235,7 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_
         b1 = box_curr + box_start
         b2 = np.min([box_end, b1 + chunk_size])
         
-        tmp = form_DtNs(*args,b1,b2,device,mode,data,ff_body_func,uu_true)
+        tmp = form_DtNs(*args,b1,b2,device,mode,interpolate,data,ff_body_func,uu_true)
         
         DtNs[box_curr:box_curr + chunk_size] = tmp
         box_curr += chunk_size
