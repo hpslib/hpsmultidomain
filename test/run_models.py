@@ -9,13 +9,13 @@ from test_3d import run_test_via_argparse
 #p_list = [30]
 p_list = [10, 12, 14, 16, 18]
 
-domain = "square"
-pde = "poisson"
-bc = "log_dist"
+domain = "curved"
+pde = "bfield_constant"
+bc = "free_space"
 ppw = 0
-kh = 0
+kh = 1
 
-output_path = "output/test_poisson_with_interpolation"
+output_path = "output/test_curved"
 
 for p in p_list:
     #n_list = list(range(2*(p-2), 100, p-2))

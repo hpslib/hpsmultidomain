@@ -254,7 +254,7 @@ def get_param_helper(geom,bfield,kh,d=2):
     
     if ((geom == 'sinusoidal') or (geom== 'curved')):
         
-        mag = 0.25
+        mag = 0.025
         psi    = lambda z: 1 - mag * torch.sin(6*z)
         dpsi   = lambda z:   - mag*6 * torch.cos(6*z)
         ddpsi  = lambda z:     mag*36  * torch.sin(6*z)

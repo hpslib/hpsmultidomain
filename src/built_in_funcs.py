@@ -159,7 +159,10 @@ def du_dir_func_greens(deriv,d,xx,kh,center=torch.tensor([-1.1,+1.,+1.2])):
         du_exact = -(xx[:,deriv] - center[deriv]) / (4*np.pi * dd**3)
         return du_exact
     else:
-        print("Error! Not set for Helmholtz yet")
+        dd = np.sqrt(ddsq)
+        du_exact = (xx[:,deriv] - center[deriv]) * (kh*dd*np.sin(kh*dd) + np.cos(kh*dd))
+        du_exact = du_exact / (4*np.pi * dd**3)
+        return du_exact
 
 def ff_body_pulse(xx,kh):
     

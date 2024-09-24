@@ -5,9 +5,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import pickle
 
-mypath      = "output/test_poisson_with_interpolation"
-plotpath    = "plots/plots_poisson_with_interpolation/"
-total_title = "Poisson with interpolation:\n"
+mypath      = "output/test_curved"
+plotpath    = "plots/plots_curved/"
+total_title = "Helmholtz with curved domain:\n"
 
 onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
 

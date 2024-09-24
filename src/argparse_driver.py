@@ -155,6 +155,19 @@ elif ( (args.pde).startswith('bfield')):
         op, param_map, \
         inv_param_map = pdo.get_param_map_and_pdo('sinusoidal', bfield, kh, d=d)
         curved_domain=True
+
+        """print(op)
+        print(param_map)
+        print(op.c)
+        print(op.c1)
+        print(op.c2)
+        print(op.c3)
+        print(op.c11)
+        print(op.c22)
+        print(op.c33)
+        print(op.c12)
+        print(op.c13)
+        print(op.c23)"""
         
     elif (args.domain == 'annulus'):
         
@@ -390,19 +403,31 @@ if d==3:
     # first order derivatives (this test is for Laplace only):
     def u_true(xx):
         #return torch.exp(xx[:,0]) * torch.sin(xx[:,1])
-        return uu_dir_func_greens(3,xx,kh)
+        if args.domain=='square':
+            return uu_dir_func_greens(3,xx,kh)
+        else:
+            return uu_dir_func_greens(3,param_map(xx),kh)
     
     def du1_true(xx):
         #return torch.exp(xx[:,0]) * torch.sin(xx[:,1])
-        return du_dir_func_greens(0,3,xx,kh)
+        if args.domain=='square':
+            return du_dir_func_greens(0,3,xx,kh)
+        else:
+            return du_dir_func_greens(0,3,param_map(xx),kh)
     
     def du2_true(xx):
         #return torch.exp(xx[:,0]) * torch.cos(xx[:,1])
-        return du_dir_func_greens(1,3,xx,kh)
+        if args.domain=='square':
+            return du_dir_func_greens(1,3,xx,kh)
+        else:
+            return du_dir_func_greens(1,3,param_map(xx),kh)
     
     def du3_true(xx):
         #return torch.zeros((xx.shape[0]))
-        return du_dir_func_greens(2,3,xx,kh)
+        if args.domain=='square':
+            return du_dir_func_greens(2,3,xx,kh)
+        else:
+            return du_dir_func_greens(2,3,param_map(xx),kh)
 
     size_face = dom.hps.q**2
     size_ext = 6 * size_face
@@ -456,6 +481,20 @@ if d==3:
     dtn_info["neumann_tensor_error"] = neumann_tensor_error
     dtn_info["neumann_sparse_error"] = neumann_sparse_error
     dtn_info["dtn_cond"] = dtn_cond
+
+    center=np.array([-1.1,+1.,+1.2])
+
+    xx = param_map(dom.hps.xx_ext)
+    import matplotlib.pyplot as plt
+    fig = plt.figure(figsize=(12, 12))
+    ax = fig.add_subplot(projection='3d')
+
+    sequence_containing_x_vals = xx[:,0] - center[0]
+    sequence_containing_y_vals = xx[:,1] - center[1]
+    sequence_containing_z_vals = xx[:,2] - center[2]
+
+    ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals)
+    plt.show()
 
 if (d==3 and 1==0):
     I_copy1  = dom.hps.I_copy1
