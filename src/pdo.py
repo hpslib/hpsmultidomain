@@ -115,11 +115,11 @@ def cij_func(parameter_map,yi_d1, yj_d1, yi_d2, yj_d2, yi_d3=None, yj_d3=None):
 
             result = 0
             if (bool_expr1):
-                result += torch.mul(yi_d1(yy),yj_d1(yy))
+                result += 2*torch.mul(yi_d1(yy),yj_d1(yy))
             if (bool_expr2):
-                result += torch.mul(yi_d2(yy),yj_d2(yy))
+                result += 2*torch.mul(yi_d2(yy),yj_d2(yy))
             if (bool_expr3):
-                result += torch.mul(yi_d3(yy),yj_d3(yy))
+                result += 2*torch.mul(yi_d3(yy),yj_d3(yy))
             return result
     return cij
 
@@ -254,7 +254,7 @@ def get_param_helper(geom,bfield,kh,d=2):
     
     if ((geom == 'sinusoidal') or (geom== 'curved')):
         
-        mag = 0.025
+        mag = 0.25
         psi    = lambda z: 1 - mag * torch.sin(6*z)
         dpsi   = lambda z:   - mag*6 * torch.cos(6*z)
         ddpsi  = lambda z:     mag*36  * torch.sin(6*z)

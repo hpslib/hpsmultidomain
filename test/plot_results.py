@@ -7,7 +7,7 @@ import pickle
 
 mypath      = "output/test_curved"
 plotpath    = "plots/plots_curved/"
-total_title = "Helmholtz with curved domain:\n"
+total_title = "Helmholtz with curved domain (k=6):\n"
 
 onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
 

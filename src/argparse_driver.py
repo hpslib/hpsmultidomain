@@ -183,6 +183,20 @@ elif ( (args.pde).startswith('bfield')):
     else:
         raise ValueError
     
+elif args.pde == "convection_diffusion":
+    if (args.ppw is not None):
+        raise ValueError
+    
+    # convection_diffusion operator
+    if d==2:
+        print("convection_diffusion is 3D only")
+        raise ValueError
+    if d==3:
+        op = pdo.PDO_3d(pdo.ones,pdo.ones,pdo.ones,c3=pdo.const(c=63))
+    kh = 0
+    curved_domain = False
+
+
 else:
     raise ValueError
     
@@ -279,6 +293,13 @@ elif (args.bc == 'log_dist'):
         known_sol = True
     else:
         raise ValueError
+elif (args.bc == "convection_diffusion"):
+    if d == 2:
+        print("Convection_diffusion is 3D only")
+        raise ValueError
+    uu_dir    = lambda xx: uu_dir_func_convection(xx)
+    ff_body   = None
+    known_sol = True
 else:
     raise ValueError("invalid bc")
 
@@ -328,7 +349,7 @@ if (args.store_sol):
 
 ################################# EVALUATING SYSTEM COMPONENTS ###################################
 # Evaluate certain parts of the 3D problem 
-
+"""
 if (d==3):
     interpolation_info = dict()
     # First we generate the arrays of Chebyshev and Gaussian nodes:
@@ -481,7 +502,7 @@ if d==3:
     dtn_info["neumann_tensor_error"] = neumann_tensor_error
     dtn_info["neumann_sparse_error"] = neumann_sparse_error
     dtn_info["dtn_cond"] = dtn_cond
-
+    
     center=np.array([-1.1,+1.,+1.2])
 
     xx = param_map(dom.hps.xx_ext)
@@ -495,6 +516,7 @@ if d==3:
 
     ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals)
     plt.show()
+    
 
 if (d==3 and 1==0):
     I_copy1  = dom.hps.I_copy1
@@ -521,4 +543,4 @@ if (args.pickle is not None):
     pickle.dump(build_info,f)
     #pickle.dump(solve_info,f)
     f.close()
-
+"""
