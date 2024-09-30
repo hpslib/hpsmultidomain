@@ -9,13 +9,13 @@ from test_3d import run_test_via_argparse
 #p_list = [30]
 p_list = [10, 12, 14, 16, 18]
 
-domain = "curved"
-pde = "bfield_constant"
-bc = "free_space"
+domain = "square"
+pde = "convection_diffusion"
+bc = "convection_diffusion"
 ppw = 0
-kh = 1
+kh = 0
 
-output_path = "output/test_curved"
+output_path = "output/convection_diffusion"
 
 for p in p_list:
     #n_list = list(range(2*(p-2), 100, p-2))

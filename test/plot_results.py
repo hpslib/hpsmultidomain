@@ -5,9 +5,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import pickle
 
-mypath      = "output/test_curved"
-plotpath    = "plots/plots_curved/"
-total_title = "Helmholtz with curved domain (k=6):\n"
+mypath      = "output/convection_diffusion"
+plotpath    = "plots/convection_diffusion/"
+total_title = "Convection-diffusion:\n"
 
 onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
 
