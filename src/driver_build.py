@@ -123,7 +123,7 @@ def configure_pde_domain(args):
             print("convection_diffusion is 3D only")
             raise ValueError
         if args.d==3:
-            op = pdo.PDO_3d(pdo.ones,pdo.ones,pdo.ones,c3=pdo.const(c=-63.))
+            op = pdo.PDO_3d(pdo.ones,pdo.ones,pdo.ones,c3=pdo.const(c=-63.),c=pdo.const(c=-1.))
         kh = 0
         curved_domain = False
 

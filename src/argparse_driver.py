@@ -100,7 +100,7 @@ build_info = build_operator_with_info(dom, args, box_geom, kh)
 ################################# SOLVE PDE ###################################
 # Solve the PDE with specified configurations and print results
 
-uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error, solve_info = run_solver(dom, args, curved_domain, kh, param_map)
+uu_dir,uu_sol,res,true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error,solve_info = run_solver(dom, args, curved_domain, kh, param_map)
 
 # Optional: Store solution and/or pickle results for later use
 if (args.store_sol):
@@ -111,7 +111,7 @@ if (args.store_sol):
 
 ################################# EVALUATING SYSTEM COMPONENTS ###################################
 # Evaluate certain parts of the 3D problem 
-"""
+
 if (d==3):
     interpolation_info = dict()
     # First we generate the arrays of Chebyshev and Gaussian nodes:
@@ -264,7 +264,7 @@ if d==3:
     dtn_info["neumann_tensor_error"] = neumann_tensor_error
     dtn_info["neumann_sparse_error"] = neumann_sparse_error
     dtn_info["dtn_cond"] = dtn_cond
-    
+    """
     center=np.array([-1.1,+1.,+1.2])
     
     xx = dom.hps.grid_xx.flatten(start_dim=0,end_dim=-2)
@@ -294,7 +294,7 @@ if d==3:
     sc = ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals, c=rel_errors, marker='o')
     plt.colorbar(sc)
     plt.show()
-    
+    """
     
 
 if (d==3 and 1==0):
@@ -323,4 +323,3 @@ if (args.pickle is not None):
     #pickle.dump(solve_info,f)
     f.close()
 
-"""

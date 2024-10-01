@@ -7,7 +7,7 @@ from built_in_funcs import *  # Importing built-in functions for specific PDEs o
 def run_solver(dom, args, curved_domain, kh=0, param_map=None):
     print("SOLVE RESULTS")
     solve_info = dict()
-
+    num_timesteps = 1
     d = args.d
 
     if (args.bc == 'free_space'):
@@ -62,9 +62,11 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None):
             print("Convection_diffusion is 3D only")
             raise ValueError
         if (args.pde == 'convection_diffusion'):
-            uu_dir    = lambda xx: uu_dir_func_convection(xx)
-            ff_body   = None
-            known_sol = True
+            uu_dir        = lambda xx: uu_dir_func_convection(xx)
+            ff_body       = lambda xx: uu_dir_func_convection(xx)
+            known_sol     = True
+            num_timesteps = 1
+            delta_t = 0.1
         else:
             raise ValueError
     else:
@@ -73,27 +75,30 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None):
 
     if (args.solver == 'slabLU'):
         raise ValueError("this code is not included in this version")
+
+    for i in range(num_timesteps):
+        ff_body_step = ff_body
+        uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body_step,known_sol=known_sol)
+
+    if (args.solver == 'superLU'):
+        print("\t--SuperLU solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\
+            %(res,true_res,resloc_hps,toc_solve))
+        solve_info['res_solve_superLU']            = res
+        solve_info['trueres_solve_superLU']        = true_res
+        solve_info['resloc_hps_solve_superLU']     = resloc_hps
+        solve_info['toc_solve_superLU']            = toc_solve
+
+        solve_info['forward_bdry_error'] = forward_bdry_error
+        solve_info['reverse_bdry_error'] = reverse_bdry_error
     else:
-        uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body,known_sol=known_sol)
-        if (args.solver == 'superLU'):
-            print("\t--SuperLU solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\
-                %(res,true_res,resloc_hps,toc_solve))
-            solve_info['res_solve_superLU']            = res
-            solve_info['trueres_solve_superLU']        = true_res
-            solve_info['resloc_hps_solve_superLU']     = resloc_hps
-            solve_info['toc_solve_superLU']            = toc_solve
+        print("\t--Builtin solver %s solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\
+            %(args.solver,res,true_res,resloc_hps,toc_solve))
+        solve_info['res_solve_petsc']            = res
+        solve_info['trueres_solve_petsc']        = true_res
+        solve_info['resloc_hps_solve_petsc']     = resloc_hps
+        solve_info['toc_solve_petsc']            = toc_solve
 
-            solve_info['forward_bdry_error'] = forward_bdry_error
-            solve_info['reverse_bdry_error'] = reverse_bdry_error
-        else:
-            print("\t--Builtin solver %s solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\
-                %(args.solver,res,true_res,resloc_hps,toc_solve))
-            solve_info['res_solve_petsc']            = res
-            solve_info['trueres_solve_petsc']        = true_res
-            solve_info['resloc_hps_solve_petsc']     = resloc_hps
-            solve_info['toc_solve_petsc']            = toc_solve
+        solve_info['forward_bdry_error'] = forward_bdry_error
+        solve_info['reverse_bdry_error'] = reverse_bdry_error
 
-            solve_info['forward_bdry_error'] = forward_bdry_error
-            solve_info['reverse_bdry_error'] = reverse_bdry_error
-
-    return uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error, solve_info
+    return uu_dir, uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error, solve_info

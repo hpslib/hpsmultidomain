@@ -158,9 +158,9 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         
         f_body = torch.zeros(box_end-box_start,Jc.shape[0],nrhs,device=device)
         if (ff_body_func is not None):
-            xx_flat = xxloc[box_start:box_end].reshape((box_end-box_start)*p**2,2)
+            xx_flat = xxloc[box_start:box_end].reshape((box_end-box_start)*p**d,d)
             tmp = ff_body_func(xx_flat)
-            f_body = tmp.reshape(box_end-box_start,p**2,nrhs)[:,Jc]
+            f_body = tmp.reshape(box_end-box_start,p**d,nrhs)[:,Jc]
         
        
         uu_sol = torch.zeros(box_end-box_start,p**d,2*nrhs,device=device)
