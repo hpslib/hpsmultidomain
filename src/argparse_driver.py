@@ -4,6 +4,8 @@ import numpy as np                     # For numerical operations
 from time import time                  # For timing operations
 torch.set_default_dtype(torch.double)  # Set default tensor type to double precision
 
+from driver_solve import run_solver
+
 from domain_driver import *  # Importing domain driver utilities for PDE solving
 from built_in_funcs import *  # Importing built-in functions for specific PDEs or conditions
 import pickle  # For serializing and saving results
@@ -44,6 +46,7 @@ args = parser.parse_args()  # Parse arguments from command line
 
 # Check if we test components:
 test_components = args.test_components
+param_map = None
 
 # Extract and setup basic parameters from parsed arguments
 n = args.n; d = args.d
@@ -243,104 +246,8 @@ build_info['p'] = p
 
 ################################# SOLVE PDE ###################################
 # Solve the PDE with specified configurations and print results
-print("SOLVE RESULTS")
-solve_info = dict()
 
-if (args.bc == 'free_space'):
-    if (args.pde == 'bfield_constant'):
-        ff_body = None; known_sol = True
-        
-        if (not curved_domain):
-            uu_dir = lambda xx: uu_dir_func_greens(d, xx,kh)
-        else:
-            uu_dir = lambda xx: uu_dir_func_greens(d, param_map(xx),kh)
-    elif (args.pde == 'bfield_variable'):
-        ff_body = None; known_sol = True
-
-        if (not curved_domain):
-            uu_dir = lambda xx: uu_true_variable_helmholtz(d, xx,kh)
-        else:
-            print("Error! Curved domain for bfield_variable")
-    else:
-        print("Error! Free space for not bfield constant or variable")
-
-        
-elif (args.bc == 'pulse'):
-    ff_body = None; known_sol = False
-    
-    if (not curved_domain):
-        uu_dir = lambda xx: uu_dir_pulse(xx,kh)
-    else:
-        uu_dir = lambda xx: uu_dir_pulse(param_map(xx),kh)
-    
-elif (args.bc == 'ones'):
-    ff_body = None; known_sol = False
-    
-    ones_func = lambda xx: torch.ones(xx.shape[0],1)
-    if (not curved_domain):
-        uu_dir = lambda xx: ones_func(xx)
-    else:
-        uu_dir = lambda xx: ones_func(param_map(xx))  
-        
-elif (args.bc == 'log_dist'):
-    
-    if ((args.pde == 'poisson') or (args.pde == 'mixed')):
-        assert kh == 0
-        assert (not curved_domain)
-
-        uu_dir  = lambda xx: uu_dir_func_greens(d, xx,kh)
-        ff_body = None
-        known_sol = True
-    else:
-        raise ValueError
-elif (args.bc == 'convection_diffusion'):
-    if d == 2:
-        print("Convection_diffusion is 3D only")
-        raise ValueError
-    if (args.pde == 'convection_diffusion'):
-        uu_dir    = lambda xx: uu_dir_func_convection(xx)
-        ff_body   = None
-        known_sol = True
-    else:
-        raise ValueError
-else:
-    raise ValueError("invalid bc")
-
-
-if (args.solver == 'slabLU'):
-    
-    raise ValueError("this code is not included in this version")
-    
-elif (args.solver == 'superLU'):
-
-    #uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
-    uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body,known_sol=known_sol)
-
-    print("\t--SuperLU solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\
-          %(res,true_res,resloc_hps,toc_solve))
-    solve_info['res_solve_superLU']            = res
-    solve_info['trueres_solve_superLU']        = true_res
-    solve_info['resloc_hps_solve_superLU']     = resloc_hps
-    solve_info['toc_solve_superLU']            = toc_solve
-
-    solve_info['forward_bdry_error'] = forward_bdry_error
-    solve_info['reverse_bdry_error'] = reverse_bdry_error
-
-else:
-
-    #uu_sol,res, true_res,resloc_hps,toc_solve = dom.solve(uu_dir,ff_body,known_sol=known_sol)
-    uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body,known_sol=known_sol)
-
-    print("\t--Builtin solver %s solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\
-          %(args.solver,res,true_res,resloc_hps,toc_solve))
-    solve_info['res_solve_petsc']            = res
-    solve_info['trueres_solve_petsc']        = true_res
-    solve_info['resloc_hps_solve_petsc']     = resloc_hps
-    solve_info['toc_solve_petsc']            = toc_solve
-
-    solve_info['forward_bdry_error'] = forward_bdry_error
-    solve_info['reverse_bdry_error'] = reverse_bdry_error
-
+uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error, solve_info = run_solver(dom, args, curved_domain, kh, param_map)
 
 # Optional: Store solution and/or pickle results for later use
 if (args.store_sol):
@@ -351,7 +258,7 @@ if (args.store_sol):
 
 ################################# EVALUATING SYSTEM COMPONENTS ###################################
 # Evaluate certain parts of the 3D problem 
-
+"""
 if (d==3):
     interpolation_info = dict()
     # First we generate the arrays of Chebyshev and Gaussian nodes:
@@ -535,6 +442,7 @@ if d==3:
     plt.colorbar(sc)
     plt.show()
     
+    
 
 if (d==3 and 1==0):
     I_copy1  = dom.hps.I_copy1
@@ -562,3 +470,4 @@ if (args.pickle is not None):
     #pickle.dump(solve_info,f)
     f.close()
 
+"""
