@@ -4,6 +4,7 @@ import numpy as np                     # For numerical operations
 from time import time                  # For timing operations
 torch.set_default_dtype(torch.double)  # Set default tensor type to double precision
 
+from driver_build import *
 from driver_solve import run_solver
 
 from domain_driver import *  # Importing domain driver utilities for PDE solving
@@ -73,135 +74,7 @@ if ((not torch.cuda.is_available()) and (args.sparse_assembly == 'reduced_gpu'))
     print("Changed sparse assembly to reduced_cpu")
 
 # Configure the PDE operator and domain based on specified arguments
-if ((args.pde == 'poisson') and (args.domain == 'square')):
-    if (args.ppw is not None):
-        raise ValueError
-    
-    # laplace operator
-    op = pdo.PDO_2d(pdo.ones,pdo.ones)
-    if d==3:
-        op = pdo.PDO_3d(pdo.ones,pdo.ones,pdo.ones)
-    kh = 0
-    curved_domain = False
-
-elif ((args.pde == 'mixed') and (args.domain == 'square')):
-    if (args.ppw is not None):
-        raise ValueError
-
-    # operator:
-    if d==2:
-        raise ValueError
-    def c(xx, center=torch.tensor([-1.1,+1.,+1.2])):
-        dd0  = xx[:,0] - center[0]
-        dd1  = xx[:,1] - center[1]
-        dd2  = xx[:,2] - center[2]
-        ddsq = dd0*dd0 + dd1*dd1 + dd2*dd2 # r^2
-        r4   = ddsq * ddsq
-        return (dd0*dd1 + dd0*dd2 + dd1*dd2) / r4
-
-    op = pdo.PDO_3d(pdo.ones,pdo.ones,pdo.ones,
-                    c12=pdo.const(c=1/3),c13=pdo.const(c=1/3),c23=pdo.const(c=1/3),
-                    c=c)
-    kh = 0
-    curved_domain = False
-
-elif ( (args.pde).startswith('bfield')):
-    ppw_set = args.ppw is not None
-    nwaves_set = args.nwaves is not None
-    kh_set = args.kh is not None
-    
-    if ((not ppw_set and not nwaves_set and not kh_set)):
-        raise ValueError('oscillatory bfield chosen but ppw and nwaves NOT set')
-    elif (ppw_set and nwaves_set) or (kh_set and nwaves_set) or (ppw_set and kh_set):
-        raise ValueError('At least two of the three between ppw, nwaves, and kh are set. Only use 1!')
-    elif (kh_set):
-        kh = args.kh
-    elif (ppw_set):
-        nwaves = int(n/args.ppw)
-        kh = (nwaves+0.03)*2*np.pi+1.8 # This wrong for 3d?
-    else:
-        nwaves = args.nwaves
-        kh = (nwaves)*2*np.pi
-    
-      
-    if (args.pde == 'bfield_constant'):
-        bfield = bfield_constant
-    elif (args.pde == 'bfield_variable'):
-        bfield = bfield_variable
-    elif (args.pde == 'bfield_bumpy'):
-        bfield = bfield_bumpy
-    elif (args.pde == 'bfield_gaussian_bumps'):
-        bfield = bfield_gaussian_bumps
-    elif (args.pde == 'bfield_cavity'):
-        bfield = bfield_cavity_scattering
-    elif (args.pde == 'bfield_crystal'):
-        bfield = bfield_crystal
-    elif (args.pde == 'bfield_crystal_waveguide'):
-        bfield = bfield_crystal_waveguide
-    elif (args.pde == 'bfield_crystal_rhombus'):
-        bfield = bfield_crystal_rhombus
-    else:
-        raise ValueError
-        
-    curved_domain = False
-    if (args.domain == 'square'):
-        
-        def c(xx):
-            return bfield(xx,kh)
-        # var coeff Helmholtz operator
-        op = pdo.PDO_2d(pdo.ones,pdo.ones,c=c)
-        if d==3:
-            op = pdo.PDO_3d(pdo.ones,pdo.ones,pdo.ones,c=c)
-        
-    elif (args.domain == 'curved'):
-        
-        op, param_map, \
-        inv_param_map = pdo.get_param_map_and_pdo('sinusoidal', bfield, kh, d=d)
-        curved_domain=True
-
-        """print(op)
-        print(param_map)
-        print(op.c)
-        print(op.c1)
-        print(op.c2)
-        print(op.c3)
-        print(op.c11)
-        print(op.c22)
-        print(op.c33)
-        print(op.c12)
-        print(op.c13)
-        print(op.c23)"""
-        
-    elif (args.domain == 'annulus'):
-        
-        op, param_map, \
-        inv_param_map = pdo.get_param_map_and_pdo('annulus', bfield, kh)
-        curved_domain=True
-        
-    elif (args.domain == 'curvy_annulus'):
-        
-        op, param_map, \
-        inv_param_map = pdo.get_param_map_and_pdo('curvy_annulus', bfield, kh)
-        curved_domain=True
-    else:
-        raise ValueError
-    
-elif args.pde == "convection_diffusion":
-    if (args.ppw is not None):
-        raise ValueError
-    
-    # convection_diffusion operator
-    if d==2:
-        print("convection_diffusion is 3D only")
-        raise ValueError
-    if d==3:
-        op = pdo.PDO_3d(pdo.ones,pdo.ones,pdo.ones,c3=pdo.const(c=-63.))
-    kh = 0
-    curved_domain = False
-
-
-else:
-    raise ValueError
+op, param_map, inv_param_map, curved_domain, kh = configure_pde_domain(args)
     
 ##### Set the domain and discretization parameters
 # Additional conditional logic for different discretization strategies
@@ -213,36 +86,13 @@ a = 1/(2*npan)
 
 dom = Domain_Driver(box_geom,op,\
                     kh,a,p=p,d=d,periodic_bc = args.periodic_bc)
-N = (p-2) * (p*dom.hps.n[0]*dom.hps.n[1] + dom.hps.n[0] + dom.hps.n[1])
-"""
-print("PDO:")
-from pprint import pprint
-pprint(vars(op))
-import inspect
-print(inspect.getsource(op.c))
-print(inspect.getsource(bfield))
-"""
 
 ################################# BUILD OPERATOR #########################
 # Build operator based on specified parameters and solver information
 
 print(args.sparse_assembly)
 
-build_info = dom.build(sparse_assembly=args.sparse_assembly,\
-                        solver_type = args.solver, verbose=True)
-build_info['N']    = N
-build_info['n']    = n
-
-build_info['pde']  = args.pde
-build_info['bc']   = args.bc
-build_info['domain'] = args.domain
-build_info['solver'] = args.solver
-build_info['sparse_assembly'] = args.sparse_assembly
-build_info['box_geom'] = box_geom
-build_info['kh']   = kh 
-build_info['periodic_bc'] = args.periodic_bc
-build_info['a'] = a
-build_info['p'] = p
+build_info = build_operator_with_info(dom, args, box_geom, kh)
 
 ################################# SOLVE PDE ###################################
 # Solve the PDE with specified configurations and print results
