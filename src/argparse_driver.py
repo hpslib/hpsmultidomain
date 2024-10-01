@@ -340,7 +340,7 @@ else:
 
     solve_info['forward_bdry_error'] = forward_bdry_error
     solve_info['reverse_bdry_error'] = reverse_bdry_error
-    
+
 
 # Optional: Store solution and/or pickle results for later use
 if (args.store_sol):
@@ -506,8 +506,10 @@ if d==3:
     dtn_info["dtn_cond"] = dtn_cond
     
     center=np.array([-1.1,+1.,+1.2])
-    """
-    xx = param_map(dom.hps.xx_ext)
+    
+    xx = dom.hps.grid_xx.flatten(start_dim=0,end_dim=-2)
+    if curved_domain:
+        xx = param_map(xx)
     import matplotlib.pyplot as plt
     fig = plt.figure(figsize=(12, 12))
     ax = fig.add_subplot(projection='3d')
@@ -516,9 +518,23 @@ if d==3:
     sequence_containing_y_vals = xx[:,1] - center[1]
     sequence_containing_z_vals = xx[:,2] - center[2]
 
-    ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals)
+    norms = np.sqrt(sequence_containing_x_vals*sequence_containing_x_vals
+                   + sequence_containing_y_vals*sequence_containing_y_vals
+                   + sequence_containing_z_vals*sequence_containing_z_vals)
+
+    result = uu_sol.flatten()
+
+    true_vals = uu_dir(xx)
+    true_vals = true_vals.squeeze(-1)
+
+    rel_errors = torch.abs(result - true_vals) / (torch.abs(true_vals) + 1)
+
+    #print(rel_errors)
+
+    sc = ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals, c=rel_errors, marker='o')
+    plt.colorbar(sc)
     plt.show()
-    """
+    
 
 if (d==3 and 1==0):
     I_copy1  = dom.hps.I_copy1
