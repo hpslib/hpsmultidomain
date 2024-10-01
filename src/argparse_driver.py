@@ -73,25 +73,28 @@ if ((not torch.cuda.is_available()) and (args.sparse_assembly == 'reduced_gpu'))
     args.sparse_assembly = 'reduced_cpu'
     print("Changed sparse assembly to reduced_cpu")
 
+################################# BUILD OPERATOR #########################
+
 # Configure the PDE operator and domain based on specified arguments
+# If we have a square domain (and thus do not need parameter maps), then
+# param_map, inv_param_map = None and curved_domain = False.
+# If there is no oscillation then kh = 0.
 op, param_map, inv_param_map, curved_domain, kh = configure_pde_domain(args)
     
 ##### Set the domain and discretization parameters
-# Additional conditional logic for different discretization strategies
 if (args.p is None):
     raise ValueError('HPS selected but p not provided')
 p = args.p
 npan = n / (p-2)
 a = 1/(2*npan)
 
-dom = Domain_Driver(box_geom,op,\
-                    kh,a,p=p,d=d,periodic_bc = args.periodic_bc)
+# Inilialize the domain driver object - we do this separately from
+# build_operator_with_info so that, in the future, we could experiment
+# with different operators in an already-built domain
+dom = Domain_Driver(box_geom,op,kh,a,p=p,d=d,periodic_bc = args.periodic_bc)
 
-################################# BUILD OPERATOR #########################
 # Build operator based on specified parameters and solver information
-
 print(args.sparse_assembly)
-
 build_info = build_operator_with_info(dom, args, box_geom, kh)
 
 ################################# SOLVE PDE ###################################
