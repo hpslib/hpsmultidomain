@@ -405,7 +405,7 @@ class HPS_Multidomain:
     
     ########################################## DtN multidomain build and solve ###################################
         
-    def get_DtNs(self,device,mode='build',data=0,ff_body_func=None,uu_true=None):
+    def get_DtNs(self,device,mode='build',data=0,ff_body_func=None,ff_body_vec=None,uu_true=None):
         a = self.a; p = self.p; q = self.q; nboxes = self.nboxes; d = self.d
         pdo = self.pdo
         
@@ -456,7 +456,7 @@ class HPS_Multidomain:
             #print("Indices: " + str(j*chunk_size) + " to " + str((j+1)*chunk_size))
             DtNs[j*chunk_size:(j+1)*chunk_size],Aloc_chunklist = \
             leaf_ops.get_DtNs_helper(*args,j*chunk_size,(j+1)*chunk_size, Aloc_chunkinit,device,\
-                                    mode,self.interpolate,data,ff_body_func,uu_true)
+                                    mode,self.interpolate,data,ff_body_func,ff_body_vec,uu_true)
 
             #print("Did chunk " + str(j))
             if Aloc_chunklist.shape[0] > 2:
@@ -469,7 +469,7 @@ class HPS_Multidomain:
         return DtNs
 
     # Input: uu_sol on I_unique
-    def solve(self,device,uu_sol,ff_body_func=None,uu_true=None):
+    def solve(self,device,uu_sol,ff_body_func=None,ff_body_vec=None,uu_true=None):
         nrhs     = uu_sol.shape[-1] # almost always 1, guessing this if for solving multiple rhs in parallel
 
         size_ext = 4*(self.q)
@@ -485,7 +485,7 @@ class HPS_Multidomain:
         
         uu_sol_bnd = uu_sol_bnd.reshape(nboxes,size_ext,nrhs)
         #print(uu_sol_bnd)
-        uu_sol_tot = self.get_DtNs(device,mode='solve',data=uu_sol_bnd,ff_body_func=ff_body_func,uu_true=uu_true)
+        uu_sol_tot = self.get_DtNs(device,mode='solve',data=uu_sol_bnd,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
         #print(uu_sol_tot)
         
         uu_sol_flat = uu_sol_tot[...,:nrhs].flatten(start_dim=0,end_dim=-2)
@@ -502,8 +502,8 @@ class HPS_Multidomain:
         res_lochps = torch.max(resvec_blocks).item()
         return uu_sol_flat, res_lochps
     
-    def reduce_body(self,device,ff_body_func):
-        ff_red = self.get_DtNs(device,mode='reduce_body',ff_body_func=ff_body_func)
+    def reduce_body(self,device,ff_body_func,ff_body_vec):
+        ff_red = self.get_DtNs(device,mode='reduce_body',ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
         
         ff_red_flatten = ff_red.flatten(start_dim=0,end_dim=-2)
         ff_red_flatten[self.I_copy1] += ff_red_flatten[self.I_copy2]

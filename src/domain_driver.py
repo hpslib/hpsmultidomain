@@ -321,7 +321,7 @@ class Domain_Driver:
         return info_dict
                 
     # ONLY NEEDED FOR SPARSE SOLVE
-    def get_rhs(self,uu_dir_func,ff_body_func=None,sum_body_load=True):
+    def get_rhs(self,uu_dir_func,ff_body_func=None,ff_body_vec=None,sum_body_load=True):
         I_Ctot   = self.I_Ctot
         I_Xtot   = self.I_Xtot
         nrhs = 1
@@ -339,7 +339,7 @@ class Domain_Driver:
             I_copy2  = self.hps.I_copy2
             ff_body  = -apply_sparse_lowmem(self.A,I_copy1,self.I_Xtot_in_unique,uu_dir)
             ff_body  = ff_body - apply_sparse_lowmem(self.A,I_copy2,self.I_Xtot_in_unique,uu_dir)
-        if (ff_body_func is not None):
+        if (ff_body_func is not None) or (ff_body_vec is not None):
 
             if (self.sparse_assembly == 'reduced_gpu'):
                 device = torch.device('cuda')
@@ -347,9 +347,9 @@ class Domain_Driver:
                 device = torch.device('cpu')
             
             if self.d==2:
-                ff_body += self.hps.reduce_body(device,ff_body_func)[I_Ctot]
+                ff_body += self.hps.reduce_body(device,ff_body_func,ff_body_vec)[I_Ctot]
             elif self.d==3:
-                ff_body += self.hps.reduce_body(device,ff_body_func)[I_Ctot]
+                ff_body += self.hps.reduce_body(device,ff_body_func,ff_body_vec)[I_Ctot]
         
         # adjust to sum body load on left and right boundaries
         if (self.periodic_bc and sum_body_load):
@@ -384,10 +384,11 @@ class Domain_Driver:
         return res
     
     # ONLY NEEDED FOR SPARSE SOLVE
-    def solve_helper_blackbox(self,uu_dir_func,ff_body_func=None):
+    def solve_helper_blackbox(self,uu_dir_func,ff_body_func=None,ff_body_vec=None):
         
         tic = time()
-        ff_body = self.get_rhs(uu_dir_func,ff_body_func); ff_body = np.array(ff_body)
+        ff_body = self.get_rhs(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
+        ff_body = np.array(ff_body)
         try:
             if (not petsc_available):
                 sol = self.superLU.solve(ff_body)
@@ -407,12 +408,12 @@ class Domain_Driver:
         return sol,rel_err,toc_solve, ff_body
         
         
-    def solve(self,uu_dir_func,ff_body_func=None,known_sol=False):
+    def solve(self,uu_dir_func,ff_body_func=None,ff_body_vec=None,known_sol=False):
         if self.d==2:
             if (self.solver_type == 'slabLU'):
                 raise ValueError("not included in this version")
             else:
-                sol,rel_err,toc_solve, _ = self.solve_helper_blackbox(uu_dir_func,ff_body_func)
+                sol,rel_err,toc_solve, _ = self.solve_helper_blackbox(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
 
             # self.A is black box matrix:
             sol_tot = torch.zeros(self.A.shape[0],1)
@@ -429,7 +430,7 @@ class Domain_Driver:
             if (self.solver_type == 'slabLU'):
                 raise ValueError("not included in this version")
             else:
-                sol,rel_err,toc_solve, ff_body = self.solve_helper_blackbox(uu_dir_func,ff_body_func) # REMOVE FF_BODY LATER
+                sol,rel_err,toc_solve, ff_body = self.solve_helper_blackbox(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
                 #print(sol)
 
             # self.A is black box matrix:
@@ -479,7 +480,7 @@ class Domain_Driver:
         for i in range(GridX.shape[0]):
             uu_true[i] = uu_dir_func(GridX[i])
         
-        sol_tot,resloc_hps = self.hps.solve(device,sol_tot,ff_body_func=ff_body_func,uu_true=uu_true)
+        sol_tot,resloc_hps = self.hps.solve(device,sol_tot,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
         toc_solve += time() - tic
         sol_tot = sol_tot.cpu()
 

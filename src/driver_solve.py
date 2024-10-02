@@ -64,7 +64,7 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None):
         if (args.pde == 'convection_diffusion'):
             uu_dir        = lambda xx: uu_dir_func_convection(xx)
             known_sol     = True
-            num_timesteps = 1
+            num_timesteps = 10
             delta_t       = 1.0
             ff_body       = lambda xx: -delta_t * uu_dir_func_convection(xx)
         else:
@@ -77,8 +77,12 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None):
         raise ValueError("this code is not included in this version")
 
     for i in range(num_timesteps):
-        ff_body_step = ff_body
-        uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body_step,known_sol=known_sol)
+        ff_body_func = ff_body
+        ff_body_vec  = None
+        if (i > 0):
+            ff_body_vec  = -delta_t * uu_sol
+            ff_body_func = None
+        uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,known_sol=known_sol)
 
     if (args.solver == 'superLU'):
         print("\t--SuperLU solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\
