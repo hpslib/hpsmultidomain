@@ -13,6 +13,7 @@ def configure_pde_domain(args):
     curved_domain = False
 
     kh = 0
+    delta_t = 0
 
     if ((args.pde == 'poisson') and (args.domain == 'square')):
         if (args.ppw is not None):
@@ -123,7 +124,9 @@ def configure_pde_domain(args):
             print("convection_diffusion is 3D only")
             raise ValueError
         if args.d==3:
-            op = pdo.PDO_3d(pdo.ones,pdo.ones,pdo.ones,c3=pdo.const(c=-63.),c=pdo.const(c=-1.))
+            delta_t = 1e-1
+            op = pdo.PDO_3d(pdo.const(c=delta_t),pdo.const(c=delta_t),pdo.const(c=delta_t),
+                            c3=pdo.const(c=-64*delta_t),c=pdo.const(c=-1))
         kh = 0
         curved_domain = False
 
@@ -131,7 +134,7 @@ def configure_pde_domain(args):
     else:
         raise ValueError
 
-    return op, param_map, inv_param_map, curved_domain, kh
+    return op, param_map, inv_param_map, curved_domain, kh, delta_t
 
 #
 # Given a domain decomposition, constructs the operator needed for the HPS computation:

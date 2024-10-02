@@ -79,7 +79,7 @@ if ((not torch.cuda.is_available()) and (args.sparse_assembly == 'reduced_gpu'))
 # If we have a square domain (and thus do not need parameter maps), then
 # param_map, inv_param_map = None and curved_domain = False.
 # If there is no oscillation then kh = 0.
-op, param_map, inv_param_map, curved_domain, kh = configure_pde_domain(args)
+op, param_map, inv_param_map, curved_domain, kh, delta_t = configure_pde_domain(args)
     
 ##### Set the domain and discretization parameters
 if (args.p is None):
@@ -100,7 +100,7 @@ build_info = build_operator_with_info(dom, args, box_geom, kh)
 ################################# SOLVE PDE ###################################
 # Solve the PDE with specified configurations and print results
 
-uu_dir,uu_sol,res,true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error,solve_info = run_solver(dom, args, curved_domain, kh, param_map)
+uu_dir,uu_sol,res,true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error,solve_info = run_solver(dom, args, curved_domain, kh, param_map, delta_t)
 
 # Optional: Store solution and/or pickle results for later use
 if (args.store_sol):

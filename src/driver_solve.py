@@ -4,7 +4,7 @@ import numpy as np                     # For numerical operations
 from domain_driver import *  # Importing domain driver utilities for PDE solving
 from built_in_funcs import *  # Importing built-in functions for specific PDEs or conditions
 
-def run_solver(dom, args, curved_domain, kh=0, param_map=None):
+def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
     print("SOLVE RESULTS")
     solve_info = dict()
     num_timesteps = 1
@@ -62,11 +62,11 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None):
             print("Convection_diffusion is 3D only")
             raise ValueError
         if (args.pde == 'convection_diffusion'):
-            uu_dir        = lambda xx: uu_dir_func_convection(xx)
+            # Dirichlet BC is from the time step we are solving for now:
+            uu_dir        = lambda xx: uu_dir_func_convection(xx, delta_t)
             known_sol     = True
             num_timesteps = 10
-            delta_t       = 1.0
-            ff_body       = lambda xx: -delta_t * uu_dir_func_convection(xx)
+            ff_body       = lambda xx: -uu_dir_func_convection(xx, 0)
         else:
             raise ValueError
     else:
@@ -80,8 +80,10 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None):
         ff_body_func = ff_body
         ff_body_vec  = None
         if (i > 0):
-            ff_body_vec  = -delta_t * uu_sol
+            ff_body_vec  = -uu_sol
             ff_body_func = None
+            # Update the Dirichlet BC for the new timestep:
+            uu_dir       = lambda xx: uu_dir_func_convection(xx, delta_t*(i+1))
         uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,known_sol=known_sol)
 
     if (args.solver == 'superLU'):
