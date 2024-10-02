@@ -340,14 +340,16 @@ class Domain_Driver:
             ff_body  = -apply_sparse_lowmem(self.A,I_copy1,self.I_Xtot_in_unique,uu_dir)
             ff_body  = ff_body - apply_sparse_lowmem(self.A,I_copy2,self.I_Xtot_in_unique,uu_dir)
         if (ff_body_func is not None):
+
+            if (self.sparse_assembly == 'reduced_gpu'):
+                device = torch.device('cuda')
+            elif (self.sparse_assembly == 'reduced_cpu'):
+                device = torch.device('cpu')
             
             if self.d==2:
-                if (self.sparse_assembly == 'reduced_gpu'):
-                    device = torch.device('cuda')
-                    ff_body += self.hps.reduce_body(device,ff_body_func)[I_Ctot]
-                elif (self.sparse_assembly == 'reduced_cpu'):
-                    device = torch.device('cpu')
-                    ff_body += self.hps.reduce_body(device,ff_body_func)[I_Ctot]
+                ff_body += self.hps.reduce_body(device,ff_body_func)[I_Ctot]
+            elif self.d==3:
+                ff_body += self.hps.reduce_body(device,ff_body_func)[I_Ctot]
         
         # adjust to sum body load on left and right boundaries
         if (self.periodic_bc and sum_body_load):

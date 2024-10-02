@@ -63,10 +63,10 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None):
             raise ValueError
         if (args.pde == 'convection_diffusion'):
             uu_dir        = lambda xx: uu_dir_func_convection(xx)
-            ff_body       = lambda xx: uu_dir_func_convection(xx)
             known_sol     = True
             num_timesteps = 1
-            delta_t = 0.1
+            delta_t       = 1.0
+            ff_body       = lambda xx: -delta_t * uu_dir_func_convection(xx)
         else:
             raise ValueError
     else:

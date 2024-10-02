@@ -123,11 +123,11 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
     else:
         Aloc = get_Aloc_3d(*args,device)
     Acc = Aloc[:,Jc,:][:,:,Jc]
-    nrhs = data.shape[-1]
 
     #print(device)
     #print("Got local arrays for form_DtNs")
     if (mode == 'build'):
+        nrhs = data.shape[-1]
         
         if interpolate == False:
             #print(Acc.shape)
@@ -155,7 +155,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             DtN  = Intmap_rev.unsqueeze(0) @ DtN
         return DtN
     elif (mode == 'solve'):
-        
+        nrhs   = data.shape[-1]
         f_body = torch.zeros(box_end-box_start,Jc.shape[0],nrhs,device=device)
         if (ff_body_func is not None):
             xx_flat = xxloc[box_start:box_end].reshape((box_end-box_start)*p**d,d)
@@ -195,10 +195,13 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
     elif (mode == 'reduce_body'):
         # assume that the data is a function that you can apply to
         # xx locations
-        xx_flat = xxloc[box_start:box_end].reshape((box_end-box_start)*p**2,2)
+        xx_flat = xxloc[box_start:box_end].reshape((box_end-box_start)*p**d,d)
         f_body = ff_body_func(xx_flat)
-        f_body = f_body.reshape(box_end-box_start,p**2,1)
-        return - Nx.unsqueeze(0) @ torch.linalg.solve(Acc,f_body[:,Jc])
+        f_body = f_body.reshape(box_end-box_start,p**d,1)
+        #print(f_body.shape)
+        #print(torch.linalg.solve(Acc,f_body[:,Jc]).shape)
+        #print(Nx.unsqueeze(0).shape)
+        return -Nx[:,Jc].unsqueeze(0) @ torch.linalg.solve(Acc,f_body[:,Jc])
     
 def get_DtN_chunksize(p,device):
     if (device == torch.device('cuda')):
