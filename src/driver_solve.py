@@ -79,12 +79,17 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
     for i in range(num_timesteps):
         ff_body_func = ff_body
         ff_body_vec  = None
-        if (i > 0):
+        if i > 0:
             ff_body_vec  = -uu_sol
             ff_body_func = None
             # Update the Dirichlet BC for the new timestep:
             uu_dir       = lambda xx: uu_dir_func_convection(xx, delta_t*(i+1))
+            uu_sol_old = uu_sol
         uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,known_sol=known_sol)
+        if i > 0:
+            change = torch.linalg.norm(uu_sol - uu_sol_old) / torch.linalg.norm(uu_sol_old)
+            print("Change from previous timestep is:")
+            print(change)
 
     if (args.solver == 'superLU'):
         print("\t--SuperLU solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\

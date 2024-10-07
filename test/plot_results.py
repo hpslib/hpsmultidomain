@@ -13,13 +13,14 @@ onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
 
 #p_list = [8, 10, 12, 14, 16, 18, 20]
 #p_list = [8, 10, 12, 14, 18, 22, 30]
-p_list = [10, 12, 14, 16, 18]
+p_list = [10, 12, 14] #, 16, 18]
 
 p_results = []
 
 for p in p_list:
     p_files = [_ for _ in onlyfiles if "_p_" + str(p) + "_" in _]
     n = []
+    delta_t = []
     toc_invert = []
     toc_build_dtn = []
     toc_leaf_solve = []
@@ -42,6 +43,7 @@ for p in p_list:
         with open(mypath + "/" + filename, 'rb') as f:
             x = pickle.load(f)
             n.append(x["n"])
+            delta_t.append(x["delta_t"])
             toc_invert.append(x["toc_build_blackbox"])
             toc_build_dtn.append(x["toc_assembly"])
             toc_leaf_solve.append(x["toc_solve_petsc"])

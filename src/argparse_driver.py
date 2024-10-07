@@ -31,6 +31,7 @@ parser.add_argument('--bc', type=str, required=True)  # Boundary condition
 parser.add_argument('--ppw',type=int, required=False)  # Points per wavelength for oscillatory problems
 parser.add_argument('--nwaves',type=float, required=False)  # Number of wavelengths
 parser.add_argument('--kh', type=float, required=False)       # checks if we have a given non-constant wavenumber
+parser.add_argument('--delta_t', type=float, required=False)  # checks if we have a given time step (only needed for convection-diffusion)
 
 # Solver and computational specifics
 parser.add_argument('--solver',type=str,required=False)  # Solver to use
@@ -99,7 +100,6 @@ build_info = build_operator_with_info(dom, args, box_geom, kh)
 
 ################################# SOLVE PDE ###################################
 # Solve the PDE with specified configurations and print results
-
 uu_dir,uu_sol,res,true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error,solve_info = run_solver(dom, args, curved_domain, kh, param_map, delta_t)
 
 # Optional: Store solution and/or pickle results for later use
@@ -264,10 +264,14 @@ if d==3:
     dtn_info["neumann_tensor_error"] = neumann_tensor_error
     dtn_info["neumann_sparse_error"] = neumann_sparse_error
     dtn_info["dtn_cond"] = dtn_cond
-    """
+    
     center=np.array([-1.1,+1.,+1.2])
     
-    xx = dom.hps.grid_xx.flatten(start_dim=0,end_dim=-2)
+    #xx = dom.hps.grid_xx.flatten(start_dim=0,end_dim=-2)
+    # result = uu_sol
+    """
+    xx = dom.hps.grid_ext
+
     if curved_domain:
         xx = param_map(xx)
     import matplotlib.pyplot as plt
@@ -282,19 +286,26 @@ if d==3:
                    + sequence_containing_y_vals*sequence_containing_y_vals
                    + sequence_containing_z_vals*sequence_containing_z_vals)
 
-    result = uu_sol.flatten()
+    Jx = torch.tensor(dom.hps.H.JJ.Jxreorder)
 
-    true_vals = uu_dir(xx)
-    true_vals = true_vals.squeeze(-1)
+    result = uu_sol[:,Jx].flatten()
 
-    rel_errors = torch.abs(result - true_vals) / (torch.abs(true_vals) + 1)
+    max_result = torch.linalg.norm(result, ord=np.inf)
 
-    #print(rel_errors)
-
-    sc = ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals, c=rel_errors, marker='o')
-    plt.colorbar(sc)
+    ax.view_init(azim=-30)
+    plt.rc('text',usetex=True)
+    plt.rc('font',**{'family':'serif','size':14})
+    plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
+    sc = ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals, c=result, marker='o', cmap="seismic", vmin=-max_result, vmax=max_result)
+    plt.title("Result of Helmholtz Equation on Curved Domain, K = " + str(kh))
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.colorbar(sc, shrink=0.5)
+    plt.rcParams['figure.figsize'] = [14, 6]
+    plt.savefig("3D-domain-faces.pdf")
     plt.show()
     """
+    
     
 
 if (d==3 and 1==0):

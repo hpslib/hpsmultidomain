@@ -59,7 +59,7 @@ def configure_pde_domain(args):
         elif (kh_set):
             kh = args.kh
         elif (ppw_set):
-            nwaves = int(n/args.ppw)
+            nwaves = int(args.n/args.ppw)
             kh = (nwaves+0.03)*2*np.pi+1.8 # This wrong for 3d?
         else:
             nwaves = args.nwaves
@@ -124,7 +124,9 @@ def configure_pde_domain(args):
             print("convection_diffusion is 3D only")
             raise ValueError
         if args.d==3:
-            delta_t = 1e-1
+            delta_t = args.delta_t
+            if delta_t is None:
+                raise ValueError("delta_t must be specified for parabolic problem")
             op = pdo.PDO_3d(pdo.const(c=delta_t),pdo.const(c=delta_t),pdo.const(c=delta_t),
                             c3=pdo.const(c=-64*delta_t),c=pdo.const(c=-1))
         kh = 0
@@ -156,5 +158,6 @@ def build_operator_with_info(dom, args, box_geom, kh=0):
     build_info['periodic_bc'] = args.periodic_bc
     build_info['a'] = dom.hps.a
     build_info['p'] = args.p
+    build_info['delta_t'] = args.delta_t
 
     return build_info
