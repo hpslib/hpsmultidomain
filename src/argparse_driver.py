@@ -109,9 +109,21 @@ if (args.store_sol):
     solve_info['xx']        = XX
     solve_info['sol']       = uu_sol
 
+if (args.pickle is not None):
+    file_loc = args.pickle
+    print("Pickling results to file %s"% (file_loc))
+    f = open(file_loc,"wb+")
+    build_info.update(solve_info)
+    #build_info.update(interpolation_info)
+    #build_info.update(dtn_info)
+    #print(build_info)
+    pickle.dump(build_info,f)
+    #pickle.dump(solve_info,f)
+    f.close()
+
 ################################# EVALUATING SYSTEM COMPONENTS ###################################
 # Evaluate certain parts of the 3D problem 
-
+"""
 if (d==3):
     interpolation_info = dict()
     # First we generate the arrays of Chebyshev and Gaussian nodes:
@@ -264,12 +276,12 @@ if d==3:
     dtn_info["neumann_tensor_error"] = neumann_tensor_error
     dtn_info["neumann_sparse_error"] = neumann_sparse_error
     dtn_info["dtn_cond"] = dtn_cond
-    
+    """
+"""
     center=np.array([-1.1,+1.,+1.2])
     
     #xx = dom.hps.grid_xx.flatten(start_dim=0,end_dim=-2)
     # result = uu_sol
-    """
     xx = dom.hps.grid_ext
 
     if curved_domain:
@@ -291,23 +303,22 @@ if d==3:
     result = uu_sol[:,Jx].flatten()
 
     max_result = torch.linalg.norm(result, ord=np.inf)
-
-    ax.view_init(azim=-30)
-    plt.rc('text',usetex=True)
-    plt.rc('font',**{'family':'serif','size':14})
-    plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
-    sc = ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals, c=result, marker='o', cmap="seismic", vmin=-max_result, vmax=max_result)
-    plt.title("Result of Helmholtz Equation on Curved Domain, K = " + str(kh))
-    plt.xlabel("x")
-    plt.ylabel("y")
-    plt.colorbar(sc, shrink=0.5)
-    plt.rcParams['figure.figsize'] = [14, 6]
-    plt.savefig("3D-domain-faces.pdf")
-    plt.show()
-    """
+"""
+    #ax.view_init(azim=-30)
+    #plt.rc('text',usetex=True)
+    #plt.rc('font',**{'family':'serif','size':14})
+    #plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
+    #sc = ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals, c=result, marker='o', cmap="seismic", vmin=-max_result, vmax=max_result)
+    #plt.title("Result of Helmholtz Equation on Curved Domain, K = " + str(kh))
+    #plt.xlabel("x")
+    #plt.ylabel("y")
+    #plt.colorbar(sc, shrink=0.5)
+    #plt.rcParams['figure.figsize'] = [14, 6]
+    #plt.savefig("3D-domain-faces.pdf")
+    #plt.show()
     
     
-
+"""
 if (d==3 and 1==0):
     I_copy1  = dom.hps.I_copy1
     I_copy2  = dom.hps.I_copy2
@@ -321,16 +332,17 @@ if (d==3 and 1==0):
             error = error + np.abs(A_CC_add[i,j] - dom.A[I_copy2[i], I_copy2[j]])
 
     print("Error in copies of A going into A_CC is " + str(error))
+    
 
 if (args.pickle is not None):
     file_loc = args.pickle
     print("Pickling results to file %s"% (file_loc))
     f = open(file_loc,"wb+")
     build_info.update(solve_info)
-    build_info.update(interpolation_info)
-    build_info.update(dtn_info)
+    #build_info.update(interpolation_info)
+    #build_info.update(dtn_info)
     #print(build_info)
     pickle.dump(build_info,f)
     #pickle.dump(solve_info,f)
     f.close()
-
+"""
