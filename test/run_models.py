@@ -16,7 +16,7 @@ ppw = 0
 kh = None
 delta_t = None
 
-output_path = "output/scaling"
+output_path = "output/scaling_40gb"
 
 for p in p_list:
     n_list = list(range(2*(p-2), 85, p-2))

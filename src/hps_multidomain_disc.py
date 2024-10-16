@@ -444,8 +444,8 @@ class HPS_Multidomain:
         else:
             args = p,q,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
         
-        # reserve at most 1GB memory for stored DtNs at a time
-        f = 0.8e9 # 0.8 GB in bytes
+        # reserve at most 40GB memory for stored DtNs at a time
+        f = 32e9 # 40 * 0.8 = 32 GB in bytes
         chunk_max = int(f / ((2*d*size_face)**2 * 8))
         chunk_size = leaf_ops.get_nearest_div(nboxes,chunk_max)
         
