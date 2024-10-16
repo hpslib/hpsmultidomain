@@ -444,25 +444,36 @@ class HPS_Multidomain:
         else:
             args = p,q,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
         
-        # reserve at most 1GB memory for stored DtNs at a time
-        f = 0.8e9 # 1 * 0.8 = 32 GB in bytes
+        # reserve at most 10GB memory for stored DtNs at a time
+        f = 8e9 # 10 * 0.8 = 8 GB in bytes
         chunk_max = int(f / ((2*d*size_face)**2 * 8))
         chunk_size = leaf_ops.get_nearest_div(nboxes,chunk_max)
+
+        print("chunk max is " + str(chunk_max) + ", chunk_size is " + str(chunk_size))
         
         assert np.mod(nboxes,chunk_size) == 0
-        Aloc_chunkinit = np.min([50,int(nboxes/4)])
+        Aloc_chunkinit = chunk_size #np.min([50,int(nboxes/4)])
         #print("Handled memory chunks")
-        for j in range(int(nboxes / chunk_size)):
+        j = 0
+        while j*chunk_max < nboxes:
+        #for j in range(int(nboxes / chunk_size)):
             #print("Indices: " + str(j*chunk_size) + " to " + str((j+1)*chunk_size))
-            DtNs[j*chunk_size:(j+1)*chunk_size],Aloc_chunklist = \
-            leaf_ops.get_DtNs_helper(*args,j*chunk_size,(j+1)*chunk_size, Aloc_chunkinit,device,\
-                                    mode,self.interpolate,data,ff_body_func,ff_body_vec,uu_true)
+            #DtNs[j*chunk_size:(j+1)*chunk_size],Aloc_chunklist = \
+            #leaf_ops.get_DtNs_helper(*args,j*chunk_size,(j+1)*chunk_size, Aloc_chunkinit,device,\
+            #                        mode,self.interpolate,data,ff_body_func,ff_body_vec,uu_true)
 
+            chunk_end = min(nboxes, (j+1)*chunk_max)
+            Aloc_chunkinit = chunk_end - j*chunk_max
+            
+            DtNs[j*chunk_max:chunk_end], Aloc_chunklist = leaf_ops.get_DtNs_helper(*args,j*chunk_max,chunk_end,Aloc_chunkinit,device,mode,self.interpolate,data,ff_body_func,ff_body_vec,uu_true) 
+            
+            print("Aloc_chunklist = " + str(Aloc_chunklist))
             #print("Did chunk " + str(j))
             if Aloc_chunklist.shape[0] > 2:
                 Aloc_chunkinit = int(Aloc_chunklist[-2])
             else:
                 Aloc_chunkinit = int(Aloc_chunklist[0])
+            j = j+1
         #print("DtNs interior = " + str(DtNs[:,Jc]))
         #print("DtNs exterior = " + str(DtNs[:,Jx]))
         #print("Whole DtN = " + str(DtNs))

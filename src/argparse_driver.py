@@ -70,6 +70,12 @@ if (args.disable_cuda):
 print("CUDA available %s" % torch.cuda.is_available())
 if (torch.cuda.is_available()):
     print("--num cuda devices %d" % torch.cuda.device_count())
+    total_memory = torch.cuda.get_device_properties(0).total_memory
+    print(f"Total GPU memory: {total_memory / 1024**3} GB")
+    allocated_memory = torch.cuda.memory_allocated(0)
+    print(f"Allocated GPU memory: {allocated_memory / 1024**3} GB")
+    reserved_memory = torch.cuda.memory_reserved(0)
+    print(f"Reserved GPU memory: {reserved_memory / 1024**3} GB")
 if ((not torch.cuda.is_available()) and (args.sparse_assembly == 'reduced_gpu')):
     args.sparse_assembly = 'reduced_cpu'
     print("Changed sparse assembly to reduced_cpu")
