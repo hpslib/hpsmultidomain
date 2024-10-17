@@ -5,16 +5,16 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import pickle
 
-mypath      = "output/poisson/"
-plotpath    = "plots/poisson/"
+mypath      = "output/scaling_new/"
+plotpath    = "plots/scaling_new/"
 total_title = "Poisson Equation:\n"
 
 #p_list = [8, 10, 12, 14, 16, 18, 20]
 #p_list = [8, 10, 12, 14, 18, 22, 30]
 
 
-#p_list = [10, 12, 14, 16, 18]
-p_list = [6, 8, 10, 12]#, 14]
+p_list = [10, 12, 14, 16, 18]
+#p_list = [6, 8, 10, 12]#, 14]
 
 def make_p_results(mypath, p_list):
     onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
@@ -117,9 +117,9 @@ plt.show()
 p_results = make_p_results(mypath, p_list)
 
 
-#make_plot(p_list, p_results, "toc_invert", total_title + "time to factorize sparse matrix", "N", "seconds")
-#make_plot(p_list, p_results, "toc_build_dtn", total_title + "time to assemble batched DtN maps", "N", "seconds")
-#make_plot(p_list, p_results, "toc_leaf_solve", total_title + "time to solve batched leaf operators", "N", "seconds")
+make_plot(p_list, p_results, "toc_invert", total_title + "time to factorize sparse matrix", "N", "seconds")
+make_plot(p_list, p_results, "toc_build_dtn", total_title + "time to assemble batched DtN maps", "N", "seconds")
+make_plot(p_list, p_results, "toc_leaf_solve", total_title + "time to solve batched leaf operators", "N", "seconds")
 
 
 """

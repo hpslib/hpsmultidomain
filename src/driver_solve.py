@@ -59,14 +59,24 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
             raise ValueError
     elif (args.bc == 'convection_diffusion'):
         if d == 2:
-            print("Convection_diffusion is 3D only")
-            raise ValueError
+            raise ValueError("Convection_diffusion is 3D only")
         if (args.pde == 'convection_diffusion'):
             # Dirichlet BC is from the time step we are solving for now:
             uu_dir        = lambda xx: uu_dir_func_convection(xx, delta_t)
             known_sol     = True
             num_timesteps = 10
             ff_body       = lambda xx: -uu_dir_func_convection(xx, 0)
+        else:
+            raise ValueError
+    elif (args.bc == 'parabolic_laplace'):
+        if d == 2:
+            raise ValueError("parabolic_laplace is 3D only")
+        if (args.pde == 'parabolic_laplace'):
+            # Dirichlet BC is from the time step we are solving for now:
+            uu_dir        = lambda xx: uu_dir_func_parabolic_laplace(xx, delta_t)
+            known_sol     = True
+            num_timesteps = 10
+            ff_body       = lambda xx: -uu_dir_func_parabolic_laplace(xx, 0)
         else:
             raise ValueError
     else:
@@ -76,20 +86,27 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
     if (args.solver == 'slabLU'):
         raise ValueError("this code is not included in this version")
 
+    ff_body_func = ff_body
+    ff_body_vec  = None
     for i in range(num_timesteps):
-        ff_body_func = ff_body
-        ff_body_vec  = None
         if i > 0:
             ff_body_vec  = -uu_sol
             ff_body_func = None
             # Update the Dirichlet BC for the new timestep:
-            uu_dir       = lambda xx: uu_dir_func_convection(xx, delta_t*(i+1))
+            if (args.bc == 'convection_diffusion'):
+                uu_dir = lambda xx: uu_dir_func_convection(xx, delta_t*(i+1))
+            elif (args.bc == 'parabolic_laplace'):
+                uu_dir = lambda xx: uu_dir_func_parabolic_laplace(xx, delta_t*(i+1))
+            else:
+                raise ValueError("multiple time steps means either convection-diffusion or parabolic laplace")
             uu_sol_old = uu_sol
+
         uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,known_sol=known_sol)
         if i > 0:
             change = torch.linalg.norm(uu_sol - uu_sol_old) / torch.linalg.norm(uu_sol_old)
-            print("Change from previous timestep is:")
-            print(change)
+            sol_norm = torch.linalg.norm(uu_sol)
+            print("Change from previous timestep is " + str(change.item()))
+            print("With current vector norm of " + str(sol_norm.item()))
 
     if (args.solver == 'superLU'):
         print("\t--SuperLU solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\

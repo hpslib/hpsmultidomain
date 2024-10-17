@@ -132,6 +132,21 @@ def configure_pde_domain(args):
         kh = 0
         curved_domain = False
 
+    elif args.pde == "parabolic_laplace":
+        if (args.ppw is not None):
+            raise ValueError
+
+        # parabolic_laplace operator
+        if args.d==2:
+            raise ValueError("parabolic_laplace is 3D only")
+        if args.d==3:
+            delta_t = args.delta_t
+            if delta_t is None:
+                raise ValueError("delta_t must be specified for parabolic problem")
+            op = pdo.PDO_3d(pdo.const(c=-delta_t),pdo.const(c=-delta_t),pdo.const(c=-delta_t),c=pdo.const(c=-1))
+        kh = 0
+        curved_domain = False
+
 
     else:
         raise ValueError

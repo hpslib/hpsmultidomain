@@ -329,3 +329,7 @@ def bfield_cavity_scattering(xx,kh):
 def uu_dir_func_convection(xx, t):
     uu_exact = np.cos(8*xx[:,0]) * (1 - 2*xx[:,1]) * np.exp(xx[:,2]) * np.exp(-t)
     return uu_exact.unsqueeze(-1)
+
+def uu_dir_func_parabolic_laplace(xx, t):
+    uu_exact = np.cos(np.sqrt(2) * xx[:,0]) * (1 - 2*xx[:,1]) * np.exp(xx[:,2]) * np.exp(-t)
+    return uu_exact.unsqueeze(-1)
