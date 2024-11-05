@@ -233,6 +233,16 @@ class Domain_Driver:
         info_dict['solver_type']          = "petsc_"+solvertype
         
         self.petsc_LU = ksp
+
+        from scipy.sparse.linalg import spsolve
+        v = np.random.rand(self.A_CC.shape[0],)
+        result = self.A_CC @ spsolve(self.A_CC,v.copy())
+        condest = np.linalg.cond(self.A_CC.todense())
+
+        res = np.linalg.norm(result - v,ord=2)
+        #print("RELATIVE RESIDUAL OF SOLUTION %5.2e" % res)
+        #print("COND A_CC %5.2e" % condest)
+
         return info_dict
     
     # ONLY NEEDED FOR SPARSE SOLVE
@@ -251,8 +261,22 @@ class Domain_Driver:
                 A_CC = A_CC[:,I_copy1] + A_CC[:,I_copy2]
 
             self.A_CC = A_CC
-            #self.dense_A_CC = self.A_CC.toarray()
-            #print("Condition number of A_CC: " + str(np.linalg.cond(self.dense_A_CC)))
+            self.dense_A_CC = self.A_CC.toarray()
+            
+            print("\n\nCondition number of A_CC: " + str(np.linalg.cond(self.dense_A_CC)) + "\n\n")
+            """
+            print("Singular values of A_CC:")
+            U, S, _ = np.linalg.svd(self.dense_A_CC)
+            print(S)
+            abs_dense_A_CC = np.abs(self.dense_A_CC)
+            largest = np.max(abs_dense_A_CC)
+            smallest = np.min(abs_dense_A_CC)
+            arglargest = np.argmax(abs_dense_A_CC)
+            argsmallest = np.argmin(abs_dense_A_CC)
+            print("Largest / smallest entry is " + str(largest) + ", " + str(smallest))
+            print("Where is " + str(arglargest) + ", " + str(argsmallest))
+            print(self.dense_A_CC.shape)
+            """
             #import sys
             #np.set_printoptions(threshold=sys.maxsize)
             #print(self.dense_A_CC)
@@ -393,10 +417,17 @@ class Domain_Driver:
             if (not petsc_available):
                 sol = self.superLU.solve(ff_body)
             else:
-                psol = PETSc.Vec().createWithArray(np.ones(ff_body.shape))
-                pb   = PETSc.Vec().createWithArray(ff_body.copy())
-                self.petsc_LU.solve(pb,psol)
-                sol  = psol.getArray().reshape(ff_body.shape)
+                print("Norm of the RHS: " + str(np.linalg.norm(ff_body)))
+                #psol = PETSc.Vec().createWithArray(np.ones(ff_body.shape))
+                #pb   = PETSc.Vec().createWithArray(ff_body.copy())
+                #self.petsc_LU.solve(pb,psol)
+                #sol  = psol.getArray().reshape(ff_body.shape)
+
+                rtol = 1e-16
+                sol, info = spla.gmres(self.A_CC, ff_body, rtol=rtol, maxiter=10)
+                print("Iterations if it didn't converge: " + str(info))
+                print("(0 means it converged to norm(rhs) * %.16f)" %rtol)
+                sol = np.expand_dims(sol, -1)
         except:
             return 0,0,0
         sol = torch.tensor(sol); ff_body = torch.tensor(ff_body)
@@ -446,27 +477,15 @@ class Domain_Driver:
             true_c_sol = uu_dir_func(self.hps.xx_active[self.I_Ctot])
             #print("System X true solution:")
             #print(true_c_sol)
-            print("Relative residual error for sparse A_CC X true solution - ff_body:")
             #print((self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()))
-            print(np.linalg.norm(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body))
-
-            #print("Relative residual error for sparse A_CC X computed solution - ff_body:")
-            #print(np.linalg.norm(self.A_CC @ sol - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body))
-
-            
-            print("Relative error on unique boundary is:")
-            #torch.set_printoptions(threshold=10_000)
-            #print((sol - true_c_sol) / true_c_sol)
-            #print("Real shared boundary is")
-            #print(true_c_sol)
-            #print("Computed is")
-            #print(sol)
-            print("With norm error of " + str(torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)))
 
             forward_bdry_error = np.linalg.norm(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body)
             forward_bdry_error = forward_bdry_error.item()
             reverse_bdry_error = torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)
             reverse_bdry_error = reverse_bdry_error.item()
+
+            print("Relative error when applying the sparse system as a FORWARD operator on the true solution, i.e. ||A u_true - b||: %f" % forward_bdry_error)
+            print("Relative error when using the factorized sparse system to solve, i.e. ||A^-1 b - u_true||: %f" % reverse_bdry_error)
 
         resloc_hps = torch.tensor([float('nan')])
         if (self.sparse_assembly == 'reduced_gpu'):

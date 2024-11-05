@@ -64,7 +64,7 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
             # Dirichlet BC is from the time step we are solving for now:
             uu_dir        = lambda xx: uu_dir_func_convection(xx, delta_t)
             known_sol     = True
-            num_timesteps = 10
+            num_timesteps = 2
             ff_body       = lambda xx: -uu_dir_func_convection(xx, 0)
         else:
             raise ValueError
@@ -75,7 +75,7 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
             # Dirichlet BC is from the time step we are solving for now:
             uu_dir        = lambda xx: uu_dir_func_parabolic_laplace(xx, delta_t)
             known_sol     = True
-            num_timesteps = 10
+            num_timesteps = 2
             ff_body       = lambda xx: -uu_dir_func_parabolic_laplace(xx, 0)
         else:
             raise ValueError
@@ -89,6 +89,7 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
     ff_body_func = ff_body
     ff_body_vec  = None
     for i in range(num_timesteps):
+        print("\nFOR the %d timestep:\n" % i)
         if i > 0:
             ff_body_vec  = -uu_sol
             ff_body_func = None
@@ -105,8 +106,10 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
         if i > 0:
             change = torch.linalg.norm(uu_sol - uu_sol_old) / torch.linalg.norm(uu_sol_old)
             sol_norm = torch.linalg.norm(uu_sol)
-            print("Change from previous timestep is " + str(change.item()))
+            print("Change in u from previous timestep is " + str(change.item()))
             print("With current vector norm of " + str(sol_norm.item()))
+
+    print("\n\n")
 
     if (args.solver == 'superLU'):
         print("\t--SuperLU solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\

@@ -191,7 +191,8 @@ if (d==3 and 1==0):
                       | (zz_copy1[:,2] > dom.box_geom[2,1] - tol))[0]
 
     print("Number of I_copy entries on domain boundary (should be 0): " + str(len(I_dir)))
-
+"""
+"""
 # Test DtN_loc accuracy:
 if d==3:
     # Here we'll test our DtN operators on a known function. First we define the known function and its
@@ -265,19 +266,35 @@ if d==3:
     dtn_cond = torch.linalg.cond(DtN_loc[0])
     dtn_cond = dtn_cond.item()
 
-    print("DtN Condition number:")
-    print(dtn_cond)
+    size_face = DtN_loc[0].shape[0] // 6
+
+    dtn_abs = torch.abs(DtN_loc[0])
+    largest = torch.max(dtn_abs).item()
+    smallest = torch.min(dtn_abs).item()
+
+    print("DtN shape is " + str(DtN_loc[0].shape))
+    print("DtN Condition number is " + str(dtn_cond))
+    print("Largest / smallest is " + str(largest) + " / " + str(smallest))
+
+    for j in range(1): #DtN_loc.shape[0]):
+        print("Entry " + str(j) + ". Recall order is L R D U B F")
+        for i in range(6):
+            dtn_partial_cond = torch.linalg.cond(DtN_loc[j, i*size_face:(i+1)*size_face])
+            print("Condition number for this face is " + str(dtn_partial_cond.item()))
+
+    
     print("\nRelative error of Neumann computation using tensor DtNs is")
     print(neumann_tensor_error)
     print("Relative error of Neumann computation using sparse matrix A is")
     print(neumann_sparse_error)
+    
 
-    dtn_info = dict()
-    dtn_info["neumann_tensor_error"] = neumann_tensor_error
-    dtn_info["neumann_sparse_error"] = neumann_sparse_error
-    dtn_info["dtn_cond"] = dtn_cond
-    """
-"""
+    #dtn_info = dict()
+    #dtn_info["neumann_tensor_error"] = neumann_tensor_error
+    #dtn_info["neumann_sparse_error"] = neumann_sparse_error
+    #dtn_info["dtn_cond"] = dtn_cond
+    
+
     center=np.array([-1.1,+1.,+1.2])
     
     #xx = dom.hps.grid_xx.flatten(start_dim=0,end_dim=-2)
