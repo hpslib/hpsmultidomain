@@ -132,13 +132,13 @@ def configure_pde_domain(args):
         kh = 0
         curved_domain = False
 
-    elif args.pde == "parabolic_laplace":
+    elif args.pde == "parabolic_heat":
         if (args.ppw is not None):
             raise ValueError
 
-        # parabolic_laplace operator
+        # parabolic_heat operator
         if args.d==2:
-            raise ValueError("parabolic_laplace is 3D only")
+            raise ValueError("parabolic_heat is 3D only")
         if args.d==3:
             delta_t = args.delta_t
             if delta_t is None:

@@ -68,15 +68,15 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
             ff_body       = lambda xx: -uu_dir_func_convection(xx, 0)
         else:
             raise ValueError
-    elif (args.bc == 'parabolic_laplace'):
+    elif (args.bc == 'parabolic_heat'):
         if d == 2:
-            raise ValueError("parabolic_laplace is 3D only")
-        if (args.pde == 'parabolic_laplace'):
+            raise ValueError("parabolic_heat is 3D only")
+        if (args.pde == 'parabolic_heat'):
             # Dirichlet BC is from the time step we are solving for now:
-            uu_dir        = lambda xx: uu_dir_func_parabolic_laplace(xx, delta_t)
+            uu_dir        = lambda xx: uu_dir_func_parabolic_heat(xx, delta_t)
             known_sol     = True
             num_timesteps = 2
-            ff_body       = lambda xx: -uu_dir_func_parabolic_laplace(xx, 0)
+            ff_body       = lambda xx: -uu_dir_func_parabolic_heat(xx, 0)
         else:
             raise ValueError
     else:
@@ -96,8 +96,8 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
             # Update the Dirichlet BC for the new timestep:
             if (args.bc == 'convection_diffusion'):
                 uu_dir = lambda xx: uu_dir_func_convection(xx, delta_t*(i+1))
-            elif (args.bc == 'parabolic_laplace'):
-                uu_dir = lambda xx: uu_dir_func_parabolic_laplace(xx, delta_t*(i+1))
+            elif (args.bc == 'parabolic_heat'):
+                uu_dir = lambda xx: uu_dir_func_parabolic_heat(xx, delta_t*(i+1))
             else:
                 raise ValueError("multiple time steps means either convection-diffusion or parabolic laplace")
             uu_sol_old = uu_sol
