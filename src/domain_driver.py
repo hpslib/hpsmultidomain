@@ -413,23 +413,25 @@ class Domain_Driver:
         tic = time()
         ff_body = self.get_rhs(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
         ff_body = np.array(ff_body)
-        try:
-            if (not petsc_available):
-                sol = self.superLU.solve(ff_body)
-            else:
-                print("Norm of the RHS: " + str(np.linalg.norm(ff_body)))
-                #psol = PETSc.Vec().createWithArray(np.ones(ff_body.shape))
-                #pb   = PETSc.Vec().createWithArray(ff_body.copy())
-                #self.petsc_LU.solve(pb,psol)
-                #sol  = psol.getArray().reshape(ff_body.shape)
 
-                rtol = 1e-16
-                sol, info = spla.gmres(self.A_CC, ff_body, rtol=rtol, maxiter=10)
-                print("Iterations if it didn't converge: " + str(info))
-                print("(0 means it converged to norm(rhs) * %.16f)" %rtol)
-                sol = np.expand_dims(sol, -1)
-        except:
-            return 0,0,0
+        assert not petsc_available
+        sol = self.superLU.solve(ff_body)
+        res     = self.A_CC @ sol - ff_body
+        relerr  = np.linalg.norm(res,ord=2)/np.linalg.norm(ff_body,ord=2)
+        print("NORM OF RESIDUAL for solver %5.2e" % relerr)
+
+
+        ##### note that you were previously calling GMRES without a preconditioner
+
+        solve_op = spla.LinearOperator(shape=self.A_CC.shape, matvec = self.superLU.solve)
+        sol = spla.gmres(self.A_CC,ff_body,M=solve_op,rtol=1e-13,maxiter=10)[0]
+        if (ff_body.ndim ==2):
+            sol = sol[:,np.newaxis]
+
+        res     = self.A_CC @ sol - ff_body
+        relerr  = np.linalg.norm(res,ord=2)/np.linalg.norm(ff_body,ord=2)
+        print("NORM OF RESIDUAL for solver with PRECONDITIONED gmres %5.2e" % relerr)
+
         sol = torch.tensor(sol); ff_body = torch.tensor(ff_body)
         toc_solve = time() - tic
         true_c_sol = uu_dir_func(self.hps.xx_active[self.I_Ctot])
