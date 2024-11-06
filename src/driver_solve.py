@@ -64,7 +64,7 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
             # Dirichlet BC is from the time step we are solving for now:
             uu_dir        = lambda xx: uu_dir_func_convection(xx, delta_t)
             known_sol     = True
-            num_timesteps = 2
+            num_timesteps = 10
             ff_body       = lambda xx: -uu_dir_func_convection(xx, 0)
         else:
             raise ValueError

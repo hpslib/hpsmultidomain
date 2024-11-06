@@ -486,8 +486,8 @@ class Domain_Driver:
             reverse_bdry_error = torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)
             reverse_bdry_error = reverse_bdry_error.item()
 
-            print("Relative error when applying the sparse system as a FORWARD operator on the true solution, i.e. ||A u_true - b||: %f" % forward_bdry_error)
-            print("Relative error when using the factorized sparse system to solve, i.e. ||A^-1 b - u_true||: %f" % reverse_bdry_error)
+            print("Relative error when applying the sparse system as a FORWARD operator on the true solution, i.e. ||A u_true - b||: %5.2e" % forward_bdry_error)
+            print("Relative error when using the factorized sparse system to solve, i.e. ||A^-1 b - u_true||: %5.2e" % reverse_bdry_error)
 
         resloc_hps = torch.tensor([float('nan')])
         if (self.sparse_assembly == 'reduced_gpu'):
