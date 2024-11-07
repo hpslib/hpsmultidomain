@@ -299,6 +299,7 @@ class Domain_Driver:
         if (not petsc_available):
             info_dict = self.build_superLU(verbose)
         else:
+            info_dict = self.build_superLU(verbose)
             info_dict = self.build_petsc(solvertype,verbose)
         return info_dict
 
@@ -414,8 +415,8 @@ class Domain_Driver:
         ff_body = self.get_rhs(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
         ff_body = np.array(ff_body)
 
-        assert not petsc_available
-        sol = self.superLU.solve(ff_body)
+        #assert not petsc_available
+        sol     = self.superLU.solve(ff_body)
         res     = self.A_CC @ sol - ff_body
         relerr  = np.linalg.norm(res,ord=2)/np.linalg.norm(ff_body,ord=2)
         print("NORM OF RESIDUAL for solver %5.2e" % relerr)
@@ -473,13 +474,8 @@ class Domain_Driver:
             sol_tot[self.I_Ctot] = sol #uu_dir_func(self.hps.xx_active[self.I_Ctot])
             # Here we set the true exterior to the given data:
             sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
-
-            # As a test, let's try multiplying the dense A_CC by the true solution:
             
             true_c_sol = uu_dir_func(self.hps.xx_active[self.I_Ctot])
-            #print("System X true solution:")
-            #print(true_c_sol)
-            #print((self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()))
 
             forward_bdry_error = np.linalg.norm(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body)
             forward_bdry_error = forward_bdry_error.item()
