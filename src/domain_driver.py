@@ -415,15 +415,20 @@ class Domain_Driver:
         ff_body = self.get_rhs(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
         ff_body = np.array(ff_body)
 
-        #assert not petsc_available
-        sol     = self.superLU.solve(ff_body)
+        if (not petsc_available):
+            sol = self.superLU.solve(ff_body)
+        else:
+            psol = PETSc.Vec().createWithArray(np.ones(ff_body.shape))
+            pb   = PETSc.Vec().createWithArray(ff_body.copy())
+            self.petsc_LU.solve(pb,psol)
+            sol  = psol.getArray().reshape(ff_body.shape)
+
         res     = self.A_CC @ sol - ff_body
         relerr  = np.linalg.norm(res,ord=2)/np.linalg.norm(ff_body,ord=2)
         print("NORM OF RESIDUAL for solver %5.2e" % relerr)
 
-
         ##### note that you were previously calling GMRES without a preconditioner
-
+        """
         solve_op = spla.LinearOperator(shape=self.A_CC.shape, matvec = self.superLU.solve)
         sol = spla.gmres(self.A_CC,ff_body,M=solve_op,rtol=1e-13,maxiter=10)[0]
         if (ff_body.ndim ==2):
@@ -432,6 +437,7 @@ class Domain_Driver:
         res     = self.A_CC @ sol - ff_body
         relerr  = np.linalg.norm(res,ord=2)/np.linalg.norm(ff_body,ord=2)
         print("NORM OF RESIDUAL for solver with PRECONDITIONED gmres %5.2e" % relerr)
+        """
 
         sol = torch.tensor(sol); ff_body = torch.tensor(ff_body)
         toc_solve = time() - tic
