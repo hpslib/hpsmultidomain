@@ -278,10 +278,10 @@ def get_param_helper(geom,bfield,kh,d=2):
             y3   = lambda xx: xx[:,2]
         
         if d==2:
-            return pdo_param_2d(kh, bfield, z1, z2, y1, y2,\
+            return pdo_param_2d(kh, bfield, z1, z2, y1, y2,
                             y1_d1=y1_d1, y2_d1=y2_d1, y2_d2=y2_d2, y2_d1d1=y2_d1d1)
         else:
-            return pdo_param_3d(kh, bfield, z1, z2, z3, y1, y2, y3,\
+            return pdo_param_3d(kh, bfield, z1, z2, z3, y1, y2, y3,
                             y1_d1=y1_d1, y2_d1=y2_d1, y2_d2=y2_d2, y3_d3=y3_d3, y2_d1d1=y2_d1d1)
     
     
@@ -292,9 +292,13 @@ def get_param_helper(geom,bfield,kh,d=2):
 
         z1 = lambda zz: torch.mul( 1 + 1 * zz[:,1], torch.cos(zz[:,0]/const_theta) )
         z2 = lambda zz: torch.mul( 1 + 1 * zz[:,1], torch.sin(zz[:,0]/const_theta) )
+        if d==3:
+            z3 = lambda zz: zz[:,2]
         
         y1 = lambda zz: const_theta* torch.atan2(zz[:,1],zz[:,0])
         y2 = lambda zz: r(zz) - 1
+        if d==3:
+            y3   = lambda zz: zz[:,2]
         
         y1_d1    = lambda zz: -const_theta     * torch.div(zz[:,1], r(zz)**2)
         y1_d2    = lambda zz: +const_theta     * torch.div(zz[:,0], r(zz)**2)
@@ -307,11 +311,21 @@ def get_param_helper(geom,bfield,kh,d=2):
         y2_d2    = lambda zz: torch.div(zz[:,1], r(zz))
         y2_d1d1  = lambda zz: torch.div(zz[:,1]**2, r(zz)**3)
         y2_d2d2  = lambda zz: torch.div(zz[:,0]**2, r(zz)**3)
+
+        if d==3:
+            y3_d3 = lambda zz: torch.ones(zz[:,2].shape,device=zz.device)
         
-        return pdo_param_2d(kh, bfield, z1,z2,y1,y2,\
-                         y1_d1=y1_d1, y1_d2=y1_d2,\
-                         y1_d1d1=y1_d1d1, y1_d2d2=y1_d2d2,\
-                         y2_d1=y2_d1, y2_d2=y2_d2, y2_d1d1=y2_d1d1, y2_d2d2=y2_d2d2)
+        if d==2:
+            return pdo_param_2d(kh, bfield, z1,z2,y1,y2,
+                                y1_d1=y1_d1, y1_d2=y1_d2,
+                                y1_d1d1=y1_d1d1, y1_d2d2=y1_d2d2,
+                                y2_d1=y2_d1, y2_d2=y2_d2, y2_d1d1=y2_d1d1, y2_d2d2=y2_d2d2)
+        else: # d==3
+            return pdo_param_3d(kh, bfield, z1,z2,z3,y1,y2,y3,
+                                y1_d1=y1_d1, y1_d2=y1_d2,
+                                y1_d1d1=y1_d1d1, y1_d2d2=y1_d2d2,
+                                y2_d1=y2_d1, y2_d2=y2_d2, y2_d1d1=y2_d1d1, y2_d2d2=y2_d2d2,
+                                y3_d3=y3_d3)
     
     elif (geom == 'curvy_annulus'):
         

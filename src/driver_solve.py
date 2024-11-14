@@ -50,13 +50,21 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
         
         if ((args.pde == 'poisson') or (args.pde == 'mixed')):
             assert kh == 0
-            assert (not curved_domain)
-
-            uu_dir = lambda xx: uu_dir_func_greens(d, xx,kh)
-            if args.periodic_bc:
-                uu_dir = lambda xx: uu_dir_func_periodic(xx)
-            ff_body = None
-            known_sol = True
+            
+            if not curved_domain:
+                uu_dir = lambda xx: uu_dir_func_greens(d, xx,kh)
+                if args.periodic_bc:
+                    uu_dir = lambda xx: uu_dir_func_periodic(xx)
+                ff_body = None
+                known_sol = True
+            elif not args.periodic_bc:
+                uu_dir = lambda xx: uu_dir_func_greens(d, param_map(xx),kh)
+                ff_body = None
+                known_sol = True
+            else:
+                uu_dir = lambda xx: uu_dir_func_periodic(param_map(xx),kh)
+                ff_body = None
+                known_sol = True
         else:
             raise ValueError
     elif (args.bc == 'convection_diffusion'):

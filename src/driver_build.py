@@ -26,6 +26,17 @@ def configure_pde_domain(args):
         kh = 0
         curved_domain = False
 
+    elif (args.pde == 'poisson'):
+        if args.d==2:
+            raise ValueError("d=2 not supported for poisson annulus")
+        if (args.ppw is not None):
+            raise ValueError
+        kh = 0
+        if args.domain == 'annulus':
+            op, param_map, \
+            inv_param_map = pdo.get_param_map_and_pdo('annulus', bfield_constant, 1, d=args.d)
+            curved_domain = True
+
     elif ((args.pde == 'mixed') and (args.domain == 'square')):
         if (args.ppw is not None):
             raise ValueError
@@ -104,9 +115,11 @@ def configure_pde_domain(args):
         elif (args.domain == 'annulus'):
             
             op, param_map, \
-            inv_param_map = pdo.get_param_map_and_pdo('annulus', bfield, kh)
+            inv_param_map = pdo.get_param_map_and_pdo('annulus', bfield, kh, d=args.d)
             curved_domain=True
             
+            print("\n Kh IS " + str(kh) + "\n")
+
         elif (args.domain == 'curvy_annulus'):
             
             op, param_map, \
