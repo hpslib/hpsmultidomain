@@ -249,12 +249,12 @@ class Domain_Driver:
         
         self.petsc_LU = ksp
 
-        from scipy.sparse.linalg import spsolve
-        v = np.random.rand(self.A_CC.shape[0],)
-        result = self.A_CC @ spsolve(self.A_CC,v.copy())
-        condest = np.linalg.cond(self.A_CC.todense())
+        #from scipy.sparse.linalg import spsolve
+        #v = np.random.rand(self.A_CC.shape[0],)
+        #result = self.A_CC @ spsolve(self.A_CC,v.copy())
+        #condest = np.linalg.cond(self.A_CC.todense())
 
-        res = np.linalg.norm(result - v,ord=2)
+        #res = np.linalg.norm(result - v,ord=2)
         #print("RELATIVE RESIDUAL OF SOLUTION %5.2e" % res)
         #print("COND A_CC %5.2e" % condest)
 
@@ -285,9 +285,9 @@ class Domain_Driver:
             A_CC = self.A[I_copy1] + self.A[I_copy2]
             A_CC = A_CC[:,I_copy1] + A_CC[:,I_copy2]
 
-            self.dense_A_CC = A_CC.toarray()
+            #self.dense_A_CC = A_CC.toarray()
             
-            print("\n\nCondition number of A_CC: " + str(np.linalg.cond(self.dense_A_CC)) + "\n\n")
+            #print("\n\nCondition number of A_CC: " + str(np.linalg.cond(self.dense_A_CC)) + "\n\n")
             """
             print("Singular values of A_CC:")
             U, S, _ = np.linalg.svd(self.dense_A_CC)
@@ -501,6 +501,10 @@ class Domain_Driver:
             forward_bdry_error = forward_bdry_error.item()
             reverse_bdry_error = torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)
             reverse_bdry_error = reverse_bdry_error.item()
+
+            #np.set_printoptions(threshold=sys.maxsize)
+            #print(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy())
+            #print(sol.cpu().detach().numpy())
 
             print("Relative error when applying the sparse system as a FORWARD operator on the true solution, i.e. ||A u_true - b||: %5.2e" % forward_bdry_error)
             print("Relative error when using the factorized sparse system to solve, i.e. ||A^-1 b - u_true||: %5.2e" % reverse_bdry_error)

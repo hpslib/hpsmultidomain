@@ -336,4 +336,6 @@ def uu_dir_func_parabolic_heat(xx, t):
 
 def uu_dir_func_periodic(xx):
     uu_exact = np.sin(2*np.pi*xx[:,0]) * xx[:,1] * np.exp(-2*np.pi*xx[:,2])
+    #uu_exact = np.sin(2*np.pi*xx[:,1]) * np.exp(-2*np.pi*xx[:,2])
+    #uu_exact = (xx[:,0] - xx[:,0]) + 1.
     return uu_exact.unsqueeze(-1)
