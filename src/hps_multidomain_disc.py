@@ -32,7 +32,7 @@ def batched_meshgrid(b, npoints, I, J):
 # HPS Multidomain class for handling multidomain discretizations and solutions
 class HPS_Multidomain:
     
-    def __init__(self, pdo, domain, a, p, d):
+    def __init__(self, pdo, domain, a, p, d, periodic_bc=False):
         """
         Initializes the HPS multidomain solver with domain information and discretization parameters.
         
@@ -48,6 +48,8 @@ class HPS_Multidomain:
         self.p      = p
         self.a      = a
         self.d      = d
+
+        self.periodic_bc = periodic_bc
 
         # For interpolation:
         self.interpolate = True
@@ -366,13 +368,14 @@ class HPS_Multidomain:
             I_unique = I_unique[I_unique > -1]
 
             # For copy 1, we need to eliminate edges that make up domain boundary. This is just:
-            # Left faces for all but leftmost boxes
+            # Left faces for all but leftmost boxes (UNLESS we have a periodic domain on the L/R boundary)
             # Down faces for all but downmost boxes
             # Back faces for all but backmost boxes
             indices_ruf = np.hstack((np.arange(size_face,2*size_face),np.arange(3*size_face,4*size_face),np.arange(5*size_face,6*size_face)))
             I_copy1 = box_ind.clone()
             I_copy1[:,:,:,indices_ruf]             = -1 # Eliminate all right, up, and front faces
-            I_copy1[0,:,:,:size_face]              = -1 # Eliminate left faces on left edge
+            if not self.periodic_bc:
+                I_copy1[0,:,:,:size_face]          = -1 # Eliminate left faces on left edge
             I_copy1[:,0,:,2*size_face:3*size_face] = -1 # Eliminate down faces on down edge
             I_copy1[:,:,0,4*size_face:5*size_face] = -1 # Eliminate back faces on back edge
             I_copy1 = I_copy1.flatten()
@@ -381,10 +384,10 @@ class HPS_Multidomain:
             #print(I_copy1)
 
             # For copy 2, we need to match relative indexing of copy 1 to easily copy from one to the other.
-            # Well do this by copying the correct copy 2 indices to their relative points in copy1,
+            # We'll do this by copying the correct copy 2 indices to their relative points in copy1,
             # then mimic the eliminations we did in copy1
             I_copy2 = box_ind.clone()
-            # Every back index is equal to the front of the preceding box
+            # Every left index is equal to the right of the preceding box
             I_copy2[:,:,1:,4*size_face:5*size_face] = I_copy2[:,:,:-1,5*size_face:]
             # Every down index is equal to the up of the preceding box
             I_copy2[:,1:,:,2*size_face:3*size_face] = I_copy2[:,:-1,:,3*size_face:4*size_face]
@@ -392,7 +395,8 @@ class HPS_Multidomain:
             I_copy2[1:,:,:,:size_face] = I_copy2[:-1,:,:,size_face:2*size_face]
 
             I_copy2[:,:,:,indices_ruf]             = -1 # Eliminate all right, up, and front faces
-            I_copy2[0,:,:,:size_face]              = -1 # Eliminate left faces on left edge
+            if not self.periodic_bc:
+                I_copy2[0,:,:,:size_face]          = -1 # Eliminate left faces on left edge
             I_copy2[:,0,:,2*size_face:3*size_face] = -1 # Eliminate down faces on down edge
             I_copy2[:,:,0,4*size_face:5*size_face] = -1 # Eliminate back faces on back edge
             I_copy2 = I_copy2.flatten()

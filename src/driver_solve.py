@@ -52,7 +52,9 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
             assert kh == 0
             assert (not curved_domain)
 
-            uu_dir  = lambda xx: uu_dir_func_greens(d, xx,kh)
+            uu_dir = lambda xx: uu_dir_func_greens(d, xx,kh)
+            if args.periodic_bc:
+                uu_dir = lambda xx: uu_dir_func_periodic(xx)
             ff_body = None
             known_sol = True
         else:
