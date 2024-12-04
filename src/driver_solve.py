@@ -118,6 +118,8 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
             sol_norm = torch.linalg.norm(uu_sol)
             print("Change in u from previous timestep is " + str(change.item()))
             print("With current vector norm of " + str(sol_norm.item()))
+        else:
+            sol_norm = torch.linalg.norm(uu_sol)
 
     print("\n\n")
 

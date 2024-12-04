@@ -16,8 +16,13 @@ import os  # For interacting with the operating system, e.g., environment variab
 parser = argparse.ArgumentParser("Call direct solver for 2D/3D domain.")
 # Add expected command-line arguments for the script
 parser.add_argument('--p',type=int,required=False)  # Polynomial order for certain methods
-parser.add_argument('--n', type=int, required=True)  # Number of discretization points
+parser.add_argument('--n', type=int, required=False)  # Number of discretization points
 parser.add_argument('--d', type=int, required=False, default=2)  # Spatial dimension of problem
+
+
+parser.add_argument('--n0', type=int, required=False)  # Number of discretization points in x0
+parser.add_argument('--n1', type=int, required=False)  # Number of discretization points in x1
+parser.add_argument('--n2', type=int, required=False)  # Number of discretization points in x2
 
 # Arguments defining the PDE problem
 parser.add_argument('--pde', type=str, required=True)  # Type of PDE
@@ -51,7 +56,17 @@ test_components = args.test_components
 param_map = None
 
 # Extract and setup basic parameters from parsed arguments
-n = args.n; d = args.d
+redundant_n = (args.n is not None) and ((args.n0 is not None) or (args.n1 is not None) or (args.n2 is not None))
+if redundant_n:
+    ValueError("Cannot have n and n0,n1,n2 set")
+elif args.n is not None:
+    n = np.array([args.n, args.n, args.n])
+elif ((args.n0 is not None) and (args.n1 is not None) and (args.n2 is not None)):
+    n = np.array([args.n0, args.n1, args.n2])
+else:
+    ValueError("Need to set either n or n0,n1,n2")
+
+d = args.d
 box_geom = torch.tensor([[0,args.box_xlim],[0,args.box_ylim]])  # Domain geometry tensor
 if d==3:
     box_geom = torch.tensor([[0,args.box_xlim],[0,args.box_ylim],[0,args.box_zlim]])
@@ -87,7 +102,7 @@ if (args.p is None):
     raise ValueError('HPS selected but p not provided')
 p = args.p
 npan = n / (p-2)
-a = 1/(2*npan)
+a = 1/(2*npan) # a is now an array
 
 # Inilialize the domain driver object - we do this separately from
 # build_operator_with_info so that, in the future, we could experiment

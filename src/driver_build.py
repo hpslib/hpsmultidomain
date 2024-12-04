@@ -70,7 +70,7 @@ def configure_pde_domain(args):
         elif (kh_set):
             kh = args.kh
         elif (ppw_set):
-            nwaves = int(args.n/args.ppw)
+            nwaves = int(args.n[0]/args.ppw)
             kh = (nwaves+0.03)*2*np.pi+1.8 # This wrong for 3d?
         else:
             nwaves = args.nwaves

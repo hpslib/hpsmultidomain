@@ -49,6 +49,7 @@ class HPS_Multidomain:
         self.a      = a
         self.d      = d
 
+
         self.periodic_bc = periodic_bc
 
         # For interpolation:
@@ -249,9 +250,9 @@ class HPS_Multidomain:
                     for k in range(n[2]):
                         box   = i*n[1]*n[2] + j*n[2] + k
                         zzloc = zz.clone()
-                        zzloc[:,0] += self.a + 2*self.a*i + self.domain[0,0]
-                        zzloc[:,1] += self.a + 2*self.a*j + self.domain[1,0]
-                        zzloc[:,2] += self.a + 2*self.a*k + self.domain[2,0]
+                        zzloc[:,0] += self.a[0] + 2*self.a[0]*i + self.domain[0,0]
+                        zzloc[:,1] += self.a[1] + 2*self.a[1]*j + self.domain[1,0]
+                        zzloc[:,2] += self.a[2] + 2*self.a[2]*k + self.domain[2,0]
                         xx[box,:,:] = zzloc
 
         return xx
@@ -275,9 +276,9 @@ class HPS_Multidomain:
                     for k in range(n[2]):
                         box   = i*n[1]*n[2] + j*n[2] + k
                         zzloc = zzG.clone()
-                        zzloc[:,0] += self.a + 2*self.a*i + self.domain[0,0]
-                        zzloc[:,1] += self.a + 2*self.a*j + self.domain[1,0]
-                        zzloc[:,2] += self.a + 2*self.a*k + self.domain[2,0]
+                        zzloc[:,0] += self.a[0] + 2*self.a[0]*i + self.domain[0,0]
+                        zzloc[:,1] += self.a[1] + 2*self.a[1]*j + self.domain[1,0]
+                        zzloc[:,2] += self.a[2] + 2*self.a[2]*k + self.domain[2,0]
                         xxG[box,:,:] = zzloc
 
         return xxG
@@ -420,7 +421,7 @@ class HPS_Multidomain:
     ########################################## DtN multidomain build and solve ###################################
         
     def get_DtNs(self,device,mode='build',data=0,ff_body_func=None,ff_body_vec=None,uu_true=None):
-        a = self.a; p = self.p; q = self.q; nboxes = self.nboxes; d = self.d
+        p = self.p; q = self.q; nboxes = self.nboxes; d = self.d
         pdo = self.pdo
         
         # For Gaussian we might need p^2, not (p-2)^2:
