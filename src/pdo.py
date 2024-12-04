@@ -287,7 +287,9 @@ def get_param_helper(geom,bfield,kh,d=2):
     
     elif (geom == 'annulus'):
         
-        const_theta = 1/(np.pi/3)
+        const_theta = 1 / (2*np.pi) # Whole annulus, use with periodic
+        #const_theta = 1/(np.pi/3) # Segment of annulus, not periodic
+
         r           = lambda zz: (zz[:,0]**2 + zz[:,1]**2)**0.5
 
         z1 = lambda zz: torch.mul( 1 + 1 * zz[:,1], torch.cos(zz[:,0]/const_theta) )

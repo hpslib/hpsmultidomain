@@ -207,7 +207,7 @@ if (d==3 and 1==0):
 
     print("Number of I_copy entries on domain boundary (should be 0): " + str(len(I_dir)))
 """
-"""
+
 # Test DtN_loc accuracy:
 if d==3:
     # Here we'll test our DtN operators on a known function. First we define the known function and its
@@ -335,19 +335,19 @@ if d==3:
     result = uu_sol[:,Jx].flatten()
 
     max_result = torch.linalg.norm(result, ord=np.inf)
-"""
-    #ax.view_init(azim=-30)
-    #plt.rc('text',usetex=True)
-    #plt.rc('font',**{'family':'serif','size':14})
-    #plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
-    #sc = ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals, c=result, marker='o', cmap="seismic", vmin=-max_result, vmax=max_result)
-    #plt.title("Result of Helmholtz Equation on Curved Domain, K = " + str(kh))
-    #plt.xlabel("x")
-    #plt.ylabel("y")
-    #plt.colorbar(sc, shrink=0.5)
-    #plt.rcParams['figure.figsize'] = [14, 6]
-    #plt.savefig("3D-domain-faces.pdf")
-    #plt.show()
+
+    ax.view_init(azim=-30)
+    plt.rc('text',usetex=True)
+    plt.rc('font',**{'family':'serif','size':14})
+    plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
+    sc = ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals, c=result, marker='o', cmap="seismic", vmin=-max_result, vmax=max_result)
+    plt.title("Result of Helmholtz Equation on Curved Domain, K = " + str(kh))
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.colorbar(sc, shrink=0.5)
+    plt.rcParams['figure.figsize'] = [14, 6]
+    plt.savefig("3D-domain-faces.pdf")
+    plt.show()
     
     
 """

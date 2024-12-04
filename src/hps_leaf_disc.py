@@ -96,7 +96,7 @@ def get_loc_interp(x_cheb, x_cheb_nocorners, q):
     cond = np.linalg.cond(Interp_loc) 
     return Interp_loc,err,cond
 
-def get_loc_interp_3d(p, q, a, l):
+def get_loc_interp_3d(p, q, l):
     """
     Computes local interpolation matrices from Chebyshev points.
     
@@ -442,7 +442,7 @@ class HPS_Disc:
         else:
             tic = time()
             l = p #min(p,q) + 10
-            Interp_loc_GtC,Interp_loc_CtG,err,cond = get_loc_interp_3d(p, q, a[0], l) # Need to figure out various a
+            Interp_loc_GtC,Interp_loc_CtG,err,cond = get_loc_interp_3d(p, q, l)
             self.Interp_mat         = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_GtC,0),6,axis=0))
             self.Interp_mat_reverse = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_CtG,0),6,axis=0))
 
