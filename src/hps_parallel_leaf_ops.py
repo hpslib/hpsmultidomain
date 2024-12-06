@@ -143,10 +143,6 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             Jtot    = torch.hstack((Jc,Jx))
             DtN     = Nx[...,Jtot].unsqueeze(0) @ S_full
 
-
-
-            print("\t\t DtN condition number")
-            print(torch.linalg.cond(DtN))
         else:
             S_tmp   = -torch.linalg.solve(Acc,Aloc[:,Jc][...,Jxun]) # Should append Identity here and not repeat Intmap
             # Might need to apply intmap_unq here:
