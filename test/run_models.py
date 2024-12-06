@@ -5,24 +5,24 @@
 from test_3d import run_test_via_argparse
 
 # First we'll run a suite of Poisson problems for different n and p:
-p_list = [10, 12, 14, 16, 18, 20, 22]#, 24, 26]
+#p_list = [10, 12, 14, 16, 18, 20, 22]#, 24, 26]
 #p_list = [30]
 #p_list = [10, 12, 14, 16, 18]
 #p_list = [22]
 
-#p_list = [6,8,10,12,14,16,18]
+p_list = [6,8,10,12,14,16,18,20,22]
 
-domain = "curved"
-pde = "bfield_constant"
-bc = "free_space"
+domain = "square"
+pde = "poisson"
+bc = "log_dist"
 ppw = None
-kh = 30
+kh = None
 delta_t = None
 
-output_path = "output/helmholtz_curved_30kh_1205"
+output_path = "output/poisson_gpu_scaling"
 
 for p in p_list:
-    n_list = list(range(2*(p-2), 100, p-2))
+    n_list = list(range(2*(p-2), 200, p-2))
     
     #n_list = [2*(p-2), 3*(p-2), 4*(p-2)]
     
