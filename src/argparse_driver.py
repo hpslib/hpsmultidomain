@@ -60,9 +60,9 @@ redundant_n = (args.n is not None) and ((args.n0 is not None) or (args.n1 is not
 if redundant_n:
     ValueError("Cannot have n and n0,n1,n2 set")
 elif args.n is not None:
-    n = np.array([args.n, args.n, args.n])
+    args.n = np.array([args.n, args.n, args.n])
 elif ((args.n0 is not None) and (args.n1 is not None) and (args.n2 is not None)):
-    n = np.array([args.n0, args.n1, args.n2])
+    args.n = np.array([args.n0, args.n1, args.n2])
 else:
     ValueError("Need to set either n or n0,n1,n2")
 
@@ -101,7 +101,7 @@ op, param_map, inv_param_map, curved_domain, kh, delta_t = configure_pde_domain(
 if (args.p is None):
     raise ValueError('HPS selected but p not provided')
 p = args.p
-npan = n / (p-2)
+npan = args.n / (p-2)
 a = 1/(2*npan) # a is now an array
 
 # Inilialize the domain driver object - we do this separately from

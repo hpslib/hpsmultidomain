@@ -10,21 +10,25 @@ from test_3d import run_test_via_argparse
 #p_list = [10, 12, 14, 16, 18]
 #p_list = [22]
 
-p_list = [6,8,10,12,14,16,18,20,22]
+#p_list = [10,12,14,16,18,20,22]
+#p_list = [18,20,22] 
+#p_list = [20,22]
+p_list = [22]
 
 domain = "square"
-pde = "poisson"
-bc = "log_dist"
+pde = "bfield_constant"
+bc = "free_space"
 ppw = None
-kh = None
+kh = 16
 delta_t = None
 
-output_path = "output/poisson_gpu_scaling"
+output_path = "output/helmholtz_gpu_kh16_1208"
 
 for p in p_list:
-    n_list = list(range(2*(p-2), 200, p-2))
+    n_list = list(range(2*(p-2), 150, p-2))
     
     #n_list = [2*(p-2), 3*(p-2), 4*(p-2)]
+    #n_list = list(range(110, 150, p-2))
     
     for n in n_list:
         print("\nRunning " + str(p) + ", " + str(n) + "\n")
