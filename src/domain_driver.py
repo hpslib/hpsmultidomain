@@ -17,6 +17,19 @@ import scipy.sparse.linalg as sla  # For sparse linear algebra operations, alter
 # Attempting to import the PETSc library for parallel computation, handling failure gracefully
 try:
     from petsc4py import PETSc
+    # Set use of BLR compression and the precision of the dropping parameter.
+    # Looks like these are better left unused which makes sense, the DtNs aren't low rank.
+    #PETSc.Options()['mat_mumps_icntl_35'] = 3
+    #PETSc.Options()['mat_mumps_cntl_7']   = 1e-6
+
+    # Set relative threshold for numerical pivoting:
+    #PETSc.Options()['mat_mumps_cntl_1'] = 0.0
+    # Set matrix permutation. 7 is automatically decided, 1-6 are different choices.
+    PETSc.Options()['mat_mumps_icntl_6']  = 7
+    PETSc.Options()['mat_mumps_icntl_8']  = 77 # Scaling strategy, set to be automatically picked
+    PETSc.Options()['mat_mumps_icntl_10'] = 0 # No iterative refinement
+    PETSc.Options()['mat_mumps_icntl_12'] = 1 # Ordering strategy with icntl 6
+    PETSc.Options()['mat_mumps_icntl_13'] = 0 # Parallel factorization of root node
     petsc_available = True
 except ImportError:
     petsc_available = False
@@ -205,6 +218,13 @@ class Domain_Driver:
     
     # ONLY NEEDED FOR SPARSE SOLVE
     def build_petsc(self,solvertype,verbose):
+        #
+        # Here we will try setting different MUMPS parameters to improve speed
+        #
+
+        # Set the blocksize using icntl(15) to the size of a face (q**2)
+        PETSc.Options()['mat_mumps_icntl_15'] = -self.hps.q**2
+
         info_dict = dict()
         tmp = self.A_CC #.tocsr()
         pA = PETSc.Mat().createAIJ(tmp.shape, csr=(tmp.indptr,tmp.indices,tmp.data),comm=PETSc.COMM_WORLD)
@@ -215,16 +235,6 @@ class Domain_Driver:
         
         ksp.getPC().setType('lu')
         ksp.getPC().setFactorSolverType(solvertype)
-
-        """
-        print("MUMPS parameters (Icntl)")
-        for i in range(1, 48):
-            print(ksp.getPC().getFactorMatrix().getMumpsIcntl(1))
-        #print("trying no static pivoting")
-        #ksp.getPC().getFactorMatrix().setMumpsCntl(4, -1.0) # This might improve speed a little...
-        #print("then")
-        #print(ksp.getPC().getFactorMatrix().getMumpsCntl(1))
-        """
         
         px = PETSc.Vec().createWithArray(np.ones(tmp.shape[0]),comm=PETSc.COMM_WORLD)
         pb = PETSc.Vec().createWithArray(np.ones(tmp.shape[0]),comm=PETSc.COMM_WORLD)
@@ -234,22 +244,9 @@ class Domain_Driver:
         ksp.solve(pb, px)
         toc_build = time() - tic
 
-        #
-        # Here we will try setting different MUMPS parameters to improve speed
-        #
-
-        #print("MUMPS parameters after build (Icntl)")
-        #for i in range(1, 20):
-        #    print(ksp.getPC().getFactorMatrix().getMumpsIcntl(i))
-
-        # Set the blocksize using icntl(15) to the size of a face (q**2)
-        ksp.getPC().getFactorMatrix().setMumpsIcntl(15, -self.hps.q**2)
-        print(ksp.getPC().getFactorMatrix().getMumpsIcntl(15))
-        
         if (verbose):
             print("\t--time for %s build through petsc = %5.2f seconds"\
                   % (solvertype,toc_build))
-        #print("Broke it in!")
                
         info_dict['toc_build_blackbox']   = toc_build
         info_dict['solver_type']          = "petsc_"+solvertype
