@@ -234,11 +234,18 @@ class Domain_Driver:
         ksp.solve(pb, px)
         toc_build = time() - tic
 
-        """
-        print("MUMPS parameters after build (Icntl)")
-        for i in range(1, 48):
-            print(ksp.getPC().getFactorMatrix().getMumpsIcntl(1))
-        """
+        #
+        # Here we will try setting different MUMPS parameters to improve speed
+        #
+
+        #print("MUMPS parameters after build (Icntl)")
+        #for i in range(1, 20):
+        #    print(ksp.getPC().getFactorMatrix().getMumpsIcntl(i))
+
+        # Set the blocksize using icntl(15) to the size of a face (q**2)
+        ksp.getPC().getFactorMatrix().setMumpsIcntl(15, -self.hps.q**2)
+        print(ksp.getPC().getFactorMatrix().getMumpsIcntl(15))
+        
         if (verbose):
             print("\t--time for %s build through petsc = %5.2f seconds"\
                   % (solvertype,toc_build))
