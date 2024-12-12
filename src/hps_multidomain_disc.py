@@ -119,6 +119,16 @@ class HPS_Multidomain:
         #print("Building DtNs")
         tic = time()
         DtN_loc = self.get_DtNs(device,'build')
+
+        import torch
+        import torchvision.models as models
+        from torch.profiler import profile, record_function, ProfilerActivity
+        with profile(activities=[ProfilerActivity.CPU], record_shapes=True) as prof:
+            with record_function("get_DtNs"):
+                self.get_DtNs(device,'build')
+        
+        print(prof.key_averages(group_by_input_shape=True).table(sort_by="cpu_time_total", row_limit=12))
+
         toc_DtN = time() - tic
         #print("Built DtNs")
         if self.d==2:
@@ -466,15 +476,15 @@ class HPS_Multidomain:
         
         assert np.mod(nboxes,chunk_size) == 0
         Aloc_chunkinit = np.min([50,int(nboxes/4)])
-        print("chunk_max = " + str(chunk_max))
-        print("Handled memory chunks")
+        #print("chunk_max = " + str(chunk_max))
+        #print("Handled memory chunks")
         for j in range(int(nboxes / chunk_size)):
-            print("Indices: " + str(j*chunk_size) + " to " + str((j+1)*chunk_size))
+            #print("Indices: " + str(j*chunk_size) + " to " + str((j+1)*chunk_size))
             DtNs[j*chunk_size:(j+1)*chunk_size],Aloc_chunklist = \
             leaf_ops.get_DtNs_helper(*args,j*chunk_size,(j+1)*chunk_size, Aloc_chunkinit,device,\
                                     mode,self.interpolate,data,ff_body_func,ff_body_vec,uu_true)
 
-            print("Did chunk " + str(j))
+            #print("Did chunk " + str(j))
             if Aloc_chunklist.shape[0] > 2:
                 Aloc_chunkinit = int(Aloc_chunklist[-2])
             else:

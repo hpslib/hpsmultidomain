@@ -134,17 +134,22 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             #print(Aloc[:,Jc][...,Jx].shape)
             #print(Acc.device)
             #print(Aloc[:,Jc][...,Jx].device)
-            thing = Aloc[:,Jc][...,Jx]
-            S_tmp   = -torch.linalg.solve(Acc,thing)
+            S_tmp = -torch.linalg.solve(Acc, Aloc[:,Jc][...,Jx])
             #print("Formed S_tmp")
-            Irep    = torch.eye(Jx.shape[0],device=device).unsqueeze(0).repeat(box_end-box_start,1,1)
-            S_full  = torch.concat((S_tmp,Irep),dim=1)
+            Irep   = torch.eye(Jx.shape[0],device=device).unsqueeze(0).repeat(box_end-box_start,1,1)
+            S_full = torch.concat((S_tmp,Irep),dim=1)
+
+            # Alternative approach that might be more memory-efficient:
+            #S_full = torch.zeros(Aloc.shape[0], Jc.shape[0] + Jx.shape[0], Jx.shape[0])
+            #S_full[:,0:Jc.shape[0],:] = -torch.linalg.solve(Acc, Aloc[:,Jc][...,Jx])
+            #S_full[:,Jc.shape[0]:Jc.shape[0]+Jx.shape[0],:] += torch.eye(Jx.shape[0],device=device).unsqueeze(0)
+
             #print("Made S_full")
-            Jtot    = torch.hstack((Jc,Jx))
-            DtN     = Nx[...,Jtot].unsqueeze(0) @ S_full
+            Jtot = torch.hstack((Jc,Jx))
+            DtN  = Nx[...,Jtot].unsqueeze(0) @ S_full
 
         else:
-            S_tmp   = -torch.linalg.solve(Acc,Aloc[:,Jc][...,Jxun]) # Should append Identity here and not repeat Intmap
+            S_tmp   = -torch.linalg.solve(Acc, Aloc[:,Jc][...,Jxun]) # Should append Identity here and not repeat Intmap
             # Might need to apply intmap_unq here:
             Intmap_repeat = Intmap_unq.unsqueeze(0).repeat(box_end-box_start,1,1)
             S_full        = torch.concat((S_tmp @ Intmap_unq.unsqueeze(0),Intmap_repeat),dim=1) # Applying interpolation to both identity and S
@@ -239,8 +244,8 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_
     chunk_list = torch.zeros(int(nboxes/chunk_init)+100,device=device).int(); 
     box_curr = 0; nchunks = 0
     
-    print("Now in get_DtNs_helper")
-    print("nboxes = " + str(nboxes))
+    #print("Now in get_DtNs_helper")
+    #print("nboxes = " + str(nboxes))
 
     while(box_curr < nboxes):
         #print("box_curr = " + str(box_curr))
@@ -249,13 +254,13 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_
         b1 = box_curr + box_start
         b2 = np.min([box_end, b1 + chunk_size])
 
-
+        """
         print("box_curr = " + str(box_curr))
         print("b1 = " + str(b1))
         print("b2 = " + str(b2))
         print("box_end = " + str(box_end))
         print("b1 + chunk_size = " + str(b1 + chunk_size))
-
+        """
         
         tmp = form_DtNs(*args,b1,b2,device,mode,interpolate,data,ff_body_func,ff_body_vec,uu_true)
         
