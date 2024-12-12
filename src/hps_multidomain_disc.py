@@ -123,11 +123,20 @@ class HPS_Multidomain:
         import torch
         import torchvision.models as models
         from torch.profiler import profile, record_function, ProfilerActivity
-        with profile(activities=[ProfilerActivity.CPU], record_shapes=True) as prof:
+
+        if torch.cuda.is_available():
+            device_string = 'cuda'
+        else:
+            device_string = 'cpu'
+        
+        activities = [ProfilerActivity.CPU, ProfilerActivity.CUDA]
+        sort_by_keyword = device_string + "_time_total"
+        
+        with profile(activities=activities, record_shapes=True) as prof:
             with record_function("get_DtNs"):
                 self.get_DtNs(device,'build')
         
-        print(prof.key_averages(group_by_input_shape=True).table(sort_by="cpu_time_total", row_limit=12))
+        print(prof.key_averages(group_by_input_shape=False).table(sort_by=sort_by_keyword, row_limit=12))
 
         toc_DtN = time() - tic
         #print("Built DtNs")
