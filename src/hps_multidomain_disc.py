@@ -466,14 +466,15 @@ class HPS_Multidomain:
         
         assert np.mod(nboxes,chunk_size) == 0
         Aloc_chunkinit = np.min([50,int(nboxes/4)])
-        #print("Handled memory chunks")
+        print("chunk_max = " + str(chunk_max))
+        print("Handled memory chunks")
         for j in range(int(nboxes / chunk_size)):
-            #print("Indices: " + str(j*chunk_size) + " to " + str((j+1)*chunk_size))
+            print("Indices: " + str(j*chunk_size) + " to " + str((j+1)*chunk_size))
             DtNs[j*chunk_size:(j+1)*chunk_size],Aloc_chunklist = \
             leaf_ops.get_DtNs_helper(*args,j*chunk_size,(j+1)*chunk_size, Aloc_chunkinit,device,\
                                     mode,self.interpolate,data,ff_body_func,ff_body_vec,uu_true)
 
-            #print("Did chunk " + str(j))
+            print("Did chunk " + str(j))
             if Aloc_chunklist.shape[0] > 2:
                 Aloc_chunkinit = int(Aloc_chunklist[-2])
             else:
@@ -486,7 +487,6 @@ class HPS_Multidomain:
     # Input: uu_sol on I_unique
     def solve(self,device,uu_sol,ff_body_func=None,ff_body_vec=None,uu_true=None):
         nrhs     = uu_sol.shape[-1] # almost always 1, guessing this if for solving multiple rhs in parallel
-
         size_ext = 4*(self.q)
         if self.d==3:
             size_ext = 6*(self.q**2)
