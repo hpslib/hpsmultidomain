@@ -77,7 +77,7 @@ def make_p_results(mypath, p_list):
 
         if pd.api.types.is_object_dtype(p_result['n']):
             p_result['n'] = p_result['n'].str[0]
-            
+
         p_result.set_index('n', inplace=True)
         p_result.sort_index(inplace=True)
         p_results.append(pd.DataFrame.from_dict(p_result))
@@ -146,7 +146,7 @@ make_plot(p_list, p_results, "dtn_cond", total_title + "condtion # of a DtN map"
 """
 
 # Here we'll create a figure plot:
-def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, title, filename):
+def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, title, ylabel, data_col, filename):
     figsize = (16,6)
     p_results_poisson = make_p_results(path1, p_list1)
     p_results_helmholtz = make_p_results(path2, p_list2)
@@ -158,14 +158,14 @@ def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, ti
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
     fig.suptitle(title)
     for i in range(len(p_list1)):
-        ax1.loglog(p_results_poisson[i].index**3, p_results_poisson[i]["true_res"])
+        ax1.loglog(p_results_poisson[i].index**3, p_results_poisson[i][data_col])
     ax1.legend(["p = " + str(_) for _ in p_list1])
     ax1.set_xlabel("N")
-    ax1.set_ylabel("Relative Error")
+    ax1.set_ylabel(ylabel)
     ax1.set_title(subtitle1)
 
     for i in range(len(p_list2)):
-        ax2.loglog(p_results_helmholtz[i].index**3, p_results_helmholtz[i]["true_res"])
+        ax2.loglog(p_results_helmholtz[i].index**3, p_results_helmholtz[i][data_col])
     ax2.legend(["p = " + str(_) for _ in p_list2])
     ax2.set_xlabel("N")
     ax2.set_title(subtitle2)
@@ -176,19 +176,26 @@ def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, ti
 p_list_poisson   = [6,8,10,12,14]
 p_list_helmholtz = [10,12,14,16,18,20,22]
 
-path_poisson   = "output/poisson/"
-path_helmholtz = "output/test_helmholtz/"
+path_poisson   = "gpu_output/poisson_gpu_scaling_1208/"
+path_helmholtz = "gpu_output/helmholtz_gpu_10ppw_1208/"
 
 subtitle1 = "Poisson Equation"
 subtitle2 = "Helmholtz Equation, 10 PPW"
 title     = "Relative Errors for Poisson and Helmholtz Equation"
-filename  = "poisson_helmholtz_accuracy.pdf"
-plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, filename)
+ylabel    = "Relative Error"
+filename  = "poisson_helmholtz_accuracy_gpu.pdf"
+plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "true_res", filename)
+
+title     = "Matrix factorization time for Poisson and Helmholtz Equation"
+ylabel    = "Seconds"
+filename  = "poisson_helmholtz_factor_time_gpu.pdf"
+plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_invert", filename)
 
 path_kh16 = "gpu_output/helmholtz_gpu_kh16_1208/"
 path_kh30 = "gpu_output/helmholtz_gpu_kh30_1208/"
 subtitle1 = "K = 16"
 subtitle2 = "K = 30"
 title     = "Relative Errors for Helmholtz Equation with Fixed K"
+ylabel    = "Relative Error"
 filename  = "helmholtz_kh_accuracy_gpu.pdf"
-plot_paired_results(p_list_helmholtz, p_list_helmholtz, path_kh16, path_kh30, subtitle1, subtitle2, title, filename)
+plot_paired_results(p_list_helmholtz, p_list_helmholtz, path_kh16, path_kh30, subtitle1, subtitle2, title, ylabel, "true_res", filename)
