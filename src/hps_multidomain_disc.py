@@ -119,26 +119,21 @@ class HPS_Multidomain:
         #print("Building DtNs")
         tic = time()
         DtN_loc = self.get_DtNs(device,'build')
-
-        import torch
-        import torchvision.models as models
+        toc_DtN = time() - tic
+        """
         from torch.profiler import profile, record_function, ProfilerActivity
-
+        activities = [ProfilerActivity.CPU]
         if torch.cuda.is_available():
             device_string = 'cuda'
+            activities += [ProfilerActivity.CUDA]
         else:
             device_string = 'cpu'
-        
-        activities = [ProfilerActivity.CPU, ProfilerActivity.CUDA]
         sort_by_keyword = device_string + "_time_total"
-        
         with profile(activities=activities, record_shapes=True) as prof:
-            with record_function("get_DtNs"):
-                self.get_DtNs(device,'build')
-        
+            with record_function("sparse_mat"):
+                self.hps.sparse_mat(device,verbose)
         print(prof.key_averages(group_by_input_shape=False).table(sort_by=sort_by_keyword, row_limit=12))
-
-        toc_DtN = time() - tic
+        """
         #print("Built DtNs")
         if self.d==2:
             size_face = self.p-2; size_ext = 4*size_face
