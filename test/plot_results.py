@@ -146,7 +146,7 @@ make_plot(p_list, p_results, "dtn_cond", total_title + "condtion # of a DtN map"
 """
 
 # Here we'll create a figure plot:
-def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, title, ylabel, data_col, filename):
+def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, title, ylabel, data_col, filename, type="loglog"):
     figsize = (16,6)
     p_results_poisson = make_p_results(path1, p_list1)
     p_results_helmholtz = make_p_results(path2, p_list2)
@@ -158,15 +158,31 @@ def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, ti
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
     fig.suptitle(title)
     for i in range(len(p_list1)):
-        ax1.loglog(p_results_poisson[i].index**3, p_results_poisson[i][data_col])
-    ax1.legend(["p = " + str(_) for _ in p_list1])
+        if type == "loglog":
+            ax1.loglog(p_results_poisson[i].index**3, p_results_poisson[i][data_col])
+        elif type == "plot":
+            ax1.plot(p_results_poisson[i].index**3, p_results_poisson[i][data_col])
+        elif type == "semilogy":
+            ax1.semilogy(p_results_poisson[i].index**3, p_results_poisson[i][data_col])
+        else:
+            raise ValueError("Type needs to be loglog, plot, or semilogy")
+    #ax1.loglog(p_results_poisson[-1].index**3, (p_results_poisson[-1].index)**4.5)
+    ax1.legend(["p = " + str(_) for _ in p_list1])# + ["trend for N**{1.5} scaling"])
     ax1.set_xlabel("N")
     ax1.set_ylabel(ylabel)
     ax1.set_title(subtitle1)
 
     for i in range(len(p_list2)):
-        ax2.loglog(p_results_helmholtz[i].index**3, p_results_helmholtz[i][data_col])
-    ax2.legend(["p = " + str(_) for _ in p_list2])
+        if type == "loglog":
+            ax2.loglog(p_results_helmholtz[i].index**3, p_results_helmholtz[i][data_col])
+        elif type == "plot":
+            ax2.plot(p_results_helmholtz[i].index**3, p_results_helmholtz[i][data_col])
+        elif type == "semilogy":
+            ax2.semilogy(p_results_helmholtz[i].index**3, p_results_helmholtz[i][data_col])
+        else:
+            raise ValueError("Type needs to be loglog, plot, or semilogy")
+    #ax2.loglog(p_results_helmholtz[-1].index**3, (p_results_helmholtz[-1].index)**4.5)
+    ax2.legend(["p = " + str(_) for _ in p_list2]) #+ ["trend for N**{1.5} scaling"])
     ax2.set_xlabel("N")
     ax2.set_title(subtitle2)
 
@@ -184,12 +200,17 @@ subtitle2 = "Helmholtz Equation, 10 PPW"
 title     = "Relative Errors for Poisson and Helmholtz Equation"
 ylabel    = "Relative Error"
 filename  = "poisson_helmholtz_accuracy_gpu.pdf"
-plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "true_res", filename)
+#plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "true_res", filename)
 
 title     = "Matrix factorization time for Poisson and Helmholtz Equation"
 ylabel    = "Seconds"
 filename  = "poisson_helmholtz_factor_time_gpu.pdf"
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_invert", filename)
+
+title     = "DtN build time for Poisson and Helmholtz Equation"
+filename  = "poisson_helmholtz_DtN_time_gpu.pdf"
+#plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_build_dtn", filename, type="plot")
+
 
 path_kh16 = "gpu_output/helmholtz_gpu_kh16_1208/"
 path_kh30 = "gpu_output/helmholtz_gpu_kh30_1208/"
@@ -198,4 +219,33 @@ subtitle2 = "K = 30"
 title     = "Relative Errors for Helmholtz Equation with Fixed K"
 ylabel    = "Relative Error"
 filename  = "helmholtz_kh_accuracy_gpu.pdf"
-plot_paired_results(p_list_helmholtz, p_list_helmholtz, path_kh16, path_kh30, subtitle1, subtitle2, title, ylabel, "true_res", filename)
+#plot_paired_results(p_list_helmholtz, p_list_helmholtz, path_kh16, path_kh30, subtitle1, subtitle2, title, ylabel, "true_res", filename)
+
+"""
+path_poisson_flags = "gpu_output/poisson_gpu_with_flags_1212/"
+p_results_poisson = make_p_results(path_poisson, [6,8])
+p_results_helmholtz = make_p_results(path_poisson_flags, [6,8])
+
+plt.title("Comparison of MUMPS factorization with and without block size flag")
+for i in range(len([6,8])):
+    plt.loglog(p_results_poisson[i].index**3, p_results_poisson[i]["toc_invert"])
+    plt.loglog(p_results_helmholtz[i].index**3, p_results_helmholtz[i]["toc_invert"])
+
+plt.legend(["p=6, no flag", "p=6, flag", "p=8, no flag", "p=8, flag"])
+plt.xlabel("N")
+plt.ylabel("Seconds")
+plt.savefig("poisson_blocksize_flag_factorization_time_gpu.pdf")
+plt.show()
+
+
+plt.title("Comparison of MUMPS factorization with and without block size flag")
+for i in range(len([6,8])):
+    plt.loglog(p_results_poisson[i].index**3, p_results_poisson[i]["true_res"])
+    plt.loglog(p_results_helmholtz[i].index**3, p_results_helmholtz[i]["true_res"])
+
+plt.legend(["p=6, no flag", "p=6, flag", "p=8, no flag", "p=8, flag"])
+plt.xlabel("N")
+plt.ylabel("Relative Error")
+plt.savefig("poisson_blocksize_flag_accuracy_gpu.pdf")
+plt.show()
+"""
