@@ -130,8 +130,8 @@ class HPS_Multidomain:
             device_string = 'cpu'
         sort_by_keyword = device_string + "_time_total"
         with profile(activities=activities, record_shapes=True) as prof:
-            with record_function("sparse_mat"):
-                self.hps.sparse_mat(device,verbose)
+            with record_function("get_DtNs"):
+                self.get_DtNs(device,'build')
         print(prof.key_averages(group_by_input_shape=False).table(sort_by=sort_by_keyword, row_limit=12))
         
         #print("Built DtNs")
