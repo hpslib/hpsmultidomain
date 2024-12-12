@@ -25,13 +25,11 @@ try:
     # Set relative threshold for numerical pivoting:
     #PETSc.Options()['mat_mumps_cntl_1'] = 0.0
     # Set matrix permutation. 7 is automatically decided, 1-6 are different choices.
-    """
     PETSc.Options()['mat_mumps_icntl_6']  = 7
     PETSc.Options()['mat_mumps_icntl_8']  = 77 # Scaling strategy, set to be automatically picked
     PETSc.Options()['mat_mumps_icntl_10'] = 0 # No iterative refinement
     PETSc.Options()['mat_mumps_icntl_12'] = 1 # Ordering strategy with icntl 6
     PETSc.Options()['mat_mumps_icntl_13'] = 0 # Parallel factorization of root node
-    """
     petsc_available = True
 except ImportError:
     petsc_available = False

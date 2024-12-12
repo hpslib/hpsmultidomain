@@ -120,7 +120,7 @@ class HPS_Multidomain:
         tic = time()
         DtN_loc = self.get_DtNs(device,'build')
         toc_DtN = time() - tic
-        
+        """
         from torch.profiler import profile, record_function, ProfilerActivity
         activities = [ProfilerActivity.CPU]
         if torch.cuda.is_available():
@@ -133,7 +133,7 @@ class HPS_Multidomain:
             with record_function("get_DtNs"):
                 self.get_DtNs(device,'build')
         print(prof.key_averages(group_by_input_shape=False).table(sort_by=sort_by_keyword, row_limit=12))
-        
+        """
         #print("Built DtNs")
         if self.d==2:
             size_face = self.p-2; size_ext = 4*size_face
