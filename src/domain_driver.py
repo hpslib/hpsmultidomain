@@ -338,7 +338,7 @@ class Domain_Driver:
         tic = time()
         self.A,assembly_time_dict = self.hps.sparse_mat(device,verbose)
         toc_assembly_tot = time() - tic
-
+        """
         from torch.profiler import profile, record_function, ProfilerActivity
 
         activities = [ProfilerActivity.CPU]
@@ -354,7 +354,7 @@ class Domain_Driver:
                 self.hps.sparse_mat(device,verbose)
         
         print(prof.key_averages(group_by_input_shape=False).table(sort_by=sort_by_keyword, row_limit=12))
-
+        """
         #print("Built sparse matrix A")
         csr_stor  = self.A.data.nbytes
         csr_stor += self.A.indices.nbytes + self.A.indptr.nbytes
