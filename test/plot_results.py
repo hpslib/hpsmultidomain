@@ -209,7 +209,11 @@ plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmhol
 
 title     = "DtN build time for Poisson and Helmholtz Equation"
 filename  = "poisson_helmholtz_DtN_time_gpu.pdf"
-#plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_build_dtn", filename, type="plot")
+plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_build_dtn", filename, type="plot")
+
+title     = "Leaf solve time for Poisson and Helmholtz Equation"
+filename  = "poisson_helmholtz_leaf_time_gpu.pdf"
+plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_leaf_solve", filename, type="plot")
 
 
 path_kh16 = "gpu_output/helmholtz_gpu_kh16_1208/"

@@ -17,7 +17,7 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
             if (not curved_domain):
                 uu_dir = lambda xx: uu_dir_func_greens(d, xx,kh)
             else:
-                uu_dir = lambda xx: uu_dir_func_greens(d, param_map(xx),kh)
+                uu_dir = lambda xx: uu_dir_func_greens(d, param_map(xx),kh) #, center=torch.tensor([-3.1,+3.,+3.2]))
         elif (args.pde == 'bfield_variable'):
             ff_body = None; known_sol = True
 

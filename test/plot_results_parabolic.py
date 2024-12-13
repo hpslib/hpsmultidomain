@@ -9,7 +9,7 @@ mypath      = "output/convection_diffusion/"
 plotpath    = "plots/convection_diffusion/"
 total_title = "Convection Diffusion with 10 timesteps:\n"
 
-p_list = [10]#, 12, 14, 16]
+p_list = [10, 12, 14, 16]
 #p_list = [8, 10, 12, 14, 18, 22, 30]
 
 
@@ -45,7 +45,7 @@ def make_p_results(mypath, p_list):
             with open(mypath + "/" + filename, 'rb') as f:
                 x = pickle.load(f)
                 n.append(x["n"])
-                #delta_t.append(x["delta_t"])
+                delta_t.append(x["delta_t"])
                 toc_invert.append(x["toc_build_blackbox"])
                 toc_build_dtn.append(x["toc_assembly"])
                 toc_leaf_solve.append(x["toc_solve_petsc"])
@@ -67,15 +67,15 @@ def make_p_results(mypath, p_list):
                 dtn_cond.append(x["dtn_cond"])"""
             
         p_result = dict(n=n, toc_invert=toc_invert, toc_build_dtn=toc_build_dtn, toc_leaf_solve=toc_leaf_solve,
-                        sparse_solve_res=sparse_solve_res, true_res=true_res, leaf_res=leaf_res)
-                        #delta_t=delta_t)
+                        sparse_solve_res=sparse_solve_res, true_res=true_res, leaf_res=leaf_res,
+                        delta_t=delta_t)
                         #forward_bdry_error=forward_bdry_error, reverse_bdry_error=reverse_bdry_error,
                         #GtC_error=GtC_error, CtG_error=CtG_error, GtC_cond=GtC_cond,CtG_cond=CtG_cond, #INTERPOLATION
                         #neumann_tensor_error=neumann_tensor_error, neumann_sparse_error=neumann_sparse_error, dtn_cond=dtn_cond)
         
         p_result = pd.DataFrame.from_dict(p_result)
 
-        p_result.set_index('n', inplace=True)
+        p_result.set_index('delta_t', inplace=True)
 
         p_result.sort_index(inplace=True)
         p_results.append(pd.DataFrame.from_dict(p_result))
@@ -84,6 +84,9 @@ def make_p_results(mypath, p_list):
 
 def make_plot(p_list, p_results, field, title, xlabel, ylabel, type="plot"):
     legend = []
+    plt.rc('text',usetex=True)
+    plt.rc('font',**{'family':'serif','size':14})
+    plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
     for i in range(len(p_list)):
         if type=="plot":
             plt.plot(p_results[i].index, p_results[i][field])
@@ -97,7 +100,7 @@ def make_plot(p_list, p_results, field, title, xlabel, ylabel, type="plot"):
     plt.legend(legend)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    plt.savefig(plotpath + field + ".png")
+    plt.savefig(plotpath + field + ".pdf")
     plt.show()
 
 """
@@ -119,6 +122,8 @@ plt.show()
 
 p_results = make_p_results(mypath, p_list)
 
+print(p_results)
+
 
 #make_plot(p_list, p_results, "toc_invert", total_title + "time to factorize sparse matrix", "N", "seconds")
 #make_plot(p_list, p_results, "toc_build_dtn", total_title + "time to assemble batched DtN maps", "N", "seconds")
@@ -127,7 +132,7 @@ p_results = make_p_results(mypath, p_list)
 
 
 #make_plot(p_list, p_results, "sparse_solve_res", total_title + "residual of sparse system solve for boundaries", "N", "relative error", type="loglog")
-#make_plot(p_list, p_results, "true_res", total_title + "residual of total result", "delta T", "relative error", type="loglog")
+make_plot(p_list, p_results, "true_res", total_title + "Residual of total result", "delta T", "relative error", type="plot")
 #make_plot(p_list, p_results, "leaf_res", total_title + "residual of leaf computations", "N", "relative error", type="loglog")
 """
 make_plot(p_list, p_results, "forward_bdry_error", total_title + "error when applying box bdries to sparse mat", "N", "relative error", type="loglog")
@@ -142,41 +147,3 @@ make_plot(p_list, p_results, "neumann_tensor_error", total_title + "applying DtN
 make_plot(p_list, p_results, "neumann_sparse_error", total_title + "applying sparse mat (from DtN) to Gaussian Dirichlet data", "N", "relative error", type="loglog")
 make_plot(p_list, p_results, "dtn_cond", total_title + "condtion # of a DtN map", "N", "condition #", type="loglog")
 """
-
-p_list_poisson = [6,8,10,12,14]
-p_list_helmholtz = [10,12,14,16,18,20,22]
-
-path_poisson = "output/poisson/"
-path_helmholtz = "output/test_helmholtz/"
-
-p_results_poisson = make_p_results(path_poisson, p_list_poisson)
-p_results_helmholtz = make_p_results(path_helmholtz, p_list_helmholtz)
-
-#print(p_results_poisson)
-#print(p_results_helmholtz)
-
-# Here we'll create a figure plot:
-figsize = (16,6)
-
-plt.rcParams['figure.figsize'] = [figsize[0],figsize[1]]
-plt.rc('text',usetex=True)
-plt.rc('font',**{'family':'serif','size':14})
-plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
-fig.suptitle("Relative Errors for Poisson and Helmholtz Equation")
-for i in range(len(p_list_poisson)):
-    ax1.loglog(p_results_poisson[i].index**3, p_results_poisson[i]["true_res"])
-ax1.legend(["p = " + str(_) for _ in p_list_poisson])
-ax1.set_xlabel("N")
-ax1.set_ylabel("Relative Error")
-ax1.set_title("Poisson Equation")
-
-for i in range(len(p_list_helmholtz)):
-    ax2.loglog(p_results_helmholtz[i].index**3, p_results_helmholtz[i]["true_res"])
-ax2.legend(["p = " + str(_) for _ in p_list_helmholtz])
-ax2.set_xlabel("N")
-ax2.set_title("Helmholtz Equation, 10 PPW")
-
-plt.savefig("poisson_helmholtz_accuracy.pdf")
-
-plt.show()

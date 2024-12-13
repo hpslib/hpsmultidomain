@@ -32,7 +32,7 @@ for p in p_list:
         run_test_via_argparse(domain, pde, bc, n, p, ppw=ppw, delta_t=delta_t, box_xlim=1.0, box_ylim=1.0, periodic_bc=False, components=False, solver="mumps", assembly_type="reduced_gpu", pickle_loc=test_file)
     """
     
-    delta_t_list = [-1, -2, -3, -4, -5]
+    delta_t_list = [-1]#, -2, -3, -4, -5]
 
     for i in delta_t_list:
         dt = 10 ** i
