@@ -519,6 +519,19 @@ class HPS_Multidomain:
         #print(uu_sol_bnd)
         uu_sol_tot = self.get_DtNs(device,mode='solve',data=uu_sol_bnd,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
         #print(uu_sol_tot)
+
+        from torch.profiler import profile, record_function, ProfilerActivity
+        activities = [ProfilerActivity.CPU]
+        if torch.cuda.is_available():
+            device_string = 'cuda'
+            activities += [ProfilerActivity.CUDA]
+        else:
+            device_string = 'cpu'
+        sort_by_keyword = device_string + "_time_total"
+        with profile(activities=activities, record_shapes=True) as prof:
+            with record_function("get_DtNs"):
+                self.get_DtNs(device,mode='solve',data=uu_sol_bnd,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
+        print(prof.key_averages(group_by_input_shape=False).table(sort_by=sort_by_keyword, row_limit=12))
         
         uu_sol_flat = uu_sol_tot[...,:nrhs].flatten(start_dim=0,end_dim=-2)
 
