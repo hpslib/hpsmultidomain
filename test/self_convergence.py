@@ -19,7 +19,7 @@ total_title = "Convection Diffusion with 10 timesteps:\n"
 
 p_list = np.array([9, 11, 13, 15, 17, 19, 21])
 
-box_list = [2, 3, 4]
+box_list = [2, 3, 4, 5, 6, 7, 8, 9]
 
 def make_p_results(mypath, p_list):
     onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
