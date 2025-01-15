@@ -29,7 +29,7 @@ output_path = "output/gravity_kh_12_1219"
 for p in p_list:
     #n_list = list(range(2*(p-2), 150, p-2))
     
-    n_list = [2*(p-2), 3*(p-2), 4*(p-2)]
+    n_list = [2*(p-2), 3*(p-2), 4*(p-2), 5*(p-2), 6*(p-2), 7*(p-2), 8*(p-2), 9*(p-2)]
     #n_list = list(range(110, 150, p-2))
     
     for n in n_list:
