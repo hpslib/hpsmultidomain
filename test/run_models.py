@@ -13,21 +13,23 @@ from test_3d import run_test_via_argparse
 #p_list = [10,12,14,16,18,20,22]
 #p_list = [18,20,22] 
 #p_list = [20,22]
-p_list = [22]
+#p_list = [22]
+
+p_list = [9,11,13,15,17,19,21]
 
 domain = "square"
-pde = "bfield_constant"
-bc = "free_space"
+pde = "bfield_gravity"
+bc = "ones"
 ppw = None
-kh = 16
+kh = 12
 delta_t = None
 
-output_path = "output/helmholtz_gpu_kh16_1208"
+output_path = "output/gravity_kh_12_1219"
 
 for p in p_list:
-    n_list = list(range(2*(p-2), 150, p-2))
+    #n_list = list(range(2*(p-2), 150, p-2))
     
-    #n_list = [2*(p-2), 3*(p-2), 4*(p-2)]
+    n_list = [2*(p-2), 3*(p-2), 4*(p-2)]
     #n_list = list(range(110, 150, p-2))
     
     for n in n_list:

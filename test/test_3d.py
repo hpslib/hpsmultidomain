@@ -5,14 +5,14 @@ os.environ['LANG']='en_US.UTF-8'
 
 torch.set_default_dtype(torch.double)  # Ensure all torch tensors are double precision for accuracy
 
-def run_test_via_argparse(domain, pde, bc, disc_n, p, box_xlim=1.0, box_ylim=1.0, periodic_bc=False, ppw=1, kh=None, delta_t=None, components=False, solver='superLU', assembly_type="reduced_cpu", pickle_loc='tmp_test_file'):
+def run_test_via_argparse(domain, pde, bc, disc_n, p, box_xlim=1.0, box_ylim=1.0, periodic_bc=False, ppw=None, kh=None, delta_t=None, components=False, solver='superLU', assembly_type="reduced_cpu", pickle_loc='tmp_test_file'):
 
     s = 'python src/argparse_driver.py --n %d --pde %s --bc %s --pickle %s' % (disc_n,pde,bc,pickle_loc)
 
     s += ' --p %d' % (p)    
     s += ' --domain %s' % (domain)
 
-    if (pde == "bfield_constant") or (pde == "bfield_variable"):
+    if (pde == "bfield_constant") or (pde == "bfield_variable") or (pde == "bfield_gravity"):
         if kh is not None:
             s += ' --kh %d' % (kh)
         else:

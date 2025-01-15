@@ -4,6 +4,8 @@ import numpy as np                     # For numerical operations
 from domain_driver import *  # Importing domain driver utilities for PDE solving
 from built_in_funcs import *  # Importing built-in functions for specific PDEs or conditions
 
+torch.set_printoptions(precision=16)
+
 #
 # Configure the PDE operator and domain based on specified arguments
 #
@@ -93,6 +95,8 @@ def configure_pde_domain(args):
             bfield = bfield_crystal_waveguide
         elif (args.pde == 'bfield_crystal_rhombus'):
             bfield = bfield_crystal_rhombus
+        elif (args.pde == 'bfield_gravity'):
+            bfield = bfield_gravity
         else:
             raise ValueError
             
@@ -160,7 +164,6 @@ def configure_pde_domain(args):
             op = pdo.PDO_3d(pdo.const(c=-delta_t),pdo.const(c=-delta_t),pdo.const(c=-delta_t),c=pdo.const(c=-1))
         kh = 0
         curved_domain = False
-
 
     else:
         raise ValueError

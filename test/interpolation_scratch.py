@@ -112,7 +112,7 @@ for p in p_list:
     #print("And the condtion numbers are:")
     cheb_cond.append(condGtC)
     gauss_cond.append(condCtG)
-
+"""
 plt.semilogy(p_list, cheb_error)
 plt.semilogy(p_list, gauss_error)
 plt.title("Errors of interpolated vs true values, l=" + str(l))
@@ -130,7 +130,7 @@ plt.ylabel("condition number")
 plt.legend(["Gaussian-to-Chebyshev", "Chebyshev-to-Gaussian"])
 plt.savefig("plots_interpolation/2Dcond_" + str(l) + "q_is_pm1.png")
 plt.show()
-
+"""
 
 """
 # Let's do 1D then extend to 2D:
@@ -169,3 +169,10 @@ print(sq(a*croots))
 print(sq(a*lroots))
 print(CtG1D @ sq(a*croots))
 """
+
+print("\n\n Cheb points:\n\n")
+
+for p in range(5, 14):
+    print(p)
+    _, x = cheb(p)
+    print(x)

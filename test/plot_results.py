@@ -151,6 +151,8 @@ def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, ti
     p_results_poisson = make_p_results(path1, p_list1)
     p_results_helmholtz = make_p_results(path2, p_list2)
 
+    print(p_results_poisson)
+
     plt.rcParams['figure.figsize'] = [figsize[0],figsize[1]]
     plt.rc('text',usetex=True)
     plt.rc('font',**{'family':'serif','size':14})
@@ -166,7 +168,7 @@ def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, ti
             ax1.semilogy(p_results_poisson[i].index**3, p_results_poisson[i][data_col])
         else:
             raise ValueError("Type needs to be loglog, plot, or semilogy")
-    #ax1.loglog(p_results_poisson[-1].index**3, (p_results_poisson[-1].index)**4.5)
+    #ax1.loglog(p_results_poisson[-1].index**3, (p_results_poisson[-1].index)**6)
     ax1.legend(["p = " + str(_) for _ in p_list1])# + ["trend for N**{1.5} scaling"])
     ax1.set_xlabel("N")
     ax1.set_ylabel(ylabel)
@@ -181,8 +183,8 @@ def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, ti
             ax2.semilogy(p_results_helmholtz[i].index**3, p_results_helmholtz[i][data_col])
         else:
             raise ValueError("Type needs to be loglog, plot, or semilogy")
-    #ax2.loglog(p_results_helmholtz[-1].index**3, (p_results_helmholtz[-1].index)**4.5)
-    ax2.legend(["p = " + str(_) for _ in p_list2]) #+ ["trend for N**{1.5} scaling"])
+    #ax2.loglog(p_results_helmholtz[-1].index**3, (p_results_helmholtz[-1].index)**6)
+    ax2.legend(["p = " + str(_) for _ in p_list2])# + ["trend for N**{1.5} scaling"])
     ax2.set_xlabel("N")
     ax2.set_title(subtitle2)
 
