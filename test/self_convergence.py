@@ -9,7 +9,7 @@ import torch
 
 torch.set_printoptions(precision=16)
 
-mypath      = "output/gravity_kh_12_1219/"
+mypath      = "gpu_output/gravity_kh_12_1219/"
 plotpath    = "plots/convection_diffusion/"
 total_title = "Convection Diffusion with 10 timesteps:\n"
 
@@ -17,7 +17,7 @@ total_title = "Convection Diffusion with 10 timesteps:\n"
 #p_list = [8, 10, 12, 14, 18, 22, 30]
 
 
-p_list = np.array([9, 11, 13, 15, 17, 19, 21])
+p_list = np.array([9, 11, 13, 15, 17]) #, 19, 21])
 
 box_list = [2, 3, 4, 5, 6, 7, 8, 9]
 
@@ -30,7 +30,7 @@ def make_p_results(mypath, p_list):
         print(box_indices)
         box_files = [] #[_ for _ in onlyfiles if "_n_" + str(p) + "_" in _]
         for i in range(len(box_indices)):
-            box_files = box_files + [_ for _ in onlyfiles if "_n_" + str(box_indices[i]) in _ and "_n_" + str(p_list[i]) + "_"]
+            box_files = box_files + [_ for _ in onlyfiles if "_n_" + str(box_indices[i]) in _ and "_p_" + str(p_list[i]) + "_" in _]
 
         p_indices = []
         computed_sols = []
@@ -48,6 +48,8 @@ def make_p_results(mypath, p_list):
         #print([_ / (boxes**3) for _ in n_indices])
         #print(np.array(p_indices) ** 3)
         midpoints = [int((_ ** 3) / 2) for _ in p_indices]
+        print(box_files)
+        print(p_indices)
         print(midpoints)
 
         # Now we want to take the midpoints of each box and compare:
@@ -57,8 +59,8 @@ def make_p_results(mypath, p_list):
             sol_reshaped[i, :] = thing[midpoint, :]
 
         sol_reshaped_error = sol_reshaped - sol_reshaped[-1]
-        sol_reshaped_error = torch.linalg.norm(sol_reshaped_error, dim=1)
-        print(sol_reshaped_error / torch.linalg.norm(sol_reshaped[-1]))
+        sol_reshaped_error = torch.linalg.norm(sol_reshaped_error, dim=1) / torch.linalg.norm(sol_reshaped[-1])
+        print(sol_reshaped)
 
         sol_errors.append(sol_reshaped_error)
 
@@ -84,12 +86,14 @@ convergences = [_[:-1] for _ in convergences]
 
 for box, convergence in zip(box_list, convergences):
     N_list = (p_list**3) * box**3
-    if convergence[-1] < 1e-16:
-        N_list = N_list[:-1]
-        convergence = convergence[:-1]
-    plt.semilogy(N_list, convergence)
+    #if convergence[-1] < 1e-16:
+    #    N_list = N_list[:-1]
+    #    convergence = convergence[:-1]
+    plt.loglog(N_list, convergence)
 
-plt.legend(["2^3 boxes", "3^3 boxes", "4^3 boxes"])
+legend = [str(_) + "^3 boxes" for _ in box_list]
+
+plt.legend(legend)
 plt.title("Convergence of Gravity Helmholtz Equation")
 plt.xlabel("N")
 plt.ylabel("Norm error across centers of boxes to p=21")
@@ -99,7 +103,7 @@ plt.show()
 for box, convergence in zip(box_list, convergences):
     plt.semilogy(p_list, convergence)
 
-plt.legend(["2^3 boxes", "3^3 boxes", "4^3 boxes"])
+plt.legend(legend)
 plt.title("Convergence of Gravity Helmholtz Equation")
 plt.xlabel("p")
 plt.ylabel("Norm error across centers of boxes to p=21")

@@ -19,7 +19,7 @@ p_list = [9,11,13,15,17,19,21]
 
 domain = "square"
 pde = "bfield_gravity"
-bc = "ones"
+bc = "zeros"
 ppw = None
 kh = 12
 delta_t = None
