@@ -56,7 +56,7 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
             uu_dir = lambda xx: zeros_func(param_map(xx))  
 
         if (args.pde == 'bfield_gravity'):
-            ff_body = lambda xx: torch.ones(xx.shape[0],1)
+            ff_body = lambda xx: torch.ones(xx.shape[0],1,device=xx.device)
             
     elif (args.bc == 'log_dist'):
         
