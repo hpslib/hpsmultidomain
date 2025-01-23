@@ -481,6 +481,7 @@ class HPS_Multidomain:
         assert np.mod(nboxes,chunk_size) == 0
         Aloc_chunkinit = np.min([50,int(nboxes/4)])
         print("chunk_max = " + str(chunk_max))
+        print("chunk_size based on mod = " + str(chunk_size))
         print("Handled memory chunks")
         for j in range(int(nboxes / chunk_size)):
             print("Indices: " + str(j*chunk_size) + " to " + str((j+1)*chunk_size))
