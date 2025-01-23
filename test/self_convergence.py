@@ -9,7 +9,7 @@ import torch
 
 torch.set_printoptions(precision=16)
 
-mypath      = "gpu_output/gravity_kh_12_0115/"
+mypath      = "gpu_output/gravity_kh_12_0116/"
 plotpath    = "plots/convection_diffusion/"
 total_title = "Convection Diffusion with 10 timesteps:\n"
 
@@ -86,32 +86,38 @@ convergences, p_lists, computed_sols, sol_reshaped = make_p_results(mypath, p_li
 
 print(p_lists)
 
+figsize = (8,6)
+plt.rcParams['figure.figsize'] = [figsize[0],figsize[1]]
+plt.rc('text',usetex=True)
+plt.rc('font',**{'family':'serif','size':14})
+plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
+
 #p_list = p_list[:-1]
-#convergences = [_[:-1] for _ in convergences]
+convergences = [_[:-1] for _ in convergences]
 
 for box, convergence, p_indices in zip(box_list, convergences, p_lists):
-    #p_indices = p_indices[:-1]
+    p_indices = p_indices[:-1]
     N_list = (np.array(p_indices)**3) * box**3
     #if convergence[-1] < 1e-16:
     #    N_list = N_list[:-1]
     #    convergence = convergence[:-1]
     plt.loglog(N_list, convergence)
 
-legend = [str(_) + "^3 boxes" for _ in box_list]
+legend = ["h = 1/" + str(_) for _ in box_list]
 
 plt.legend(legend)
-plt.title("Convergence of Gravity Helmholtz Equation")
+plt.title("p-Refinement of Gravity Helmholtz Equation")
 plt.xlabel("N")
 plt.ylabel("Relative Errpr")
 plt.savefig("gravity_convergence_N.pdf")
 plt.show()
 
 for box, convergence, p_indices in zip(box_list, convergences, p_lists):
-    #p_indices = p_indices[:-1]
+    p_indices = p_indices[:-1]
     plt.semilogy(p_indices, convergence)
 
 plt.legend(legend)
-plt.title("Convergence of Gravity Helmholtz Equation")
+plt.title("p-Refinement of Gravity Helmholtz Equation")
 plt.xlabel("p")
 plt.ylabel("Relative Error")
 plt.savefig("gravity_convergence_p.pdf")

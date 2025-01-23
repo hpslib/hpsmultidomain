@@ -238,29 +238,26 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_
         DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1],device=device)
     elif (mode == 'reduce_body'):
         DtNs = torch.zeros(nboxes,2*d*size_face,1,device=device)
-    #print("Built zero arrays in helper")
+    print("Built zero arrays in helper")
     chunk_size = chunk_init
     args = p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
     chunk_list = torch.zeros(int(nboxes/chunk_init)+100,device=device).int(); 
     box_curr = 0; nchunks = 0
     
-    #print("Now in get_DtNs_helper")
-    #print("nboxes = " + str(nboxes))
+    print("Now in get_DtNs_helper")
+    print("nboxes = " + str(nboxes))
 
     while(box_curr < nboxes):
-        #print("box_curr = " + str(box_curr))
-        #print("nboxes   = " + str(nboxes))
-
         b1 = box_curr + box_start
         b2 = np.min([box_end, b1 + chunk_size])
 
-        """
+        
         print("box_curr = " + str(box_curr))
         print("b1 = " + str(b1))
         print("b2 = " + str(b2))
         print("box_end = " + str(box_end))
         print("b1 + chunk_size = " + str(b1 + chunk_size))
-        """
+        
         
         tmp = form_DtNs(*args,b1,b2,device,mode,interpolate,data,ff_body_func,ff_body_vec,uu_true)
         

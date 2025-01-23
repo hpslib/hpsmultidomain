@@ -443,7 +443,7 @@ class HPS_Multidomain:
         if (mode == 'build'):
             DtNs = torch.zeros(nboxes,2*d*size_face,2*d*size_face)
             data = torch.zeros(nboxes,2*d*size_face,1)
-            #print("Initialized arrays of zeros")
+            print("Initialized arrays of zeros")
         elif (mode == 'solve'):
             DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1])
         elif (mode == 'reduce_body'):
@@ -463,7 +463,7 @@ class HPS_Multidomain:
             
         Intmap = torch.tensor(self.H.Interp_mat).to(device)
         Ds     = self.H.Ds.to(device)
-        #print("Copied all required parts to device")
+        print("Copied all required parts to device")
         if (mode =='solve'):
             data = data.to(device)
 
@@ -480,15 +480,15 @@ class HPS_Multidomain:
         
         assert np.mod(nboxes,chunk_size) == 0
         Aloc_chunkinit = np.min([50,int(nboxes/4)])
-        #print("chunk_max = " + str(chunk_max))
-        #print("Handled memory chunks")
+        print("chunk_max = " + str(chunk_max))
+        print("Handled memory chunks")
         for j in range(int(nboxes / chunk_size)):
-            #print("Indices: " + str(j*chunk_size) + " to " + str((j+1)*chunk_size))
+            print("Indices: " + str(j*chunk_size) + " to " + str((j+1)*chunk_size))
             DtNs[j*chunk_size:(j+1)*chunk_size],Aloc_chunklist = \
             leaf_ops.get_DtNs_helper(*args,j*chunk_size,(j+1)*chunk_size, Aloc_chunkinit,device,\
                                     mode,self.interpolate,data,ff_body_func,ff_body_vec,uu_true)
 
-            #print("Did chunk " + str(j))
+            print("Did chunk " + str(j))
             if Aloc_chunklist.shape[0] > 2:
                 Aloc_chunkinit = int(Aloc_chunklist[-2])
             else:

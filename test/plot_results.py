@@ -175,6 +175,8 @@ def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, ti
     ax1.set_title(subtitle1)
 
     for i in range(len(p_list2)):
+        #if i == 0 and type == "loglog":
+        #    ax2.loglog(p_results_helmholtz[i].index[1:]**3, p_results_helmholtz[i][data_col][1:])
         if type == "loglog":
             ax2.loglog(p_results_helmholtz[i].index**3, p_results_helmholtz[i][data_col])
         elif type == "plot":
@@ -194,7 +196,7 @@ def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, ti
 p_list_poisson   = [6,8,10,12,14]
 p_list_helmholtz = [10,12,14,16,18,20,22]
 
-path_poisson   = "gpu_output/poisson_gpu_scaling_1208/"
+path_poisson   = "gpu_output/poisson_scaling_0116/"
 path_helmholtz = "gpu_output/helmholtz_gpu_10ppw_1208/"
 
 subtitle1 = "Poisson Equation"
@@ -202,7 +204,7 @@ subtitle2 = "Helmholtz Equation, 10 PPW"
 title     = "Relative Errors for Poisson and Helmholtz Equation"
 ylabel    = "Relative Error"
 filename  = "poisson_helmholtz_accuracy_gpu.pdf"
-#plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "true_res", filename)
+plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "true_res", filename)
 
 title     = "Matrix factorization time for Poisson and Helmholtz Equation"
 ylabel    = "Seconds"
