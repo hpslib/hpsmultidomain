@@ -122,7 +122,6 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         Aloc = get_Aloc_2d(*args,device)
     else:
         Aloc = get_Aloc_3d(*args,device)
-    Acc = Aloc[:,Jc,:][:,:,Jc]
 
     #print(device)
     #print("Got local arrays for form_DtNs")
@@ -130,18 +129,18 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         nrhs = data.shape[-1]
         
         if interpolate == False:
-            #print(Acc.shape)
+            #print(Aloc[:,Jc,:][:,:,Jc].shape)
             #print(Aloc[:,Jc][...,Jx].shape)
-            #print(Acc.device)
+            #print(Aloc[:,Jc,:][:,:,Jc].device)
             #print(Aloc[:,Jc][...,Jx].device)
-            S_tmp = -torch.linalg.solve(Acc, Aloc[:,Jc][...,Jx])
+            S_tmp = -torch.linalg.solve(Aloc[:,Jc,:][:,:,Jc], Aloc[:,Jc][...,Jx])
             #print("Formed S_tmp")
             Irep   = torch.eye(Jx.shape[0],device=device).unsqueeze(0).repeat(box_end-box_start,1,1)
             S_full = torch.concat((S_tmp,Irep),dim=1)
 
             # Alternative approach that might be more memory-efficient:
             #S_full = torch.zeros(Aloc.shape[0], Jc.shape[0] + Jx.shape[0], Jx.shape[0])
-            #S_full[:,0:Jc.shape[0],:] = -torch.linalg.solve(Acc, Aloc[:,Jc][...,Jx])
+            #S_full[:,0:Jc.shape[0],:] = -torch.linalg.solve(Aloc[:,Jc,:][:,:,Jc], Aloc[:,Jc][...,Jx])
             #S_full[:,Jc.shape[0]:Jc.shape[0]+Jx.shape[0],:] += torch.eye(Jx.shape[0],device=device).unsqueeze(0)
 
             #print("Made S_full")
@@ -149,7 +148,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             DtN  = Nx[...,Jtot].unsqueeze(0) @ S_full
 
         else:
-            S_tmp   = -torch.linalg.solve(Acc, Aloc[:,Jc][...,Jxun]) # Should append Identity here and not repeat Intmap
+            S_tmp   = -torch.linalg.solve(Aloc[:,Jc,:][:,:,Jc], Aloc[:,Jc][...,Jxun]) # Should append Identity here and not repeat Intmap
             # Might need to apply intmap_unq here:
             Intmap_repeat = Intmap_unq.unsqueeze(0).repeat(box_end-box_start,1,1)
             S_full        = torch.concat((S_tmp @ Intmap_unq.unsqueeze(0),Intmap_repeat),dim=1) # Applying interpolation to both identity and S
@@ -182,15 +181,15 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         if interpolate == False:
             #print(nrhs)
             #print((f_body - Aloc[:,Jc][...,Jx] @ data[box_start:box_end]).shape)
-            #print(Acc.shape)
+            #print(Aloc[:,Jc,:][:,:,Jc].shape)
             #print(Jc.shape)
             uu_sol[:,Jx,:nrhs] = data[box_start:box_end]
-            uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc][...,Jx] @ data[box_start:box_end])
+            uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Aloc[:,Jc,:][:,:,Jc], f_body - Aloc[:,Jc][...,Jx] @ data[box_start:box_end])
             #print(uu_sol)#[:,Jc,:nrhs])
         else:
             # Need to make this Jxunique like here:
             uu_sol[:,Jxun,:nrhs] = Intmap_unq.unsqueeze(0) @ data[box_start:box_end]
-            uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc][...,Jxun] @ uu_sol[:,Jxun,:nrhs])
+            uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Aloc[:,Jc,:][:,:,Jc], f_body - Aloc[:,Jc][...,Jxun] @ uu_sol[:,Jxun,:nrhs])
             
         # calculate residual
         if uu_true is None:
@@ -211,9 +210,9 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
 
         f_body = f_body.reshape(box_end-box_start,p**d,1)
         #print(f_body.shape)
-        #print(torch.linalg.solve(Acc,f_body[:,Jc]).shape)
+        #print(torch.linalg.solve(Aloc[:,Jc,:][:,:,Jc],f_body[:,Jc]).shape)
         #print(Nx.unsqueeze(0).shape)
-        return -Nx[:,Jc].unsqueeze(0) @ torch.linalg.solve(Acc,f_body[:,Jc])
+        return -Nx[:,Jc].unsqueeze(0) @ torch.linalg.solve(Aloc[:,Jc,:][:,:,Jc],f_body[:,Jc])
     
 def get_DtN_chunksize(p,d,device):
     q = p-2
