@@ -263,7 +263,7 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_
         print("box_end = " + str(box_end))
         print("b1 + chunk_size = " + str(b1 + chunk_size))
         
-        
+        print(torch.cuda.memory_summary())
         tmp = form_DtNs(*args,b1,b2,device,mode,interpolate,data,ff_body_func,ff_body_vec,uu_true)
         
         DtNs[box_curr:box_curr + chunk_size] = tmp
