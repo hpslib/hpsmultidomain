@@ -226,7 +226,7 @@ def get_DtN_chunksize(p,d,device):
     chunk_max = int(f / (4*p**(2*d) * 8)) # 8 bytes in 64 bits memory
     if d == 3:
         chunk_max = int(f / ((q**6 + 12*q**5 + 72*q**4) * 8)) # 8 bytes in 64 bits memory
-    return np.max(int(chunk_max), 1)
+    return np.max([chunk_max, 1])
 
 
 def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,\
