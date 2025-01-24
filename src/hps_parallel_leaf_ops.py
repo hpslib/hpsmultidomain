@@ -215,7 +215,7 @@ def get_DtN_chunksize(p,d,device):
         r = torch.cuda.memory_reserved(0)
         a = torch.cuda.memory_allocated(0)
         f = r-a # in bytes
-        print(f"Available memory for next chunk: {r} - {a} = {f}")
+        #print(f"Available memory for next chunk: {r} - {a} = {f}")
     else:
         f = 10e9 # 10 GB in bytes
     chunk_max = int(f / (4*p**(2*d) * 8)) # 8 bytes in 64 bits memory
