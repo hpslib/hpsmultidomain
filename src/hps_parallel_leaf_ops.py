@@ -267,7 +267,7 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_
         DtNs[box_curr:box_curr + chunk_size] = tmp
         box_curr += chunk_size
 
-        chunk_size = np.max([get_DtN_chunksize(p,d,device),chunk_init])
+        chunk_size = get_DtN_chunksize(p,d,device) #np.max([get_DtN_chunksize(p,d,device),chunk_init])
         chunk_list[nchunks] = b2-b1
         nchunks += 1
     return DtNs.cpu(),chunk_list[:nchunks]
