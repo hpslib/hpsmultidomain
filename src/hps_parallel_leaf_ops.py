@@ -227,7 +227,7 @@ def get_DtN_chunksize(p,d,device):
     if d == 3:
         chunk_max = int(f / ((q**6 + 12*q**5 + 72*q**4) * 8)) # 8 bytes in 64 bits memory
 
-    print("Available memory for next chunk: %f", f)
+    print(f"Available memory for next chunk: {r} - {a} = {f}")
     return np.max([chunk_max, 1])
 
 
