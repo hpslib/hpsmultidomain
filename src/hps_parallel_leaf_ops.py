@@ -174,13 +174,17 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             #print((f_body - Aloc[:,Jc][...,Jx] @ data[box_start:box_end]).shape)
             #print(Acc.shape)
             #print(Jc.shape)
-            uu_sol[:,Jx,:nrhs] = data[box_start:box_end]
-            uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc[:,None],Jx] @ data[box_start:box_end])
+            uu_sol[:,Jx,:nrhs]  = data[box_start:box_end]
+            uu_sol[:,Jc,:nrhs]  = -Aloc[:,Jc[:,None],Jx] @ data[box_start:box_end]
+            uu_sol[:,Jc,:nrhs] += f_body
+            uu_sol[:,Jc,:nrhs]  = torch.linalg.solve(Acc, uu_sol[:,Jc,:nrhs])
             #print(uu_sol)#[:,Jc,:nrhs])
         else:
             # Need to make this Jxunique like here:
             uu_sol[:,Jxun,:nrhs] = Intmap_unq.unsqueeze(0) @ data[box_start:box_end]
-            uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc[:,None],Jxun] @ uu_sol[:,Jxun,:nrhs])
+            uu_sol[:,Jc,:nrhs]   = -Aloc[:,Jc[:,None],Jxun] @ uu_sol[:,Jxun,:nrhs]
+            uu_sol[:,Jc,:nrhs]  += f_body
+            uu_sol[:,Jc,:nrhs]   = torch.linalg.solve(Acc, uu_sol[:,Jc,:nrhs])
             
         # calculate residual
         if uu_true is None:
