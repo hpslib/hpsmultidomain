@@ -474,12 +474,14 @@ class HPS_Multidomain:
             args = p,q,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
         
         # reserve at most 1GB memory for stored DtNs at a time
-        f = 0.8e9 # 1 * 0.8 = 32 GB in bytes
-        chunk_max = int(f / ((2*d*size_face)**2 * 8))
+        f = 0.8e9 # 1 * 0.8 = 0.8 GB in bytes
+        chunk_max = int(f / ((2*d*size_face)**2 * 8)) # Size of DtN matrix * number of bytes per double
         chunk_size = leaf_ops.get_nearest_div(nboxes,chunk_max)
         
         assert np.mod(nboxes,chunk_size) == 0
-        Aloc_chunkinit = chunk_size #np.min([50,int(nboxes/4)])
+        Aloc_chunkinit = np.min([50,int(nboxes/4)])
+        if d==3:
+            Aloc_chunkinit = np.max(int(0.2e9 / ((q**6 + 12*q**5 + 72*q**4) * 8)), 1)
         print("chunk_max = " + str(chunk_max))
         print("chunk_size based on mod = " + str(chunk_size))
         print("Handled memory chunks")
@@ -490,10 +492,7 @@ class HPS_Multidomain:
                                     mode,self.interpolate,data,ff_body_func,ff_body_vec,uu_true)
 
             print("Did chunk " + str(j))
-            if Aloc_chunklist.shape[0] > 2:
-                Aloc_chunkinit = int(Aloc_chunklist[-2])
-            else:
-                Aloc_chunkinit = int(Aloc_chunklist[0])
+            Aloc_chunkinit = int(Aloc_chunklist[0])
         #print("DtNs interior = " + str(DtNs[:,Jc]))
         #print("DtNs exterior = " + str(DtNs[:,Jx]))
         #print("Whole DtN = " + str(DtNs))

@@ -216,14 +216,17 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         return -Nx[:,Jc].unsqueeze(0) @ torch.linalg.solve(Acc,f_body[:,Jc])
     
 def get_DtN_chunksize(p,d,device):
+    q = p-2
     if (device == torch.device('cuda')):
         r = torch.cuda.memory_reserved(0)
         a = torch.cuda.memory_allocated(0)
         f = r-a # in bytes
     else:
         f = 10e9 # 10 GB in bytes
-    chunk_max = int(f / (p**4 * 8)) # 8 bytes in 64 bits memory
-    return int(chunk_max/4)
+    chunk_max = int(f / (4*p**(2*d) * 8)) # 8 bytes in 64 bits memory
+    if d == 3:
+        chunk_max = int(f / ((q**6 + 12*q**5 + 72*q**4) * 8)) # 8 bytes in 64 bits memory
+    return np.max(int(chunk_max), 1)
 
 
 def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,\
