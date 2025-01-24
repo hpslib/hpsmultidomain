@@ -122,7 +122,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         Aloc = get_Aloc_2d(*args,device)
     else:
         Aloc = get_Aloc_3d(*args,device)
-    Acc = Aloc[:, Jc[:,None], Jc]
+    Acc = Aloc[:,Jc[:,None],Jc]
 
     #print(device)
     #print("Got local arrays for form_DtNs")
@@ -134,7 +134,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             #print(Aloc[:,Jc][...,Jx].shape)
             #print(Acc.device)
             #print(Aloc[:,Jc][...,Jx].device)
-            S_tmp = -torch.linalg.solve(Acc, Aloc[:, Jc[:,None], Jx])
+            S_tmp = -torch.linalg.solve(Acc, Aloc[:,Jc[:,None],Jx])
             #print("Formed S_tmp")
             Irep   = torch.eye(Jx.shape[0],device=device).unsqueeze(0).repeat(box_end-box_start,1,1)
             S_full = torch.concat((S_tmp,Irep),dim=1)
@@ -149,7 +149,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             DtN  = Nx[...,Jtot].unsqueeze(0) @ S_full
 
         else:
-            S_tmp   = -torch.linalg.solve(Acc, Aloc[:, Jc[:,None], Jxun]) # Should append Identity here and not repeat Intmap
+            S_tmp   = -torch.linalg.solve(Acc, Aloc[:,Jc[:,None],Jxun]) # Should append Identity here and not repeat Intmap
             # Might need to apply intmap_unq here:
             Intmap_repeat = Intmap_unq.unsqueeze(0).repeat(box_end-box_start,1,1)
             S_full        = torch.concat((S_tmp @ Intmap_unq.unsqueeze(0),Intmap_repeat),dim=1) # Applying interpolation to both identity and S
@@ -185,12 +185,12 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             #print(Acc.shape)
             #print(Jc.shape)
             uu_sol[:,Jx,:nrhs] = data[box_start:box_end]
-            uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc][...,Jx] @ data[box_start:box_end])
+            uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc[:,None],Jx] @ data[box_start:box_end])
             #print(uu_sol)#[:,Jc,:nrhs])
         else:
             # Need to make this Jxunique like here:
             uu_sol[:,Jxun,:nrhs] = Intmap_unq.unsqueeze(0) @ data[box_start:box_end]
-            uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc][...,Jxun] @ uu_sol[:,Jxun,:nrhs])
+            uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc[:,None],Jxun] @ uu_sol[:,Jxun,:nrhs])
             
         # calculate residual
         if uu_true is None:
