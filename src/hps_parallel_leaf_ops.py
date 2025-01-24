@@ -122,7 +122,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         Aloc = get_Aloc_2d(*args,device)
     else:
         Aloc = get_Aloc_3d(*args,device)
-    Acc = Aloc[:,Jc,:][:,:,Jc]
+    Acc = Aloc[:, Jc[:,None], Jc]
 
     #print(device)
     #print("Got local arrays for form_DtNs")
@@ -134,7 +134,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             #print(Aloc[:,Jc][...,Jx].shape)
             #print(Acc.device)
             #print(Aloc[:,Jc][...,Jx].device)
-            S_tmp = -torch.linalg.solve(Acc, Aloc[:,Jc][...,Jx])
+            S_tmp = -torch.linalg.solve(Acc, Aloc[:, Jc[:,None], Jx])
             #print("Formed S_tmp")
             Irep   = torch.eye(Jx.shape[0],device=device).unsqueeze(0).repeat(box_end-box_start,1,1)
             S_full = torch.concat((S_tmp,Irep),dim=1)
@@ -149,7 +149,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             DtN  = Nx[...,Jtot].unsqueeze(0) @ S_full
 
         else:
-            S_tmp   = -torch.linalg.solve(Acc, Aloc[:,Jc][...,Jxun]) # Should append Identity here and not repeat Intmap
+            S_tmp   = -torch.linalg.solve(Acc, Aloc[:, Jc[:,None], Jxun]) # Should append Identity here and not repeat Intmap
             # Might need to apply intmap_unq here:
             Intmap_repeat = Intmap_unq.unsqueeze(0).repeat(box_end-box_start,1,1)
             S_full        = torch.concat((S_tmp @ Intmap_unq.unsqueeze(0),Intmap_repeat),dim=1) # Applying interpolation to both identity and S
@@ -221,13 +221,12 @@ def get_DtN_chunksize(p,d,device):
         r = torch.cuda.memory_reserved(0)
         a = torch.cuda.memory_allocated(0)
         f = r-a # in bytes
+        print(f"Available memory for next chunk: {r} - {a} = {f}")
     else:
         f = 10e9 # 10 GB in bytes
     chunk_max = int(f / (4*p**(2*d) * 8)) # 8 bytes in 64 bits memory
     if d == 3:
-        chunk_max = int(f / ((q**6 + 12*q**5 + 72*q**4) * 8)) # 8 bytes in 64 bits memory
-
-    print(f"Available memory for next chunk: {r} - {a} = {f}")
+        chunk_max = int(f / ((p**6 + q**6 + 12*q**5 + 72*q**4) * 8)) # 8 bytes in 64 bits memory
     return np.max([chunk_max, 1])
 
 
