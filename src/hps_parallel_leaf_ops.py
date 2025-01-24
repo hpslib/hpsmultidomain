@@ -130,12 +130,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         nrhs = data.shape[-1]
         
         if interpolate == False:
-            #print(Acc.shape)
-            #print(Aloc[:,Jc][...,Jx].shape)
-            #print(Acc.device)
-            #print(Aloc[:,Jc][...,Jx].device)
-            S_tmp = -torch.linalg.solve(Acc, Aloc[:,Jc[:,None],Jx])
-            #print("Formed S_tmp")
+            S_tmp  = -torch.linalg.solve(Acc, Aloc[:,Jc[:,None],Jx])
             Irep   = torch.eye(Jx.shape[0],device=device).unsqueeze(0).repeat(box_end-box_start,1,1)
             S_full = torch.concat((S_tmp,Irep),dim=1)
 
@@ -174,12 +169,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         
         if d==2:
             uu_sol[:,Jxreo,:nrhs] = Intmap.unsqueeze(0) @ data[box_start:box_end]
-        #elif d==3 and pdo.c12 is not None and pdo.c13 is not None and pdo.c23 is not None:
-        #    uu_sol[:,Jxun,:nrhs] = Intmap_unq.unsqueeze(0) @ data[box_start:box_end]
-        #else:
-        #    uu_sol[:,Jx,:nrhs] = data[box_start:box_end]
-
-        if interpolate == False:
+        elif interpolate == False:
             #print(nrhs)
             #print((f_body - Aloc[:,Jc][...,Jx] @ data[box_start:box_end]).shape)
             #print(Acc.shape)
@@ -242,26 +232,27 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_
         DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1],device=device)
     elif (mode == 'reduce_body'):
         DtNs = torch.zeros(nboxes,2*d*size_face,1,device=device)
-    print("Built zero arrays in helper")
+    #print("Built zero arrays in helper")
     chunk_size = chunk_init
     args = p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
     chunk_list = torch.zeros(int(nboxes/chunk_init)+100,device=device).int(); 
     box_curr = 0; nchunks = 0
     
-    print("Now in get_DtNs_helper")
-    print("nboxes = " + str(nboxes))
+    #print("Now in get_DtNs_helper")
+    #print("nboxes = " + str(nboxes))
 
     while(box_curr < nboxes):
         b1 = box_curr + box_start
         b2 = np.min([box_end, b1 + chunk_size])
 
-        
+        """
         print("box_curr = " + str(box_curr))
         print("b1 = " + str(b1))
         print("b2 = " + str(b2))
         print("box_end = " + str(box_end))
         print("b1 + chunk_size = " + str(b1 + chunk_size))
         #print(torch.cuda.memory_summary())
+        """
 
         tmp = form_DtNs(*args,b1,b2,device,mode,interpolate,data,ff_body_func,ff_body_vec,uu_true)
         
