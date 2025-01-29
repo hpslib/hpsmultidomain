@@ -195,18 +195,21 @@ class HPS_Multidomain:
             # avoid accidentally hitting those. That said, these accidental hits should be on
             # boundaries that aren't touched by A_CC anyway
 
-            col_data = col_data.repeat((size_ext,1))
 
-            row_data = col_data.T
+            row_data = torch.repeat_interleave(col_data, size_ext)
+            col_data = col_data.repeat((size_ext))
 
             box_range = size_ext * torch.arange(nprod, device=device)
-            box_range = box_range.unsqueeze(-1)
             box_range = box_range.unsqueeze(-1)
 
             row_data = box_range + row_data
             col_data = box_range + col_data
             #print("Built row and column data")
             data = DtN_loc.flatten()
+            print(row_data.shape, row_data.get_device())
+            print(col_data.shape, col_data.get_device())
+            print("DtN_loc device: " + str(DtN_loc.get_device()))
+            print("Data device: " + str(data.get_device()))
             row_data = row_data.flatten()
             col_data = col_data.flatten()
             #print(len(torch.unique(row_data)))
