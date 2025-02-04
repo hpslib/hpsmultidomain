@@ -451,6 +451,8 @@ class HPS_Multidomain:
             DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1])
         elif (mode == 'reduce_body'):
             DtNs = torch.zeros(nboxes,2*d*size_face,1)
+        elif (mode == 's_blocks'):
+            DtNs = torch.zeros(nboxes,(p-2)**d,2*d*size_face)
         
         xxloc = self.grid_xx.to(device)
         Nxtot = torch.tensor(self.H.Nxc).to(device)
@@ -519,8 +521,20 @@ class HPS_Multidomain:
         #print(uu_sol_bnd)
         
         uu_sol_bnd = uu_sol_bnd.reshape(nboxes,size_ext,nrhs)
-        #print(uu_sol_bnd)
+        print(uu_sol_bnd.shape)
+
+        #
+        # Create a large S_sparse here:
+        #
+        S_batches = self.create_full_S(device)
+
+        print(S_batches.shape)
         uu_sol_tot = self.get_DtNs(device,mode='solve',data=uu_sol_bnd,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
+        print(uu_sol_tot.shape)
+
+        Jc = torch.tensor(self.H.JJ.Jc).to(device)
+        print(torch.linalg.norm(uu_sol_tot[:,Jc,:nrhs] - S_batches @ uu_sol_bnd) / torch.linalg.norm(uu_sol_tot[:,Jc,:nrhs]))
+
         #print(uu_sol_tot)
         """
         from torch.profiler import profile, record_function, ProfilerActivity
@@ -556,3 +570,8 @@ class HPS_Multidomain:
         ff_red_flatten = ff_red.flatten(start_dim=0,end_dim=-2)
         ff_red_flatten[self.I_copy1] += ff_red_flatten[self.I_copy2]
         return ff_red_flatten[self.I_unique]
+
+    def create_full_S(self, device):
+        S_batches = self.get_DtNs(device,mode='s_blocks')
+        return S_batches
+

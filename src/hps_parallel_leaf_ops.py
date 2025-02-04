@@ -208,6 +208,10 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         #print(torch.linalg.solve(Acc,f_body[:,Jc]).shape)
         #print(Nx.unsqueeze(0).shape)
         return -Nx[:,Jc].unsqueeze(0) @ torch.linalg.solve(Acc,f_body[:,Jc])
+
+    elif (mode == 's_blocks'):
+        S_tmp  = -torch.linalg.solve(Acc, Aloc[:,Jc[:,None],Jx])
+        return S_tmp
     
 def get_DtN_chunksize(p,d,device):
     q = p-2
@@ -238,6 +242,8 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_
         DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1],device=device)
     elif (mode == 'reduce_body'):
         DtNs = torch.zeros(nboxes,2*d*size_face,1,device=device)
+    elif (mode == 's_blocks'):
+        DtNs = torch.zeros(nboxes,(p-2)**d,2*d*size_face,device=device)
     #print("Built zero arrays in helper")
     chunk_size = chunk_init
     args = p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
