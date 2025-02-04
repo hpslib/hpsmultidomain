@@ -289,7 +289,7 @@ class Domain_Driver:
             A_CC = self.A[I_copy1] + self.A[I_copy2]
             A_CC = A_CC[:,I_copy1] + A_CC[:,I_copy2]
 
-            #self.dense_A_CC = A_CC.toarray()
+            self.dense_A_CC = A_CC.toarray()
             
             #print("\n\nCondition number of A_CC: " + str(np.linalg.cond(self.dense_A_CC)) + "\n\n")
             """
@@ -545,6 +545,28 @@ class Domain_Driver:
         sol_tot,resloc_hps = self.hps.solve(device,sol_tot,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
         toc_solve += time() - tic
         sol_tot = sol_tot.cpu()
+
+        #
+        # Section where we set up total sparse system:
+        #
+        print("Now let's evaluate the total sparse system:")
+        print(self.dense_A_CC.shape)
+        print(self.hps.S_B.shape)
+        total_sparse = np.block([[self.dense_A_CC, np.zeros((self.dense_A_CC.shape[0], self.hps.q**3 * self.hps.nboxes))],
+                                 [self.hps.S_B, np.identity(self.hps.q**3 * self.hps.nboxes)]])
+
+        print(total_sparse.shape)
+        print("Condition number for condensed sparse system:")
+        print(np.linalg.cond(self.dense_A_CC, p=2))
+        print("Condition number for the total sparse system:")
+        print(np.linalg.cond(total_sparse, p=2))
+
+        #
+        # Next step: set up total_sparse as a matrix, make sure it actually solves the system.
+        #
+
+        # This total sparse matrix has form [A_CC, 0; S_B, I]:
+
 
         true_err = torch.tensor([float('nan')])
         if (known_sol):

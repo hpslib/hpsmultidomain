@@ -206,10 +206,6 @@ class HPS_Multidomain:
             col_data = box_range + col_data
             #print("Built row and column data")
             data = DtN_loc.flatten()
-            print(row_data.shape, row_data.get_device())
-            print(col_data.shape, col_data.get_device())
-            print("DtN_loc device: " + str(DtN_loc.get_device()))
-            print("Data device: " + str(data.get_device()))
             row_data = row_data.flatten()
             col_data = col_data.flatten()
             #print(len(torch.unique(row_data)))
@@ -519,21 +515,35 @@ class HPS_Multidomain:
 
         torch.set_printoptions(threshold=10_000)
         #print(uu_sol_bnd)
-        
-        uu_sol_bnd = uu_sol_bnd.reshape(nboxes,size_ext,nrhs)
-        print(uu_sol_bnd.shape)
 
         #
         # Create a large S_sparse here:
         #
         S_batches = self.create_full_S(device)
+        S_batches = torch.block_diag(*S_batches)
+        # account for redundant self.I_copy2
+        S_batches[:,self.I_copy1] += S_batches[:,self.I_copy2]
+        S_B = S_batches[:,self.I_copy1]
+        S_batches = S_batches[:,self.I_unique]
 
+        # Next step: split columns based on what is from total boundary (I_unique \ I_copy1) and what is on shared boundary (I_copy1)
+
+        uu_from_S = S_batches @ uu_sol
+
+        uu_from_S  = uu_from_S.reshape(nboxes,self.q**3,nrhs)
+        uu_sol_bnd = uu_sol_bnd.reshape(nboxes,size_ext,nrhs)
+
+        print(uu_sol_bnd.shape)
         print(S_batches.shape)
+        print(S_B.shape)
+
+        self.S_B = S_B.cpu().detach().numpy()
+
         uu_sol_tot = self.get_DtNs(device,mode='solve',data=uu_sol_bnd,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
         print(uu_sol_tot.shape)
 
         Jc = torch.tensor(self.H.JJ.Jc).to(device)
-        print(torch.linalg.norm(uu_sol_tot[:,Jc,:nrhs] - S_batches @ uu_sol_bnd) / torch.linalg.norm(uu_sol_tot[:,Jc,:nrhs]))
+        print(torch.linalg.norm(uu_sol_tot[:,Jc,:nrhs] - uu_from_S) / torch.linalg.norm(uu_sol_tot[:,Jc,:nrhs]))
 
         #print(uu_sol_tot)
         """
