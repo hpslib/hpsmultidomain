@@ -524,6 +524,11 @@ class HPS_Multidomain:
         # account for redundant self.I_copy2
         S_batches[:,self.I_copy1] += S_batches[:,self.I_copy2]
         S_B = S_batches[:,self.I_copy1]
+
+        mask = torch.isin(self.I_unique, self.I_copy1)
+        I_unique_only = self.I_unique[~mask]
+        S_D = S_batches[:,I_unique_only]
+
         S_batches = S_batches[:,self.I_unique]
 
         # Next step: split columns based on what is from total boundary (I_unique \ I_copy1) and what is on shared boundary (I_copy1)
@@ -536,8 +541,10 @@ class HPS_Multidomain:
         print(uu_sol_bnd.shape)
         print(S_batches.shape)
         print(S_B.shape)
+        print(S_D.shape)
 
         self.S_B = S_B.cpu().detach().numpy()
+        self.S_D = S_D#.cpu().detach().numpy()
 
         uu_sol_tot = self.get_DtNs(device,mode='solve',data=uu_sol_bnd,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
         print(uu_sol_tot.shape)

@@ -550,23 +550,44 @@ class Domain_Driver:
         # Section where we set up total sparse system:
         #
         print("Now let's evaluate the total sparse system:")
-        print(self.dense_A_CC.shape)
-        print(self.hps.S_B.shape)
-        total_sparse = np.block([[self.dense_A_CC, np.zeros((self.dense_A_CC.shape[0], self.hps.q**3 * self.hps.nboxes))],
-                                 [self.hps.S_B, np.identity(self.hps.q**3 * self.hps.nboxes)]])
+        total_sparse_np = np.block([[self.dense_A_CC, np.zeros((self.dense_A_CC.shape[0], self.hps.q**3 * self.hps.nboxes))],
+                                    [-self.hps.S_B, np.identity(self.hps.q**3 * self.hps.nboxes)]])
 
-        print(total_sparse.shape)
+        total_sparse    = torch.from_numpy(total_sparse_np).to(device)
+        self.dense_A_CC = torch.from_numpy(self.dense_A_CC)
+
         print("Condition number for condensed sparse system:")
-        print(np.linalg.cond(self.dense_A_CC, p=2))
+        print(torch.linalg.cond(self.dense_A_CC, p=2))
         print("Condition number for the total sparse system:")
-        print(np.linalg.cond(total_sparse, p=2))
+        print(torch.linalg.cond(total_sparse, p=2))
 
         #
-        # Next step: set up total_sparse as a matrix, make sure it actually solves the system.
+        # Next step: make sure total_sparse actually solves the system.
         #
+        ff_body = self.get_rhs(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
+        S_D_uu  = self.hps.S_D @ uu_dir_func(self.hps.xx_active[self.I_Xtot])
 
-        # This total sparse matrix has form [A_CC, 0; S_B, I]:
+        RHS = torch.cat((ff_body, S_D_uu)).to(device)
 
+        Jc = torch.tensor(self.hps.H.JJ.Jc)
+        grid_interior  = self.hps.grid_xx[:,Jc,:].flatten(start_dim=0,end_dim=-2)
+        u_B = uu_dir_func(self.hps.xx_active[self.I_Ctot])
+        u_I = uu_dir_func(grid_interior)
+        sol_boundaries = torch.cat((u_B, u_I)).to(device)
+
+        print("Rel error for just boundary portion:")
+        rel_error_condensed_sparse = torch.linalg.norm(self.dense_A_CC @ u_B - ff_body) / torch.linalg.norm(ff_body)
+        print(rel_error_condensed_sparse)
+
+        # sol_boundaries is u on the box boundaries, then u on the box interiors. Does total_sparse solve this?
+        print("Rel error for total sparse system:")
+        rel_error_total_sparse = torch.linalg.norm(total_sparse @ sol_boundaries - RHS) / torch.linalg.norm(RHS)
+        print(rel_error_total_sparse)
+
+        #
+        # Here: set up inverse solve using MUMPS on total sparse system
+        #
+        self.total_sparse_solve(total_sparse_np, RHS.detach().cpu().numpy(), sol_boundaries.detach().cpu().numpy())
 
         true_err = torch.tensor([float('nan')])
         if (known_sol):
@@ -589,3 +610,8 @@ class Domain_Driver:
             true_err = true_err.item()
 
         return sol_tot,rel_err,true_err,resloc_hps,toc_solve, forward_bdry_error, reverse_bdry_error
+
+
+    def total_sparse_solve(self, total_sparse_np, RHS, sol_boundaries):
+
+        thing = 1
