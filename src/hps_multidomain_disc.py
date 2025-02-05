@@ -521,42 +521,9 @@ class HPS_Multidomain:
         #
         # Create a large S_sparse here:
         #
-        S_batches = self.create_full_S(device)
-        #S_batches = torch.block_diag(*S_batches)
-        S_batches = spblock_diag(S_batches, format="csc")
-
-        S_batches.indices = S_batches.indices.astype(np.int64)
-        S_batches.indptr = S_batches.indptr.astype(np.int64)
-        
-        print(S_batches.shape)
-        print(type(S_batches.indices[0]))
-        print(type(S_batches.indptr[0]))
-
-        
-        # account for redundant self.I_copy2
-        S_batches[:,self.I_copy1] += S_batches[:,self.I_copy2]
-        S_B = S_batches[:,self.I_copy1]
-
-        mask = torch.isin(self.I_unique, self.I_copy1)
-        I_unique_only = self.I_unique[~mask]
-        S_D = S_batches[:,I_unique_only]
-
-        S_batches = S_batches[:,self.I_unique]
-
-        # Next step: split columns based on what is from total boundary (I_unique \ I_copy1) and what is on shared boundary (I_copy1)
-
-        #uu_from_S = S_batches @ uu_sol.to(device='cpu') 
-        #uu_from_S = uu_from_S.reshape(nboxes,self.q**3,nrhs)
+        self.create_full_S(device)
 
         uu_sol_bnd = uu_sol_bnd.reshape(nboxes,size_ext,nrhs)
-
-        #print(uu_sol_bnd.shape)
-        #print(S_batches.shape)
-        #print(S_B.shape)
-        #print(S_D.shape)
-
-        self.S_B = S_B# .cpu().detach().numpy()
-        self.S_D = S_D#.cpu().detach().numpy()
 
         uu_sol_tot = self.get_DtNs(device,mode='solve',data=uu_sol_bnd,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
         #print(uu_sol_tot.shape)
@@ -581,14 +548,6 @@ class HPS_Multidomain:
         """
         uu_sol_flat = uu_sol_tot[...,:nrhs].flatten(start_dim=0,end_dim=-2)
 
-        #print(uu_sol_tot[...,nrhs:].shape)
-        #print("Residual on boundary:")
-        #print(uu_sol_tot[:,self.H.JJ.Jxunique,nrhs:])
-        #print("Max is " + str(torch.max(uu_sol_tot[:,self.H.JJ.Jxunique,nrhs:])))
-        #print("Residual on interior. Shape is " + str(uu_sol_tot[:,self.H.JJ.Jc,nrhs:].shape))
-        #print(uu_sol_tot[:,self.H.JJ.Jc,nrhs:])
-        #print("Max is " + str(torch.max(uu_sol_tot[:,self.H.JJ.Jc,nrhs:])))
-
         resvec_blocks = torch.linalg.norm(uu_sol_tot[...,nrhs:])
         res_lochps = torch.max(resvec_blocks).item()
         return uu_sol_flat, res_lochps
@@ -602,5 +561,23 @@ class HPS_Multidomain:
 
     def create_full_S(self, device):
         S_batches = self.get_DtNs(device,mode='s_blocks')
-        return S_batches
+
+        S_batches = spblock_diag(S_batches, format="csc")
+
+        S_batches.indices = S_batches.indices.astype(np.int64)
+        S_batches.indptr = S_batches.indptr.astype(np.int64)
+
+        
+        # account for redundant self.I_copy2
+        S_batches[:,self.I_copy1] += S_batches[:,self.I_copy2]
+        S_B = S_batches[:,self.I_copy1]
+
+        mask = torch.isin(self.I_unique, self.I_copy1)
+        I_unique_only = self.I_unique[~mask]
+        S_D = S_batches[:,I_unique_only]
+
+        S_batches = S_batches[:,self.I_unique]
+
+        self.S_B = S_B# .cpu().detach().numpy()
+        self.S_D = S_D#.cpu().detach().numpy()
 
