@@ -555,23 +555,33 @@ class HPS_Multidomain:
         return ff_red_flatten[self.I_unique]
 
     def create_full_S(self, device):
+        tic = time()
         S_batches = self.get_DtNs(device,mode='s_blocks')
+        toc = time() - tic
+        print("Time to build S blocks: " + str(toc))
 
+        tic = time()
         S_batches = spblock_diag(S_batches, format="csc")
-
         S_batches.indices = S_batches.indices.astype(np.int64)
         S_batches.indptr = S_batches.indptr.astype(np.int64)
-
+        toc = time() - tic
+        print("Time to build sparse S and fix index types: " + str(toc))
         
         # account for redundant self.I_copy2
+        tic = time()
         S_batches[:,self.I_copy1] += S_batches[:,self.I_copy2]
         S_B = S_batches[:,self.I_copy1]
+        toc = time() - tic
+        print("Time to build S_B (S portions that act on box boundaries not on domain boundary): " + str(toc))
 
+        tic = time()
         mask = torch.isin(self.I_unique, self.I_copy1)
         I_unique_only = self.I_unique[~mask]
         S_D = S_batches[:,I_unique_only]
+        toc = time() - tic
+        print("Time to build S_D (S portions that act on domain boundary): " + str(toc))
 
-        S_batches = S_batches[:,self.I_unique]
+        #S_batches = S_batches[:,self.I_unique]
 
         self.S_B = S_B# .cpu().detach().numpy()
         self.S_D = S_D#.cpu().detach().numpy()
