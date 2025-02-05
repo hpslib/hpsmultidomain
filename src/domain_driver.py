@@ -553,6 +553,11 @@ class Domain_Driver:
         #total_sparse_np = np.block([[self.dense_A_CC, np.zeros((self.dense_A_CC.shape[0], self.hps.q**3 * self.hps.nboxes))],
         #                            [-self.hps.S_B, np.identity(self.hps.q**3 * self.hps.nboxes)]])
 
+        #
+        # Create a large S_sparse here:
+        #
+        self.hps.create_full_S(device)
+
         blocks = [[self.A_CC, None], [-self.hps.S_B, speye(self.hps.q**3 * self.hps.nboxes)]]
 
         total_sparse = spblock_array(blocks, format="csr")
