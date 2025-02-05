@@ -560,6 +560,8 @@ class HPS_Multidomain:
         toc = time() - tic
         print("Time to build S blocks: " + str(toc))
 
+        print(type(S_batches))
+
         tic = time()
         S_batches = spblock_diag(S_batches, format="csc")
         S_batches.indices = S_batches.indices.astype(np.int64)
@@ -569,7 +571,7 @@ class HPS_Multidomain:
         
         # account for redundant self.I_copy2
         tic = time()
-        S_batches[:,self.I_copy1] += S_batches[:,self.I_copy2]
+        S_batches[:,self.I_copy1] += S_batches[:,self.I_copy2] # Get this line in front of spblock_diag - maybe reshape, slice, then reshape
         S_B = S_batches[:,self.I_copy1]
         toc = time() - tic
         print("Time to build S_B (S portions that act on box boundaries not on domain boundary): " + str(toc))
