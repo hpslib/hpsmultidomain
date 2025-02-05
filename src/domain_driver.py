@@ -3,7 +3,7 @@ import numpy as np  # For numerical operations, especially those not directly su
 import sys  # System-specific parameters and functions
 
 # Importing necessary components for sparse matrix operations
-from scipy.sparse import kron, diags, block_diag, eye as speye, hstack as sp_hstack
+from scipy.sparse import kron, diags, block_diag, eye as speye, hstack as sp_hstack, csr_matrix
 import scipy.sparse.linalg as spla  # For sparse linear algebra operations
 from time import time  # For timing operations
 torch.set_default_dtype(torch.double)  # Setting default tensor type to double for precision
@@ -587,7 +587,7 @@ class Domain_Driver:
         #
         # Here: set up inverse solve using MUMPS on total sparse system
         #
-        self.total_sparse_solve(total_sparse_np, RHS.detach().cpu().numpy(), sol_boundaries.detach().cpu().numpy())
+        self.total_sparse_solve(total_sparse_np, RHS.detach().cpu().numpy(), sol_boundaries.detach().cpu().numpy(), "MUMPS")
 
         true_err = torch.tensor([float('nan')])
         if (known_sol):
@@ -612,6 +612,35 @@ class Domain_Driver:
         return sol_tot,rel_err,true_err,resloc_hps,toc_solve, forward_bdry_error, reverse_bdry_error
 
 
-    def total_sparse_solve(self, total_sparse_np, RHS, sol_boundaries):
+    def total_sparse_solve(self, total_sparse_np, RHS, sol_boundaries, solvertype):
 
-        thing = 1
+        tmp = csr_matrix(total_sparse_np)
+        pA = PETSc.Mat().createAIJ(tmp.shape, csr=(tmp.indptr,tmp.indices,tmp.data),comm=PETSc.COMM_WORLD)
+        
+        ksp = PETSc.KSP().create(comm=PETSc.COMM_WORLD)
+        ksp.setOperators(pA)
+        ksp.setType('preonly')
+        
+        ksp.getPC().setType('lu')
+        ksp.getPC().setFactorSolverType(solvertype)
+        
+        px = PETSc.Vec().createWithArray(np.ones(tmp.shape[0]),comm=PETSc.COMM_WORLD)
+        pb = PETSc.Vec().createWithArray(np.ones(tmp.shape[0]),comm=PETSc.COMM_WORLD)
+
+        #print("Initiated the ksp operator, still need to do a solve to break it in")        
+        tic = time()
+        ksp.solve(pb, px)
+        toc_build = time() - tic
+
+        psol = PETSc.Vec().createWithArray(np.ones(RHS.shape[0]))
+        pb   = PETSc.Vec().createWithArray(RHS.flatten())
+
+        ksp.solve(pb,psol)
+        sol  = psol.getArray().reshape(RHS.shape)
+
+        print("\t--time for %s build whole sparse system through petsc = %5.2f seconds"\
+                  % (solvertype,toc_build))
+
+        rel_error = np.linalg.norm(sol - sol_boundaries) / np.linalg.norm(sol_boundaries)
+
+        print("Relative error for whole sparse system solve is " + str(rel_error))
