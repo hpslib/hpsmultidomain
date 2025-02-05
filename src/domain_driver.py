@@ -3,7 +3,7 @@ import numpy as np  # For numerical operations, especially those not directly su
 import sys  # System-specific parameters and functions
 
 # Importing necessary components for sparse matrix operations
-from scipy.sparse import kron, diags, block_diag, eye as speye, hstack as sp_hstack, csr_matrix
+from scipy.sparse import kron, diags, block_diag, eye as speye, hstack as sp_hstack, csr_matrix, block_array as spblock_array
 import scipy.sparse.linalg as spla  # For sparse linear algebra operations
 from time import time  # For timing operations
 torch.set_default_dtype(torch.double)  # Setting default tensor type to double for precision
@@ -550,11 +550,15 @@ class Domain_Driver:
         # Section where we set up total sparse system:
         #
         print("Now let's evaluate the total sparse system:")
-        total_sparse_np = np.block([[self.dense_A_CC, np.zeros((self.dense_A_CC.shape[0], self.hps.q**3 * self.hps.nboxes))],
-                                    [-self.hps.S_B, np.identity(self.hps.q**3 * self.hps.nboxes)]])
+        #total_sparse_np = np.block([[self.dense_A_CC, np.zeros((self.dense_A_CC.shape[0], self.hps.q**3 * self.hps.nboxes))],
+        #                            [-self.hps.S_B, np.identity(self.hps.q**3 * self.hps.nboxes)]])
 
-        total_sparse    = torch.from_numpy(total_sparse_np)
-        self.dense_A_CC = torch.from_numpy(self.dense_A_CC)
+        blocks = [[self.A_CC, None], [-self.hps.S_B, speye(self.hps.q**3 * self.hps.nboxes)]]
+
+        total_sparse = spblock_array(blocks, format="csr")
+
+        #total_sparse    = torch.from_numpy(total_sparse_np)
+        #self.dense_A_CC = torch.from_numpy(self.dense_A_CC)
 
         #print("Condition number for condensed sparse system:")
         #print(torch.linalg.cond(self.dense_A_CC, p=2))
@@ -564,30 +568,30 @@ class Domain_Driver:
         #
         # Next step: make sure total_sparse actually solves the system.
         #
-        ff_body = self.get_rhs(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
+        ff_body = self.get_rhs(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec).detach().cpu().numpy()
         S_D_uu  = self.hps.S_D @ uu_dir_func(self.hps.xx_active[self.I_Xtot])
 
-        RHS = torch.cat((ff_body, S_D_uu))
+        RHS = np.concatenate((ff_body, S_D_uu))
 
         Jc = torch.tensor(self.hps.H.JJ.Jc)
         grid_interior  = self.hps.grid_xx[:,Jc,:].flatten(start_dim=0,end_dim=-2)
         u_B = uu_dir_func(self.hps.xx_active[self.I_Ctot])
         u_I = uu_dir_func(grid_interior)
-        sol_boundaries = torch.cat((u_B, u_I))
+        sol_boundaries = torch.cat((u_B, u_I)).detach().cpu().numpy()
 
         print("Rel error for just boundary portion:")
-        rel_error_condensed_sparse = torch.linalg.norm(self.dense_A_CC @ u_B - ff_body) / torch.linalg.norm(ff_body)
+        rel_error_condensed_sparse = np.linalg.norm(self.A_CC @ u_B.detach().cpu().numpy() - ff_body) / np.linalg.norm(ff_body)
         print(rel_error_condensed_sparse)
 
         # sol_boundaries is u on the box boundaries, then u on the box interiors. Does total_sparse solve this?
         print("Rel error for total sparse system:")
-        rel_error_total_sparse = torch.linalg.norm(total_sparse @ sol_boundaries - RHS) / torch.linalg.norm(RHS)
+        rel_error_total_sparse = np.linalg.norm(total_sparse @ sol_boundaries - RHS) / np.linalg.norm(RHS)
         print(rel_error_total_sparse)
 
         #
         # Here: set up inverse solve using MUMPS on total sparse system
         #
-        self.total_sparse_solve(total_sparse_np, RHS.detach().cpu().numpy(), sol_boundaries.detach().cpu().numpy(), "MUMPS")
+        self.total_sparse_solve(total_sparse, RHS, sol_boundaries, "MUMPS")
 
         true_err = torch.tensor([float('nan')])
         if (known_sol):
@@ -614,7 +618,7 @@ class Domain_Driver:
 
     def total_sparse_solve(self, total_sparse_np, RHS, sol_boundaries, solvertype):
 
-        tmp = csr_matrix(total_sparse_np)
+        tmp = total_sparse_np #csr_matrix(total_sparse_np)
         pA = PETSc.Mat().createAIJ(tmp.shape, csr=(tmp.indptr,tmp.indices,tmp.data),comm=PETSc.COMM_WORLD)
         
         ksp = PETSc.KSP().create(comm=PETSc.COMM_WORLD)
