@@ -533,7 +533,7 @@ class HPS_Multidomain:
 
         # Next step: split columns based on what is from total boundary (I_unique \ I_copy1) and what is on shared boundary (I_copy1)
 
-        uu_from_S = S_batches @ uu_sol
+        uu_from_S = S_batches @ uu_sol.to(device='cpu') 
 
         uu_from_S  = uu_from_S.reshape(nboxes,self.q**3,nrhs)
         uu_sol_bnd = uu_sol_bnd.reshape(nboxes,size_ext,nrhs)

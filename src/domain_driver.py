@@ -553,7 +553,7 @@ class Domain_Driver:
         total_sparse_np = np.block([[self.dense_A_CC, np.zeros((self.dense_A_CC.shape[0], self.hps.q**3 * self.hps.nboxes))],
                                     [-self.hps.S_B, np.identity(self.hps.q**3 * self.hps.nboxes)]])
 
-        total_sparse    = torch.from_numpy(total_sparse_np).to(device)
+        total_sparse    = torch.from_numpy(total_sparse_np)
         self.dense_A_CC = torch.from_numpy(self.dense_A_CC)
 
         #print("Condition number for condensed sparse system:")
@@ -567,13 +567,13 @@ class Domain_Driver:
         ff_body = self.get_rhs(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
         S_D_uu  = self.hps.S_D @ uu_dir_func(self.hps.xx_active[self.I_Xtot])
 
-        RHS = torch.cat((ff_body, S_D_uu)).to(device)
+        RHS = torch.cat((ff_body, S_D_uu))
 
         Jc = torch.tensor(self.hps.H.JJ.Jc)
         grid_interior  = self.hps.grid_xx[:,Jc,:].flatten(start_dim=0,end_dim=-2)
         u_B = uu_dir_func(self.hps.xx_active[self.I_Ctot])
         u_I = uu_dir_func(grid_interior)
-        sol_boundaries = torch.cat((u_B, u_I)).to(device)
+        sol_boundaries = torch.cat((u_B, u_I))
 
         print("Rel error for just boundary portion:")
         rel_error_condensed_sparse = torch.linalg.norm(self.dense_A_CC @ u_B - ff_body) / torch.linalg.norm(ff_body)
