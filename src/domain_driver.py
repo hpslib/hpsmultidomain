@@ -556,10 +556,10 @@ class Domain_Driver:
         total_sparse    = torch.from_numpy(total_sparse_np).to(device)
         self.dense_A_CC = torch.from_numpy(self.dense_A_CC)
 
-        print("Condition number for condensed sparse system:")
-        print(torch.linalg.cond(self.dense_A_CC, p=2))
-        print("Condition number for the total sparse system:")
-        print(torch.linalg.cond(total_sparse, p=2))
+        #print("Condition number for condensed sparse system:")
+        #print(torch.linalg.cond(self.dense_A_CC, p=2))
+        #print("Condition number for the total sparse system:")
+        #print(torch.linalg.cond(total_sparse, p=2))
 
         #
         # Next step: make sure total_sparse actually solves the system.
