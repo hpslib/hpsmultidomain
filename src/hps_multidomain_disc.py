@@ -518,11 +518,6 @@ class HPS_Multidomain:
         torch.set_printoptions(threshold=10_000)
         #print(uu_sol_bnd)
 
-        #
-        # Create a large S_sparse here:
-        #
-        self.create_full_S(device)
-
         uu_sol_bnd = uu_sol_bnd.reshape(nboxes,size_ext,nrhs)
 
         uu_sol_tot = self.get_DtNs(device,mode='solve',data=uu_sol_bnd,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
