@@ -524,6 +524,15 @@ class HPS_Multidomain:
         S_batches = self.create_full_S(device)
         #S_batches = torch.block_diag(*S_batches)
         S_batches = spblock_diag(S_batches, format="csc")
+
+        S_batches.indices = S_batches.indices.astype(np.int64)
+        S_batches.indptr = S_batches.indptr.astype(np.int64)
+        
+        print(S_batches.shape)
+        print(type(S_batches.indices[0]))
+        print(type(S_batches.indptr[0]))
+
+        
         # account for redundant self.I_copy2
         S_batches[:,self.I_copy1] += S_batches[:,self.I_copy2]
         S_B = S_batches[:,self.I_copy1]
