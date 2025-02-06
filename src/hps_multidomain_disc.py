@@ -7,7 +7,7 @@ from time import time  # Tracking execution times
 import hps_leaf_disc as hps_disc  
 import hps_parallel_leaf_ops as leaf_ops
 
-from scipy.sparse import block_diag as spblock_diag
+from scipy.sparse import block_diag as spblock_diag, csc_matrix
 
 # Utility function to create batched meshgrid for tensor operations
 def batched_meshgrid(b, npoints, I, J):
@@ -557,31 +557,52 @@ class HPS_Multidomain:
     def create_full_S(self, device):
         tic = time()
         S_batches = self.get_DtNs(device,mode='s_blocks')
-        toc = time() - tic
-        print("Time to build S blocks: " + str(toc))
+        print(S_batches.shape)
+        # Adding copy2 to copy1. First we need to permute and flatten:
+        #toc = time() - tic
+        #print("Time to build S blocks: " + str(toc))
 
-        print(type(S_batches))
-
-        tic = time()
+        #tic = time()
         S_batches = spblock_diag(S_batches, format="csc")
         S_batches.indices = S_batches.indices.astype(np.int64)
         S_batches.indptr = S_batches.indptr.astype(np.int64)
-        toc = time() - tic
-        print("Time to build sparse S and fix index types: " + str(toc))
+        #toc = time() - tic
+        #print("Time to build sparse S and fix index types: " + str(toc))
+
+        #print(S_batches[:,self.I_copy1].indptr)# - S_batches[:,self.I_copy2].indptr)
         
         # account for redundant self.I_copy2
-        tic = time()
-        S_batches[:,self.I_copy1] += S_batches[:,self.I_copy2] # Get this line in front of spblock_diag - maybe reshape, slice, then reshape
-        S_B = S_batches[:,self.I_copy1]
-        toc = time() - tic
-        print("Time to build S_B (S portions that act on box boundaries not on domain boundary): " + str(toc))
+        #tic = time()
+        #S_batches[:,self.I_copy1] += S_batches[:,self.I_copy2]
+        # Above is a VERY slow line. Can maybe use sparsity pattern here.
+        # Each column has the same number of entries btw copy1 and copy2, thus:
+        # - indptr is doubled
+        # indices is reshaped to size self.q**3 (# of entries per column), stacked, then flattened
+        # data is reshaped to size self.q**3, stacked, then flattened
 
-        tic = time()
+        S_B_indptr = 2 * S_batches[:,self.I_copy1].indptr
+        S_B_indices = np.hstack((np.reshape(S_batches[:,self.I_copy2].indices, (-1, self.q**3)),
+                                 np.reshape(S_batches[:,self.I_copy1].indices, (-1, self.q**3))))
+
+        S_B_data = np.hstack((np.reshape(S_batches[:,self.I_copy2].data, (-1, self.q**3)),
+                              np.reshape(S_batches[:,self.I_copy1].data, (-1, self.q**3))))
+
+        S_B_indices = S_B_indices.flatten()
+        S_B_data    = S_B_data.flatten()
+
+        S_B = csc_matrix((S_B_data, S_B_indices, S_B_indptr), shape=(S_batches[:,self.I_copy1].shape)) #S_batches[:,self.I_copy1]
+        #toc = time() - tic
+        #print("Time to build S_B (S portions that act on box boundaries not on domain boundary): " + str(toc))
+
+        #tic = time()
         mask = torch.isin(self.I_unique, self.I_copy1)
         I_unique_only = self.I_unique[~mask]
         S_D = S_batches[:,I_unique_only]
+        #toc = time() - tic
+        #print("Time to build S_D (S portions that act on domain boundary): " + str(toc))
+
         toc = time() - tic
-        print("Time to build S_D (S portions that act on domain boundary): " + str(toc))
+        print("Time to build S needed for whole sparse system: " + str(toc))
 
         #S_batches = S_batches[:,self.I_unique]
 
