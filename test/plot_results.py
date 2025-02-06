@@ -16,6 +16,7 @@ p_list = [10]#, 12, 14, 16]
 #p_list = [10, 12, 14, 16, 18, 20, 22]
 #p_list = [6, 8, 10, 12]#, 14]
 
+
 def make_p_results(mypath, p_list):
     onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
     p_results = []
@@ -33,6 +34,13 @@ def make_p_results(mypath, p_list):
         #forward_bdry_error = []
         #reverse_bdry_error = []
 
+        # Full sparse system stuff
+        toc_full_sparse_build  = []
+        toc_full_sparse_factor = []
+        rel_err_full_sparse    = []
+        cond_reduced           = []
+        cond_total             = []
+
         # Interpolation stuff
         GtC_error = []
         CtG_error = []
@@ -44,6 +52,7 @@ def make_p_results(mypath, p_list):
         for filename in p_files:
             with open(mypath + "/" + filename, 'rb') as f:
                 x = pickle.load(f)
+
                 n.append(x["n"])
                 #delta_t.append(x["delta_t"])
                 toc_invert.append(x["toc_build_blackbox"])
@@ -54,6 +63,13 @@ def make_p_results(mypath, p_list):
                 leaf_res.append(x["resloc_hps_solve_petsc"])
                 #forward_bdry_error.append(x["forward_bdry_error"])
                 #reverse_bdry_error.append(x["reverse_bdry_error"])
+
+                # Full sparse system stuff
+                toc_full_sparse_build.append(x["toc_full_sparse_build"])
+                toc_full_sparse_factor.append(x["toc_full_sparse_factor"])
+                rel_err_full_sparse.append(x["rel_err_full_sparse"])
+                cond_reduced.append(x["cond_reduced"])
+                cond_total.append(x["cond_total"])
 
 
                 # Interpolation stuff
@@ -67,7 +83,9 @@ def make_p_results(mypath, p_list):
                 dtn_cond.append(x["dtn_cond"])"""
             
         p_result = dict(n=n, toc_invert=toc_invert, toc_build_dtn=toc_build_dtn, toc_leaf_solve=toc_leaf_solve,
-                        sparse_solve_res=sparse_solve_res, true_res=true_res, leaf_res=leaf_res)
+                        sparse_solve_res=sparse_solve_res, true_res=true_res, leaf_res=leaf_res,
+                        toc_full_sparse_build=toc_full_sparse_build, toc_full_sparse_factor=toc_full_sparse_factor,
+                        rel_err_full_sparse=rel_err_full_sparse, cond_reduced=cond_reduced, cond_total=cond_total)
                         #delta_t=delta_t)
                         #forward_bdry_error=forward_bdry_error, reverse_bdry_error=reverse_bdry_error,
                         #GtC_error=GtC_error, CtG_error=CtG_error, GtC_cond=GtC_cond,CtG_cond=CtG_cond, #INTERPOLATION
@@ -193,12 +211,23 @@ def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, ti
     plt.savefig(filename)
     plt.show()
 
-p_list_poisson   = [6,8,10,12,14]
-p_list_helmholtz = [10,12,14,16,18,20,22]
+p_list_poisson   = [8,10,12,14,16]
+p_list_helmholtz = [8,10,12,14,16,18]
 
-path_poisson   = "gpu_output/poisson_scaling_0116/"
-path_helmholtz = "gpu_output/helmholtz_gpu_10ppw_1208/"
+path_poisson   = "gpu_output/full_sparse_poisson_0205/"
+path_helmholtz = "gpu_output/full_sparse_helmholtz_10ppw_0205/"
 
+make_p_results(p_list_helmholtz, p_list_helmholtz)
+
+subtitle1 = "Poisson Equation"
+subtitle2 = "Helmholtz Equation, 10 PPW"
+title     = "Full sparse matrix factorization time for Poisson and Helmholtz Equation"
+ylabel    = "Seconds"
+filename  = "full_sparse_poisson_helmholtz_factor_time_gpu.pdf"
+plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_full_sparse_factor", filename)
+
+
+"""
 subtitle1 = "Poisson Equation"
 subtitle2 = "Helmholtz Equation, 10 PPW"
 title     = "Relative Errors for Poisson and Helmholtz Equation"
@@ -228,6 +257,8 @@ title     = "Relative Errors for Helmholtz Equation with Fixed K"
 ylabel    = "Relative Error"
 filename  = "helmholtz_kh_accuracy_gpu.pdf"
 #plot_paired_results(p_list_helmholtz, p_list_helmholtz, path_kh16, path_kh30, subtitle1, subtitle2, title, ylabel, "true_res", filename)
+"""
+
 
 """
 path_poisson_flags = "gpu_output/poisson_gpu_with_flags_1212/"
