@@ -565,7 +565,7 @@ class Domain_Driver:
         cond_reduced = -1
         cond_total   = -1
 
-        if self.hps.nboxes < 10:
+        if self.hps.nboxes < 30:
             total_sparse_dense = total_sparse.toarray()
             cond_reduced = np.linalg.cond(self.dense_A_CC, p=2)
             cond_total   = np.linalg.cond(total_sparse_dense, p=2)
