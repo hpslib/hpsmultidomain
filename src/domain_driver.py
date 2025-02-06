@@ -556,19 +556,24 @@ class Domain_Driver:
         #
         # Create a large S_sparse here:
         #
-        self.hps.create_full_S(device)
+        toc_full_sparse_build = self.hps.create_full_S(device)
 
         blocks = [[self.A_CC, None], [-self.hps.S_B, speye(self.hps.q**3 * self.hps.nboxes)]]
 
         total_sparse = spblock_array(blocks, format="csr")
 
-        #total_sparse    = torch.from_numpy(total_sparse_np)
-        #self.dense_A_CC = torch.from_numpy(self.dense_A_CC)
+        cond_reduced = -1
+        cond_total   = -1
 
-        #print("Condition number for condensed sparse system:")
-        #print(torch.linalg.cond(self.dense_A_CC, p=2))
-        #print("Condition number for the total sparse system:")
-        #print(torch.linalg.cond(total_sparse, p=2))
+        if self.hps.nboxes < 10:
+            total_sparse_dense = total_sparse.toarray()
+            cond_reduced = np.linalg.cond(self.dense_A_CC, p=2)
+            cond_total   = np.linalg.cond(total_sparse_dense, p=2)
+
+        print("Condition number for condensed sparse system:")
+        print(cond_reduced)
+        print("Condition number for the total sparse system:")
+        print(cond_total)
 
         #
         # Next step: make sure total_sparse actually solves the system.
@@ -596,7 +601,7 @@ class Domain_Driver:
         #
         # Here: set up inverse solve using MUMPS on total sparse system
         #
-        self.total_sparse_solve(total_sparse, RHS, sol_boundaries, "MUMPS")
+        rel_err_full_sparse, toc_full_sparse_factor = self.total_sparse_solve(total_sparse, RHS, sol_boundaries, "MUMPS")
 
         true_err = torch.tensor([float('nan')])
         if (known_sol):
@@ -618,7 +623,10 @@ class Domain_Driver:
             del uu_true
             true_err = true_err.item()
 
-        return sol_tot,rel_err,true_err,resloc_hps,toc_solve, forward_bdry_error, reverse_bdry_error
+        return sol_tot,rel_err,true_err,resloc_hps,toc_solve, forward_bdry_error, reverse_bdry_error, \
+               toc_full_sparse_build, toc_full_sparse_factor, rel_err_full_sparse, \
+                cond_reduced, cond_total
+
 
 
     def total_sparse_solve(self, total_sparse_np, RHS, sol_boundaries, solvertype):
@@ -639,7 +647,7 @@ class Domain_Driver:
         #print("Initiated the ksp operator, still need to do a solve to break it in")        
         tic = time()
         ksp.solve(pb, px)
-        toc_build = time() - tic
+        toc_full_sparse_factor = time() - tic
 
         psol = PETSc.Vec().createWithArray(np.ones(RHS.shape[0]))
         pb   = PETSc.Vec().createWithArray(RHS.flatten())
@@ -648,8 +656,9 @@ class Domain_Driver:
         sol  = psol.getArray().reshape(RHS.shape)
 
         print("\t--time for %s build whole sparse system through petsc = %5.2f seconds"\
-                  % (solvertype,toc_build))
+                  % (solvertype,toc_full_sparse_factor))
 
         rel_error = np.linalg.norm(sol - sol_boundaries) / np.linalg.norm(sol_boundaries)
 
         print("Relative error for whole sparse system solve is " + str(rel_error))
+        return rel_error, toc_full_sparse_factor

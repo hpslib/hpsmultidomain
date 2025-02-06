@@ -124,7 +124,10 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
                 raise ValueError("multiple time steps means either convection-diffusion or parabolic laplace")
             uu_sol_old = uu_sol
 
-        uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,known_sol=known_sol)
+        uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error, \
+            toc_full_sparse_build, toc_full_sparse_factor, rel_err_full_sparse, \
+            cond_reduced, cond_total = dom.solve(uu_dir,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,known_sol=known_sol)
+        
         if i > 0:
             change = torch.linalg.norm(uu_sol - uu_sol_old) / torch.linalg.norm(uu_sol_old)
             sol_norm = torch.linalg.norm(uu_sol)
@@ -155,6 +158,13 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
 
         solve_info['forward_bdry_error'] = forward_bdry_error
         solve_info['reverse_bdry_error'] = reverse_bdry_error
-        solve_info['computed_sol']       = uu_sol
+        #solve_info['computed_sol']       = uu_sol
+
+        solve_info['toc_full_sparse_build']  = toc_full_sparse_build
+        solve_info['toc_full_sparse_factor'] = toc_full_sparse_factor
+        solve_info['rel_err_full_sparse']    = rel_err_full_sparse
+
+        solve_info['cond_reduced'] = cond_reduced
+        solve_info['cond_total']   = cond_total
 
     return uu_dir, uu_sol,res, sol_norm,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error, solve_info

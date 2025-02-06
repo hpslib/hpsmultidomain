@@ -608,4 +608,5 @@ class HPS_Multidomain:
 
         self.S_B = S_B# .cpu().detach().numpy()
         self.S_D = S_D#.cpu().detach().numpy()
+        return toc
 
