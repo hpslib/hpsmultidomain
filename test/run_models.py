@@ -18,7 +18,7 @@ p_list = [8,10,12,14,16,18,20,22]
 #p_list = [9,11,13,15,17,19,21]
 
 domain = "square"
-pde = "bfield_constant"
+pde = "poisson"
 bc = "log_dist"
 ppw = None
 kh = None
