@@ -193,30 +193,30 @@ def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, ti
     plt.savefig(filename)
     plt.show()
 
-p_list_poisson   = [6,8,10,12,14]
+p_list_poisson   = [10,18,20]
 p_list_helmholtz = [10,12,14,16,18,20,22]
 
-path_poisson   = "gpu_output/poisson_scaling_0116/"
-path_helmholtz = "gpu_output/helmholtz_gpu_10ppw_1208/"
+path_poisson   = "gpu_output/poisson_scaling_new_slices_0123/"
+path_helmholtz = "gpu_output/helmholtz_kh_16_new_slices_0129/"
 
 subtitle1 = "Poisson Equation"
-subtitle2 = "Helmholtz Equation, 10 PPW"
+subtitle2 = "Helmholtz Equation, K = 16"
 title     = "Relative Errors for Poisson and Helmholtz Equation"
 ylabel    = "Relative Error"
-filename  = "poisson_helmholtz_accuracy_gpu.pdf"
+filename  = "poisson_helmholtz_new_slice_accuracy_gpu.pdf"
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "true_res", filename)
 
 title     = "Matrix factorization time for Poisson and Helmholtz Equation"
 ylabel    = "Seconds"
-filename  = "poisson_helmholtz_factor_time_gpu.pdf"
+filename  = "poisson_helmholtz_new_slice_factor_time_gpu.pdf"
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_invert", filename)
 
 title     = "DtN build time for Poisson and Helmholtz Equation"
-filename  = "poisson_helmholtz_DtN_time_gpu.pdf"
+filename  = "poisson_helmholtz_new_slice_DtN_time_gpu.pdf"
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_build_dtn", filename, type="plot")
 
 title     = "Leaf solve time for Poisson and Helmholtz Equation"
-filename  = "poisson_helmholtz_leaf_time_gpu.pdf"
+filename  = "poisson_helmholtz_new_slice_leaf_time_gpu.pdf"
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_leaf_solve", filename, type="plot")
 
 
