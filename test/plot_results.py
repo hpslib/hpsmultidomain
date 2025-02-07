@@ -106,11 +106,11 @@ def make_plot(p_list, p_results, field, title, xlabel, ylabel, type="plot"):
     legend = []
     for i in range(len(p_list)):
         if type=="plot":
-            plt.plot(p_results[i].index, p_results[i][field])
+            plt.plot(p_results[i].index**3, p_results[i][field])
         if type=="semilogy":
-            plt.semilogy(p_results[i].index, p_results[i][field])
+            plt.semilogy(p_results[i].index**3, p_results[i][field])
         if type=="loglog":
-            plt.loglog(p_results[i].index, p_results[i][field])
+            plt.loglog(p_results[i].index**3, p_results[i][field])
         legend.append("p = " + str(p_list[i]))
 
     plt.title(title)
@@ -136,9 +136,6 @@ plt.ylabel("seconds")
 plt.savefig("plots_poisson/log_toc_invert.png")
 plt.show()
 """
-
-p_results = make_p_results(mypath, p_list)
-
 
 #make_plot(p_list, p_results, "toc_invert", total_title + "time to factorize sparse matrix", "N", "seconds")
 #make_plot(p_list, p_results, "toc_build_dtn", total_title + "time to assemble batched DtN maps", "N", "seconds")
@@ -214,17 +211,42 @@ def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, ti
 p_list_poisson   = [8,10,12,14,16]
 p_list_helmholtz = [8,10,12,14,16,18]
 
-path_poisson   = "gpu_output/full_sparse_poisson_0205/"
+path_poisson   = "gpu_output/full_sparse_poisson_0205"
 path_helmholtz = "gpu_output/full_sparse_helmholtz_10ppw_0205/"
 
-make_p_results(p_list_helmholtz, p_list_helmholtz)
+p_results_poisson   = make_p_results(path_poisson, p_list_poisson)
+p_results_helmholtz = make_p_results(path_helmholtz, p_list_helmholtz)
 
-subtitle1 = "Poisson Equation"
-subtitle2 = "Helmholtz Equation, 10 PPW"
-title     = "Full sparse matrix factorization time for Poisson and Helmholtz Equation"
+
 ylabel    = "Seconds"
 filename  = "full_sparse_poisson_helmholtz_factor_time_gpu.pdf"
-plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_full_sparse_factor", filename)
+
+title     = "Full sparse matrix factorization time for Poisson Equation"
+make_plot(p_list_poisson, p_results_poisson, "toc_full_sparse_factor", title, "N", ylabel, type="loglog")
+title = "Reduced sparse matrix factorization time for Poisson Equation"
+make_plot(p_list_poisson, p_results_poisson, "toc_invert", title, "N", "seconds", type="loglog")
+
+
+title     = "Full sparse matrix factorization time for Helmholtz Equation"
+ylabel    = "Seconds"
+make_plot(p_list_helmholtz, p_results_helmholtz, "toc_full_sparse_factor", title, "N", ylabel, type="loglog")
+title = "Reduced sparse matrix factorization time for Helmholtz Equation"
+make_plot(p_list_helmholtz, p_results_helmholtz, "toc_invert", title, "N", "seconds", type="loglog")
+
+title     = "Full sparse matrix build time for Poisson Equation"
+make_plot(p_list_poisson, p_results_poisson, "toc_full_sparse_build", title, "N", ylabel, type="plot")
+title = "Reduced sparse matrix build time for Poisson Equation"
+make_plot(p_list_poisson, p_results_poisson, "toc_build_dtn", title, "N", "seconds", type="plot")
+
+
+title     = "Full sparse matrix build time for Helmholtz Equation"
+ylabel    = "Seconds"
+make_plot(p_list_helmholtz, p_results_helmholtz, "toc_full_sparse_build", title, "N", ylabel, type="plot")
+title = "Reduced sparse matrix build time for Helmholtz Equation"
+make_plot(p_list_helmholtz, p_results_helmholtz, "toc_build_dtn", title, "N", "seconds", type="plot")
+
+
+#plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_full_sparse_factor", filename)
 
 
 """

@@ -164,6 +164,9 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
         solve_info['toc_full_sparse_factor'] = toc_full_sparse_factor
         solve_info['rel_err_full_sparse']    = rel_err_full_sparse
 
+        print(solve_info['toc_full_sparse_build'])
+        print(solve_info['toc_full_sparse_factor'])
+
         solve_info['cond_reduced'] = cond_reduced
         solve_info['cond_total']   = cond_total
 

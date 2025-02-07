@@ -10,10 +10,12 @@ from test_3d import run_test_via_argparse
 #p_list = [10, 12, 14, 16, 18]
 #p_list = [22]
 
-p_list = [8,10,12,14] #,16,18,20,22]
+#p_list = [8,10,12,14] #,16,18,20,22]
 #p_list = [18,20,22] 
 #p_list = [20,22]
 #p_list = [22]
+
+p_list = [8, 10]
 
 #p_list = [9,11,13,15,17,19,21]
 
@@ -24,7 +26,7 @@ ppw = None
 kh = None
 delta_t = None
 
-output_path = "output/full_sparse_poisson_0205"
+output_path = "output/full_sparse_poisson_0205_small"
 
 for p in p_list:
     #n_list = list(range(2*(p-2), 100, p-2))
