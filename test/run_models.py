@@ -5,7 +5,7 @@
 from test_3d import run_test_via_argparse
 
 # First we'll run a suite of Poisson problems for different n and p:
-#p_list = [10, 12, 14, 16, 18, 20, 22]#, 24, 26]
+p_list = [10, 12, 14, 16, 18, 20, 22]#, 24, 26]
 #p_list = [30]
 #p_list = [10, 12, 14, 16, 18]
 #p_list = [22]
@@ -15,21 +15,21 @@ from test_3d import run_test_via_argparse
 #p_list = [20,22]
 #p_list = [22]
 
-p_list = [9,11,13,15,17,19,21]
+#p_list = [9,11,13,15,17,19,21]
 
-domain = "square"
-pde = "bfield_gravity"
-bc = "zeros"
+domain = "curved"
+pde = "bfield_constant"
+bc = "free_space"
 ppw = None
-kh = 12
+kh = 16
 delta_t = None
 
 output_path = "output/gravity_kh_12_1219"
 
 for p in p_list:
-    #n_list = list(range(2*(p-2), 150, p-2))
+    n_list = list(range(2*(p-2), 200, p-2))
     
-    n_list = [2*(p-2), 3*(p-2), 4*(p-2), 5*(p-2), 6*(p-2), 7*(p-2), 8*(p-2), 9*(p-2)]
+    #n_list = [2*(p-2), 3*(p-2), 4*(p-2), 5*(p-2), 6*(p-2), 7*(p-2), 8*(p-2), 9*(p-2)]
     #n_list = list(range(110, 150, p-2))
     
     for n in n_list:

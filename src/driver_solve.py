@@ -155,6 +155,5 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
 
         solve_info['forward_bdry_error'] = forward_bdry_error
         solve_info['reverse_bdry_error'] = reverse_bdry_error
-        solve_info['computed_sol']       = uu_sol
 
     return uu_dir, uu_sol,res, sol_norm,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error, solve_info
