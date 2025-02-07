@@ -24,7 +24,7 @@ ppw = None
 kh = 16
 delta_t = None
 
-output_path = "output/gravity_kh_12_1219"
+output_path = "output/curved_gpu_scaling_kh16_0207"
 
 for p in p_list:
     n_list = list(range(2*(p-2), 200, p-2))
