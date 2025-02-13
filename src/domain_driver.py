@@ -8,6 +8,8 @@ import scipy.sparse.linalg as spla  # For sparse linear algebra operations
 from time import time  # For timing operations
 torch.set_default_dtype(torch.double)  # Setting default tensor type to double for precision
 
+from scipy.linalg import solve as scipy_solve, norm as scipy_norm
+
 # Import custom modules for handling multidomain discretization and partial differential operators
 import hps_multidomain_disc
 import pdo
@@ -566,9 +568,16 @@ class Domain_Driver:
         cond_total   = -1
 
         if self.hps.nboxes < 30:
+
+            A_CC_inv = scipy_solve(self.dense_A_CC, np.identity(self.dense_A_CC.shape[0]))
+            cond_reduced = scipy_norm(self.dense_A_CC, ord=2) * scipy_norm(A_CC_inv, ord=2)
+
             total_sparse_dense = total_sparse.toarray()
-            cond_reduced = np.linalg.cond(self.dense_A_CC, p=2)
-            cond_total   = np.linalg.cond(total_sparse_dense, p=2)
+            total_sparse_dense_inv = scipy_solve(total_sparse_dense, np.identity(total_sparse_dense.shape[0]))
+            cond_total = scipy_norm(total_sparse_dense, ord=2) * scipy_norm(total_sparse_dense_inv, ord=2)
+
+            #cond_reduced = np.linalg.cond(self.dense_A_CC, p=2)
+            #cond_total   = np.linalg.cond(total_sparse_dense, p=2)
 
         print("Condition number for condensed sparse system:")
         print(cond_reduced)
