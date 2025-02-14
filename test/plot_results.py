@@ -161,74 +161,80 @@ def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, ti
     fig.suptitle(title)
     for i in range(len(p_list1)):
         if type == "loglog":
-            ax1.loglog(p_results_poisson[i].index**3, p_results_poisson[i][data_col])
+            ax1.loglog(p_results_poisson[i].index**3, p_results_poisson[i][data_col], '.-')
         elif type == "plot":
-            ax1.plot(p_results_poisson[i].index**3, p_results_poisson[i][data_col])
+            ax1.plot(p_results_poisson[i].index**3, p_results_poisson[i][data_col], '.-')
         elif type == "semilogy":
-            ax1.semilogy(p_results_poisson[i].index**3, p_results_poisson[i][data_col])
+            ax1.semilogy(p_results_poisson[i].index**3, p_results_poisson[i][data_col], '.-')
         else:
             raise ValueError("Type needs to be loglog, plot, or semilogy")
     #ax1.loglog(p_results_poisson[-1].index**3, (p_results_poisson[-1].index)**6)
-    ax1.legend(["p = " + str(_) for _ in p_list1])# + ["trend for N**{1.5} scaling"])
-    ax1.set_xlabel("N")
+    ax1.legend(["$p$ = " + str(_) for _ in p_list1])# + ["trend for N**{1.5} scaling"])
+    ax1.set_xlabel("$N$")
     ax1.set_ylabel(ylabel)
     ax1.set_title(subtitle1)
+    ax1.grid(True)
 
     for i in range(len(p_list2)):
         #if i == 0 and type == "loglog":
         #    ax2.loglog(p_results_helmholtz[i].index[1:]**3, p_results_helmholtz[i][data_col][1:])
         if type == "loglog":
-            ax2.loglog(p_results_helmholtz[i].index**3, p_results_helmholtz[i][data_col])
+            ax2.loglog(p_results_helmholtz[i].index**3, p_results_helmholtz[i][data_col], '.-')
         elif type == "plot":
-            ax2.plot(p_results_helmholtz[i].index**3, p_results_helmholtz[i][data_col])
+            ax2.plot(p_results_helmholtz[i].index**3, p_results_helmholtz[i][data_col], '.-')
         elif type == "semilogy":
-            ax2.semilogy(p_results_helmholtz[i].index**3, p_results_helmholtz[i][data_col])
+            ax2.semilogy(p_results_helmholtz[i].index**3, p_results_helmholtz[i][data_col], '.-')
         else:
             raise ValueError("Type needs to be loglog, plot, or semilogy")
     #ax2.loglog(p_results_helmholtz[-1].index**3, (p_results_helmholtz[-1].index)**6)
-    ax2.legend(["p = " + str(_) for _ in p_list2])# + ["trend for N**{1.5} scaling"])
-    ax2.set_xlabel("N")
+    ax2.legend(["$p$ = " + str(_) for _ in p_list2])# + ["trend for N**{1.5} scaling"])
+    ax2.set_xlabel("$N$")
     ax2.set_title(subtitle2)
+    ax2.grid(True)
 
     plt.savefig(filename)
     plt.show()
 
-p_list_poisson   = [10,18,20]
+p_list_poisson   = [6, 8, 10, 12, 14]
 p_list_helmholtz = [10,12,14,16,18,20,22]
 
-path_poisson   = "gpu_output/poisson_scaling_new_slices_0123/"
-path_helmholtz = "gpu_output/helmholtz_kh_16_new_slices_0129/"
 
+path_poisson   = "gpu_output/poisson_scaling_new_slices_0123/"
+path_helmholtz = "gpu_output/helmholtz_10ppw_0211/"
+
+p_results_poisson = make_p_results(path_poisson, p_list_poisson)
+
+"""
 subtitle1 = "Poisson Equation"
-subtitle2 = "Helmholtz Equation, K = 16"
+subtitle2 = "Helmholtz Equation, 10 Points per Wavelength"
 title     = "Relative Errors for Poisson and Helmholtz Equation"
 ylabel    = "Relative Error"
-filename  = "poisson_helmholtz_new_slice_accuracy_gpu.pdf"
+filename  = "poisson_helmholtz_accuracy_gpu.pdf"
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "true_res", filename)
 
 title     = "Matrix factorization time for Poisson and Helmholtz Equation"
 ylabel    = "Seconds"
-filename  = "poisson_helmholtz_new_slice_factor_time_gpu.pdf"
+filename  = "poisson_helmholtz_factor_time_gpu.pdf"
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_invert", filename)
 
 title     = "DtN build time for Poisson and Helmholtz Equation"
-filename  = "poisson_helmholtz_new_slice_DtN_time_gpu.pdf"
+filename  = "poisson_helmholtz_DtN_time_gpu.pdf"
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_build_dtn", filename, type="plot")
 
 title     = "Leaf solve time for Poisson and Helmholtz Equation"
-filename  = "poisson_helmholtz_new_slice_leaf_time_gpu.pdf"
+filename  = "poisson_helmholtz_leaf_time_gpu.pdf"
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_leaf_solve", filename, type="plot")
 
 
 path_kh16 = "gpu_output/helmholtz_gpu_kh16_1208/"
 path_kh30 = "gpu_output/helmholtz_gpu_kh30_1208/"
-subtitle1 = "K = 16"
-subtitle2 = "K = 30"
-title     = "Relative Errors for Helmholtz Equation with Fixed K"
+subtitle1 = "$k$ = 16"
+subtitle2 = "$k$ = 30"
+title     = "Relative Errors for Helmholtz Equation with Fixed $k$"
 ylabel    = "Relative Error"
 filename  = "helmholtz_kh_accuracy_gpu.pdf"
-#plot_paired_results(p_list_helmholtz, p_list_helmholtz, path_kh16, path_kh30, subtitle1, subtitle2, title, ylabel, "true_res", filename)
-
+plot_paired_results(p_list_helmholtz, p_list_helmholtz, path_kh16, path_kh30, subtitle1, subtitle2, title, ylabel, "true_res", filename)
+"""
 """
 path_poisson_flags = "gpu_output/poisson_gpu_with_flags_1212/"
 p_results_poisson = make_p_results(path_poisson, [6,8])
@@ -256,4 +262,29 @@ plt.xlabel("N")
 plt.ylabel("Relative Error")
 plt.savefig("poisson_blocksize_flag_accuracy_gpu.pdf")
 plt.show()
+"""
+
+"""
+# For convergence estimates
+p = 6
+h_array = (p-2) / p_results_poisson[0].index.to_numpy()
+h_array_cube = h_array**3
+
+#print(h_array)
+print(np.log(p_results_poisson[0]["true_res"].to_numpy()) / np.log(h_array))
+
+p = 8
+h_array = (p-2) / p_results_poisson[1].index.to_numpy()
+h_array_cube = h_array**3
+
+#print(h_array)
+print(np.log(p_results_poisson[1]["true_res"].to_numpy()) / np.log(h_array))
+
+p = 10
+h_array = (p-2) / p_results_poisson[2].index.to_numpy()
+h_array_cube = h_array**3
+
+#print(h_array)
+print(np.log(p_results_poisson[2]["true_res"].to_numpy()) / np.log(h_array))
+
 """
