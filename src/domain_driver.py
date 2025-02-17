@@ -546,6 +546,8 @@ class Domain_Driver:
         toc_solve += time() - tic
         sol_tot = sol_tot.cpu()
 
+        sol_tot = torch.reshape(sol_tot, (self.hps.nboxes,self.hps.p**3))
+
         true_err = torch.tensor([float('nan')])
         if (known_sol):
             XX = self.hps.xx_tot
@@ -554,7 +556,7 @@ class Domain_Driver:
                 true_err = torch.linalg.norm(sol_tot-uu_true) / torch.linalg.norm(uu_true)
             if self.d==3:
                 # special protocol for 3D case, temporarily avoiding edges of boxes:
-                sol_tot = torch.reshape(sol_tot, (self.hps.nboxes,self.hps.p**3))
+                #sol_tot = torch.reshape(sol_tot, (self.hps.nboxes,self.hps.p**3))
                 uu_true = torch.reshape(uu_true, (self.hps.nboxes,self.hps.p**3))
 
                 Jx   = torch.tensor(self.hps.H.JJ.Jx)#.to(device)

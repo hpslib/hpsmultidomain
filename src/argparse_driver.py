@@ -116,6 +116,8 @@ build_info = build_operator_with_info(dom, args, box_geom, kh)
 ################################# SOLVE PDE ###################################
 # Solve the PDE with specified configurations and print results
 uu_dir,uu_sol,res,true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error,solve_info = run_solver(dom, args, curved_domain, kh, param_map, delta_t)
+print(uu_sol.shape)
+
 
 # Optional: Store solution and/or pickle results for later use
 if (args.store_sol):
@@ -207,7 +209,7 @@ if (d==3 and 1==0):
 
     print("Number of I_copy entries on domain boundary (should be 0): " + str(len(I_dir)))
 """
-"""
+
 # Test DtN_loc accuracy:
 if d==3:
     # Here we'll test our DtN operators on a known function. First we define the known function and its
@@ -312,15 +314,11 @@ if d==3:
 
     center=np.array([-1.1,+1.,+1.2])
     
-    #xx = dom.hps.grid_xx.flatten(start_dim=0,end_dim=-2)
-    # result = uu_sol
-    xx = dom.hps.grid_ext
+    xx = dom.hps.grid_xx.flatten(start_dim=0,end_dim=-2)
+    #xx = dom.hps.grid_ext
 
     if curved_domain:
         xx = param_map(xx)
-    import matplotlib.pyplot as plt
-    fig = plt.figure(figsize=(12, 12))
-    ax = fig.add_subplot(projection='3d')
 
     sequence_containing_x_vals = xx[:,0] - center[0]
     sequence_containing_y_vals = xx[:,1] - center[1]
@@ -332,24 +330,41 @@ if d==3:
 
     Jx = torch.tensor(dom.hps.H.JJ.Jxreorder)
 
-    result = uu_sol[:,Jx].flatten()
+    result = uu_sol.flatten() #uu_sol[:,Jx].flatten()
 
     max_result = torch.linalg.norm(result, ord=np.inf)
-"""
-    #ax.view_init(azim=-30)
-    #plt.rc('text',usetex=True)
-    #plt.rc('font',**{'family':'serif','size':14})
-    #plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
-    #sc = ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals, c=result, marker='o', cmap="seismic", vmin=-max_result, vmax=max_result)
-"""
-    plt.title("Result of Helmholtz Equation on Curved Domain, K = " + str(kh))
+
+    interior0 = torch.logical_and((xx[:, 0] > 0), (xx[:, 0] < 1))
+    interior1 = torch.logical_and((xx[:, 1] > 0), (xx[:, 1] < 1))
+    interior2 = torch.logical_and((xx[:, 2] > 0), (xx[:, 2] < 1))
+
+    interior = torch.logical_and(torch.logical_and(interior0, interior1), interior2)
+    
+    # Eliminates the domain exterior points
+    sequence_containing_x_vals = sequence_containing_x_vals[interior]
+    sequence_containing_y_vals = sequence_containing_y_vals[interior]
+    sequence_containing_z_vals = sequence_containing_z_vals[interior]
+    result = result[interior]
+    
+    h = round(a[0] * 2, 2)
+
+    import matplotlib.pyplot as plt
+    plt.rc('text',usetex=True)
+    plt.rc('font',**{'family':'serif','size':14})
+    plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
+    fig = plt.figure(figsize=(12, 12))
+    ax = fig.add_subplot(projection='3d')
+    ax.view_init(azim=-30)
+    sc = ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals, c=result, marker='.', cmap="seismic", vmin=-max_result, vmax=max_result)
+
+    plt.title("Gravity Helmholtz Equation: $k = $" + str(kh) + ", $p = $" + str(p) + ", $h = $" + str(h))
     plt.xlabel("x")
     plt.ylabel("y")
     plt.colorbar(sc, shrink=0.5)
     plt.rcParams['figure.figsize'] = [14, 6]
-    plt.savefig("3D-domain-faces.pdf")
+    plt.savefig("3D-domain-faces-gravity-p9-h3.pdf")
     plt.show()
-"""
+
     
 """
 if (d==3 and 1==0):
