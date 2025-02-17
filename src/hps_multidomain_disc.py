@@ -182,7 +182,7 @@ class HPS_Multidomain:
         else:
             # For 3D, we're indexing box by box. Thus let's follow that approach here:
             tic = time()
-            col_data = torch.arange(size_ext, device=device)
+            col_data = torch.arange(size_ext, device="cpu")
             
             # Add one box worth to F, n2 box worth to U, n1*n2 box worth to L
             # The idea is that this ensures all matrix entries correspond to boundary values in

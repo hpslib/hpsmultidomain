@@ -209,7 +209,7 @@ if (d==3 and 1==0):
 
     print("Number of I_copy entries on domain boundary (should be 0): " + str(len(I_dir)))
 """
-
+"""
 # Test DtN_loc accuracy:
 if d==3:
     # Here we'll test our DtN operators on a known function. First we define the known function and its
@@ -347,16 +347,16 @@ if d==3:
     result = result[interior]
     
     h = round(a[0] * 2, 2)
-
-    import matplotlib.pyplot as plt
-    plt.rc('text',usetex=True)
-    plt.rc('font',**{'family':'serif','size':14})
-    plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
-    fig = plt.figure(figsize=(12, 12))
-    ax = fig.add_subplot(projection='3d')
-    ax.view_init(azim=-30)
-    sc = ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals, c=result, marker='.', cmap="seismic", vmin=-max_result, vmax=max_result)
-
+"""
+    #import matplotlib.pyplot as plt
+    #plt.rc('text',usetex=True)
+    #plt.rc('font',**{'family':'serif','size':14})
+    #plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
+    #fig = plt.figure(figsize=(12, 12))
+    #ax = fig.add_subplot(projection='3d')
+    #ax.view_init(azim=-30)
+    #sc = ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals, c=result, marker='.', cmap="seismic", vmin=-max_result, vmax=max_result)
+"""
     plt.title("Gravity Helmholtz Equation: $k = $" + str(kh) + ", $p = $" + str(p) + ", $h = $" + str(h))
     plt.xlabel("x")
     plt.ylabel("y")
@@ -364,7 +364,7 @@ if d==3:
     plt.rcParams['figure.figsize'] = [14, 6]
     plt.savefig("3D-domain-faces-gravity-p9-h3.pdf")
     plt.show()
-
+"""
     
 """
 if (d==3 and 1==0):
