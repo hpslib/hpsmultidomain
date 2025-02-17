@@ -101,25 +101,27 @@ for box, convergence, p_indices in zip(box_list, convergences, p_lists):
     #if convergence[-1] < 1e-16:
     #    N_list = N_list[:-1]
     #    convergence = convergence[:-1]
-    plt.loglog(N_list, convergence)
+    plt.loglog(N_list, convergence, ".-")
 
-legend = ["h = 1/" + str(_) for _ in box_list]
+legend = ["$h$ = 1/" + str(_) for _ in box_list]
 
 plt.legend(legend)
-plt.title("p-Refinement of Gravity Helmholtz Equation")
-plt.xlabel("N")
-plt.ylabel("Relative Errpr")
+plt.title("$p$-Refinement of Gravity Helmholtz Equation")
+plt.xlabel("$N$")
+plt.ylabel("Relative Error")
+plt.grid(True)
 plt.savefig("gravity_convergence_N.pdf")
 plt.show()
 
 for box, convergence, p_indices in zip(box_list, convergences, p_lists):
     p_indices = p_indices[:-1]
-    plt.semilogy(p_indices, convergence)
+    plt.semilogy(p_indices, convergence, ".-")
 
 plt.legend(legend)
-plt.title("p-Refinement of Gravity Helmholtz Equation")
-plt.xlabel("p")
+plt.title("$p$-Refinement of Gravity Helmholtz Equation")
+plt.xlabel("$p$")
 plt.ylabel("Relative Error")
+plt.grid(True)
 plt.savefig("gravity_convergence_p.pdf")
 plt.show()
 
