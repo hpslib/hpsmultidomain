@@ -182,7 +182,10 @@ class HPS_Multidomain:
         else:
             # For 3D, we're indexing box by box. Thus let's follow that approach here:
             tic = time()
-            col_data = torch.arange(size_ext, device="cpu")
+            col_data = torch.arange(size_ext, device="cpu")#, dtype=torch.float64)
+
+            print("Type of col_data:")
+            print(col_data.dtype)
             
             # Add one box worth to F, n2 box worth to U, n1*n2 box worth to L
             # The idea is that this ensures all matrix entries correspond to boundary values in
@@ -212,6 +215,9 @@ class HPS_Multidomain:
             #print(len(torch.unique(col_data)))
             toc_flatten = time() - tic
             #print("Flattened data")
+
+        print("Type of numpy row_data:")
+        print(row_data.detach().cpu().numpy().dtype)
         
         tic = time()
         sp_mat = sp.coo_matrix((data.detach().cpu().numpy(),(row_data.detach().cpu().numpy(),col_data.detach().cpu().numpy())))

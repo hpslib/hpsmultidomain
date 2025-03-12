@@ -16,6 +16,7 @@ def configure_pde_domain(args):
 
     kh = 0
     delta_t = 0
+    num_timesteps = 1
 
     if ((args.pde == 'poisson') and (args.domain == 'square')):
         if (args.ppw is not None):
@@ -141,9 +142,12 @@ def configure_pde_domain(args):
             print("convection_diffusion is 3D only")
             raise ValueError
         if args.d==3:
-            delta_t = args.delta_t
+            delta_t       = args.delta_t
+            num_timesteps = args.num_timesteps
             if delta_t is None:
                 raise ValueError("delta_t must be specified for parabolic problem")
+            if num_timesteps is None:
+                raise ValueError("num_timesteps must be specified for parabolic problem")
             op = pdo.PDO_3d(pdo.const(c=-delta_t),pdo.const(c=-delta_t),pdo.const(c=-delta_t),
                             c3=pdo.const(c=-2*delta_t),
                             c=pdo.const(c=-1))
@@ -158,9 +162,12 @@ def configure_pde_domain(args):
         if args.d==2:
             raise ValueError("parabolic_heat is 3D only")
         if args.d==3:
-            delta_t = args.delta_t
+            delta_t       = args.delta_t
+            num_timesteps = args.num_timesteps
             if delta_t is None:
                 raise ValueError("delta_t must be specified for parabolic problem")
+            if num_timesteps is None:
+                raise ValueError("num_timesteps must be specified for parabolic problem")
             op = pdo.PDO_3d(pdo.const(c=-delta_t),pdo.const(c=-delta_t),pdo.const(c=-delta_t),c=pdo.const(c=-1))
         kh = 0
         curved_domain = False
@@ -168,7 +175,7 @@ def configure_pde_domain(args):
     else:
         raise ValueError
 
-    return op, param_map, inv_param_map, curved_domain, kh, delta_t
+    return op, param_map, inv_param_map, curved_domain, kh, delta_t, num_timesteps
 
 #
 # Given a domain decomposition, constructs the operator needed for the HPS computation:

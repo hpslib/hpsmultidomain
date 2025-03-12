@@ -326,8 +326,8 @@ def bfield_cavity_scattering(xx,kh):
     kh_fun = -kh**2 * (1 - b)
     return kh_fun.unsqueeze(-1)
 
-def bfield_gravity(xx, kh):
-    gravity_fun = 100 * kh * (1 - xx[:,2])
+def bfield_gravity(xx, kh, center=np.array([-1.1,+1.,+1.2])):
+    gravity_fun = -kh**2 * (1 - (xx[:,2] - center[2]))
     return gravity_fun.unsqueeze(-1)
 
 def uu_dir_func_convection(xx, t):

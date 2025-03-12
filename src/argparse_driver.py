@@ -37,6 +37,7 @@ parser.add_argument('--ppw',type=int, required=False)  # Points per wavelength f
 parser.add_argument('--nwaves',type=float, required=False)  # Number of wavelengths
 parser.add_argument('--kh', type=float, required=False)       # checks if we have a given non-constant wavenumber
 parser.add_argument('--delta_t', type=float, required=False)  # checks if we have a given time step (only needed for convection-diffusion)
+parser.add_argument('--num_timesteps', type=float, required=False)  # checks if we have a given number of timesteps (only needed for convection-diffusion)
 
 # Solver and computational specifics
 parser.add_argument('--solver',type=str,required=False)  # Solver to use
@@ -95,7 +96,7 @@ if ((not torch.cuda.is_available()) and (args.sparse_assembly == 'reduced_gpu'))
 # If we have a square domain (and thus do not need parameter maps), then
 # param_map, inv_param_map = None and curved_domain = False.
 # If there is no oscillation then kh = 0.
-op, param_map, inv_param_map, curved_domain, kh, delta_t = configure_pde_domain(args)
+op, param_map, inv_param_map, curved_domain, kh, delta_t, num_timesteps = configure_pde_domain(args)
     
 ##### Set the domain and discretization parameters
 if (args.p is None):
@@ -115,7 +116,7 @@ build_info = build_operator_with_info(dom, args, box_geom, kh)
 
 ################################# SOLVE PDE ###################################
 # Solve the PDE with specified configurations and print results
-uu_dir,uu_sol,res,true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error,solve_info = run_solver(dom, args, curved_domain, kh, param_map, delta_t)
+uu_dir,uu_sol,res,true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error,solve_info = run_solver(dom, args, curved_domain, kh, param_map, delta_t, num_timesteps)
 print(uu_sol.shape)
 
 
@@ -209,7 +210,7 @@ if (d==3 and 1==0):
 
     print("Number of I_copy entries on domain boundary (should be 0): " + str(len(I_dir)))
 """
-"""
+
 # Test DtN_loc accuracy:
 if d==3:
     # Here we'll test our DtN operators on a known function. First we define the known function and its
@@ -317,6 +318,14 @@ if d==3:
     xx = dom.hps.grid_xx.flatten(start_dim=0,end_dim=-2)
     #xx = dom.hps.grid_ext
 
+    #print(xx)
+    tol = 1e-8
+    interior0 = torch.logical_and((xx[:, 0] > 0.3 + tol), (xx[:, 0] < 0.5 + tol))
+    #interior1 = torch.logical_and((xx[:, 1] > 0 + tol), (xx[:, 1] < 1 - tol))
+    interior2 = torch.logical_and((xx[:, 2] > 0.3 + tol), (xx[:, 2] < 0.5 + tol))
+
+    interior = interior2 #torch.logical_and(torch.logical_and(interior0, interior1), interior2)
+
     if curved_domain:
         xx = param_map(xx)
 
@@ -333,13 +342,9 @@ if d==3:
     result = uu_sol.flatten() #uu_sol[:,Jx].flatten()
 
     max_result = torch.linalg.norm(result, ord=np.inf)
-
-    interior0 = torch.logical_and((xx[:, 0] > 0), (xx[:, 0] < 1))
-    interior1 = torch.logical_and((xx[:, 1] > 0), (xx[:, 1] < 1))
-    interior2 = torch.logical_and((xx[:, 2] > 0), (xx[:, 2] < 1))
-
-    interior = torch.logical_and(torch.logical_and(interior0, interior1), interior2)
     
+
+
     # Eliminates the domain exterior points
     sequence_containing_x_vals = sequence_containing_x_vals[interior]
     sequence_containing_y_vals = sequence_containing_y_vals[interior]
@@ -347,23 +352,50 @@ if d==3:
     result = result[interior]
     
     h = round(a[0] * 2, 2)
-"""
-    #import matplotlib.pyplot as plt
-    #plt.rc('text',usetex=True)
-    #plt.rc('font',**{'family':'serif','size':14})
-    #plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
-    #fig = plt.figure(figsize=(12, 12))
-    #ax = fig.add_subplot(projection='3d')
+
+    import matplotlib.pyplot as plt
+    plt.rc('text',usetex=True)
+    plt.rc('font',**{'family':'serif','size':18})
+    plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
+    fig = plt.figure(figsize=(12, 12))
+    ax = fig.add_subplot(projection='3d')
     #ax.view_init(azim=-30)
-    #sc = ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals, c=result, marker='.', cmap="seismic", vmin=-max_result, vmax=max_result)
-"""
-    plt.title("Gravity Helmholtz Equation: $k = $" + str(kh) + ", $p = $" + str(p) + ", $h = $" + str(h))
+    #ax.view_init(elev=5, azim=-5)
+    ax.view_init(elev=95, azim=-90)
+    sc = ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals, c=result, marker='.', cmap="seismic", vmin=-max_result, vmax=max_result)
+    """
+    ax.set_xticks([-1.0, 3.0])
+    ax.set_xticklabels(["-1.0", "3.0"])
+    ax.set_yticks([-3.0, 1.0])
+    ax.set_yticklabels(["-3.0", "1.0"])
+    ax.set_zticks([-.9, -.7])
+    ax.set_zticklabels(["-.9", "-.7"])
+    """
+    #ax.set_xticks([1.4, 1.6])
+    #ax.set_xticklabels(["1.4", "1.6"])
+
+    plt.title("Helmholtz Equation: $\kappa = $" + str(kh) + ", $p = $" + str(p) + ", $h$ = 0.625 x 0.5 x 0.5")
     plt.xlabel("x")
-    plt.ylabel("y")
+    plt.ylabel("  y")
     plt.colorbar(sc, shrink=0.5)
     plt.rcParams['figure.figsize'] = [14, 6]
-    plt.savefig("3D-domain-faces-gravity-p9-h3.pdf")
+    plt.savefig("3D-domain-faces-annulus-p18-h16x2x2.png")
     plt.show()
+
+# Printing out sparsity pattern:
+#import matplotlib.pyplot as plt
+#plt.rc('text',usetex=True)
+#plt.rc('font',**{'family':'serif','size':14})
+#plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
+"""
+fig = plt.figure(figsize=(8, 8))
+#dense_A_CC = dom.A_CC.toarray()
+plt.spy(dom.A_CC, markersize=1e-6)
+plt.xlabel("Column")
+plt.ylabel("Row")
+plt.title("Sparsity Pattern for $5^3$ Subdomains")
+plt.savefig("sparsity_pattern_5cubed.png", dpi=300, transparent=True)
+plt.show()
 """
     
 """

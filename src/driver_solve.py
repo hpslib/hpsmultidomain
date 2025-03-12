@@ -4,7 +4,7 @@ import numpy as np                     # For numerical operations
 from domain_driver import *  # Importing domain driver utilities for PDE solving
 from built_in_funcs import *  # Importing built-in functions for specific PDEs or conditions
 
-def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
+def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_timesteps=1):
     print("SOLVE RESULTS")
     solve_info = dict()
     num_timesteps = 1
@@ -56,7 +56,7 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0):
             uu_dir = lambda xx: zeros_func(param_map(xx))  
 
         if (args.pde == 'bfield_gravity'):
-            ff_body = lambda xx: torch.ones(xx.shape[0],1,device=xx.device)
+            ff_body = lambda xx: -torch.ones(xx.shape[0],1,device=xx.device)
             
     elif (args.bc == 'log_dist'):
         
