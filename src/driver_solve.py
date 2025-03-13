@@ -7,7 +7,6 @@ from built_in_funcs import *  # Importing built-in functions for specific PDEs o
 def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_timesteps=1):
     print("SOLVE RESULTS")
     solve_info = dict()
-    num_timesteps = 1
     d = args.d
 
     if (args.bc == 'free_space'):
@@ -84,10 +83,9 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
             raise ValueError("Convection_diffusion is 3D only")
         if (args.pde == 'convection_diffusion'):
             # Dirichlet BC is from the time step we are solving for now:
-            uu_dir        = lambda xx: uu_dir_func_convection(xx, delta_t)
-            known_sol     = True
-            num_timesteps = 10
-            ff_body       = lambda xx: -uu_dir_func_convection(xx, 0)
+            uu_dir        = lambda xx: torch.zeros(xx.shape[0], 1)
+            known_sol     = False
+            ff_body       = lambda xx: convection_u_init(xx)
         else:
             raise ValueError
     elif (args.bc == 'parabolic_heat'):
@@ -97,7 +95,6 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
             # Dirichlet BC is from the time step we are solving for now:
             uu_dir        = lambda xx: uu_dir_func_parabolic_heat(xx, delta_t)
             known_sol     = True
-            num_timesteps = 10
             ff_body       = lambda xx: -uu_dir_func_parabolic_heat(xx, 0)
         else:
             raise ValueError
@@ -113,15 +110,15 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
     for i in range(num_timesteps):
         print("\nFOR the %d timestep:\n" % i)
         if i > 0:
-            ff_body_vec  = -uu_sol
+            ff_body_vec  = uu_sol
             ff_body_func = None
-            # Update the Dirichlet BC for the new timestep:
-            if (args.bc == 'convection_diffusion'):
-                uu_dir = lambda xx: uu_dir_func_convection(xx, delta_t*(i+1))
-            elif (args.bc == 'parabolic_heat'):
+            # Update the Dirichlet BC for the new timestep (parabolic heat only):
+            #if (args.bc == 'convection_diffusion'):
+            #    uu_dir = lambda xx: uu_dir_func_convection(xx, delta_t*(i+1))
+            if (args.bc == 'parabolic_heat'):
                 uu_dir = lambda xx: uu_dir_func_parabolic_heat(xx, delta_t*(i+1))
-            else:
-                raise ValueError("multiple time steps means either convection-diffusion or parabolic laplace")
+            #else:
+            #    raise ValueError("multiple time steps means either convection-diffusion or parabolic laplace")
             uu_sol_old = uu_sol
 
         uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,known_sol=known_sol)

@@ -37,7 +37,7 @@ parser.add_argument('--ppw',type=int, required=False)  # Points per wavelength f
 parser.add_argument('--nwaves',type=float, required=False)  # Number of wavelengths
 parser.add_argument('--kh', type=float, required=False)       # checks if we have a given non-constant wavenumber
 parser.add_argument('--delta_t', type=float, required=False)  # checks if we have a given time step (only needed for convection-diffusion)
-parser.add_argument('--num_timesteps', type=float, required=False)  # checks if we have a given number of timesteps (only needed for convection-diffusion)
+parser.add_argument('--num_timesteps', type=int, required=False)  # checks if we have a given number of timesteps (only needed for convection-diffusion)
 
 # Solver and computational specifics
 parser.add_argument('--solver',type=str,required=False)  # Solver to use
@@ -313,7 +313,7 @@ if d==3:
     #dtn_info["dtn_cond"] = dtn_cond
     
 
-    center=np.array([-1.1,+1.,+1.2])
+    center=np.array([0.5,0.5,0.5])
     
     xx = dom.hps.grid_xx.flatten(start_dim=0,end_dim=-2)
     #xx = dom.hps.grid_ext
@@ -340,16 +340,16 @@ if d==3:
     Jx = torch.tensor(dom.hps.H.JJ.Jxreorder)
 
     result = uu_sol.flatten() #uu_sol[:,Jx].flatten()
-
-    max_result = torch.linalg.norm(result, ord=np.inf)
     
 
 
     # Eliminates the domain exterior points
-    sequence_containing_x_vals = sequence_containing_x_vals[interior]
-    sequence_containing_y_vals = sequence_containing_y_vals[interior]
-    sequence_containing_z_vals = sequence_containing_z_vals[interior]
-    result = result[interior]
+    #sequence_containing_x_vals = sequence_containing_x_vals[interior]
+    #sequence_containing_y_vals = sequence_containing_y_vals[interior]
+    #sequence_containing_z_vals = sequence_containing_z_vals[interior]
+    #result = result[interior]
+
+    max_result = torch.linalg.norm(result, ord=np.inf)
     
     h = round(a[0] * 2, 2)
 
@@ -374,12 +374,12 @@ if d==3:
     #ax.set_xticks([1.4, 1.6])
     #ax.set_xticklabels(["1.4", "1.6"])
 
-    plt.title("Helmholtz Equation: $\kappa = $" + str(kh) + ", $p = $" + str(p) + ", $h$ = 0.625 x 0.5 x 0.5")
+    #plt.title("Helmholtz Equation: $\kappa = $" + str(kh) + ", $p = $" + str(p) + ", $h$ = 0.625 x 0.5 x 0.5")
     plt.xlabel("x")
     plt.ylabel("  y")
     plt.colorbar(sc, shrink=0.5)
     plt.rcParams['figure.figsize'] = [14, 6]
-    plt.savefig("3D-domain-faces-annulus-p18-h16x2x2.png")
+    #plt.savefig("3D-domain-faces-annulus-p18-h16x2x2.png")
     plt.show()
 
 # Printing out sparsity pattern:
