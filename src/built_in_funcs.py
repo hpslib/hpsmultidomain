@@ -345,18 +345,18 @@ def uu_dir_func_periodic(xx,kh=0):
     return uu_exact.unsqueeze(-1)
 
 def convection_b1(xx):
-    b = -np.cos(10*xx[:,0] - 5) * np.sin(10*xx[:,1] - 5) * xx[:,2]
+    b = -np.cos(xx[:,0] - 0.5) * np.sin(xx[:,1] - 0.5) * xx[:,2]
     return b.unsqueeze(-1)
 
 def convection_b2(xx):
-    b = np.sin(10*xx[:,0] - 5) * np.cos(10*xx[:,1] - 5) * xx[:,2]
+    b = np.sin(xx[:,0] - 0.5) * np.cos(xx[:,1] - 0.5) * xx[:,2]
     return b.unsqueeze(-1)
 
 def convection_bdiv(xx):
-    b = 10*(np.sin(10*xx[:,0] - 5) * np.sin(10*xx[:,1] - 5) + np.cos(10*xx[:,0] - 5) * np.cos(10*xx[:,1] - 5)) * xx[:,2]
+    b = (np.sin(xx[:,0] - 0.5) * np.sin(xx[:,1] - 0.5) + np.cos(xx[:,0] - 0.5) * np.cos(xx[:,1] - 0.5)) * xx[:,2]
     return b.unsqueeze(-1)
 
 def convection_u_init(xx):
-    #u = np.exp(-((xx[:,2]-0.5)*(xx[:,2]-0.5) / 0.02) - ((10*xx[:,0]-5)*(10*xx[:,0]-5) + (10*xx[:,1]-3)*(10*xx[:,1]-3)) / 0.05)
-    u = np.exp(-((xx[:,2]-0.5)*(xx[:,2]-0.5) / 0.002) - ((xx[:,0]-0.5)*(xx[:,0]-0.5) + (xx[:,1]-0.5)*(xx[:,1]-0.5)) / 0.002)
+    u = np.exp(-((xx[:,2]-0.5)**2 / 0.002) - ((xx[:,0]-0.5)**2 + (xx[:,1]-0.2)**2) / 0.002)
+    #u = np.exp(-((xx[:,2]-0.5)*(xx[:,2]-0.5) / 0.002) - ((xx[:,0]-0.5)*(xx[:,0]-0.5) + (xx[:,1]-0.5)*(xx[:,1]-0.5)) / 0.002)
     return u.unsqueeze(-1)

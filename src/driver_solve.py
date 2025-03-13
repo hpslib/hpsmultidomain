@@ -123,12 +123,12 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
 
         uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,known_sol=known_sol)
         if i > 0:
-            change = torch.linalg.norm(uu_sol - uu_sol_old) / torch.linalg.norm(uu_sol_old)
-            sol_norm = torch.linalg.norm(uu_sol)
-            print("Change in u from previous timestep is " + str(change.item()))
-            print("With current vector norm of " + str(sol_norm.item()))
-        else:
-            sol_norm = torch.linalg.norm(uu_sol)
+        #    change = torch.linalg.norm(uu_sol - uu_sol_old) / torch.linalg.norm(uu_sol_old)
+            sol_norm = torch.linalg.norm(uu_sol, ord=1)
+        #    print("Change in u from previous timestep is " + str(change.item()))
+            print("With current vector 1-norm of " + str(sol_norm.item()))
+
+    sol_norm = torch.linalg.norm(uu_sol)
 
     print("\n\n")
 
