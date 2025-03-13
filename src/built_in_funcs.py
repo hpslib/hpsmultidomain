@@ -331,7 +331,7 @@ def bfield_gravity(xx, kh, center=np.array([-1.1,+1.,+1.2])):
     return gravity_fun.unsqueeze(-1)
 
 def uu_dir_func_convection(xx, t):
-    uu_exact = np.cos(2*xx[:,0]) * (1 - 2*xx[:,1]) * np.exp(-xx[:,2]) * np.exp(-t)
+    uu_exact = np.cos(8*xx[:,0]) * (1 - 2*xx[:,1]) * np.exp(-xx[:,2]) * np.exp(-t)
     return uu_exact.unsqueeze(-1)
 
 def uu_dir_func_parabolic_heat(xx, t):

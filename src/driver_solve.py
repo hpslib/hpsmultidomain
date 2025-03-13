@@ -7,7 +7,6 @@ from built_in_funcs import *  # Importing built-in functions for specific PDEs o
 def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_timesteps=1):
     print("SOLVE RESULTS")
     solve_info = dict()
-    num_timesteps = 1
     d = args.d
 
     if (args.bc == 'free_space'):
@@ -86,7 +85,6 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
             # Dirichlet BC is from the time step we are solving for now:
             uu_dir        = lambda xx: uu_dir_func_convection(xx, delta_t)
             known_sol     = True
-            num_timesteps = 10
             ff_body       = lambda xx: -uu_dir_func_convection(xx, 0)
         else:
             raise ValueError
@@ -97,7 +95,6 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
             # Dirichlet BC is from the time step we are solving for now:
             uu_dir        = lambda xx: uu_dir_func_parabolic_heat(xx, delta_t)
             known_sol     = True
-            num_timesteps = 10
             ff_body       = lambda xx: -uu_dir_func_parabolic_heat(xx, 0)
         else:
             raise ValueError

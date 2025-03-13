@@ -149,7 +149,7 @@ def configure_pde_domain(args):
             if num_timesteps is None:
                 raise ValueError("num_timesteps must be specified for parabolic problem")
             op = pdo.PDO_3d(pdo.const(c=-delta_t),pdo.const(c=-delta_t),pdo.const(c=-delta_t),
-                            c3=pdo.const(c=-2*delta_t),
+                            c3=pdo.const(c=-62*delta_t),
                             c=pdo.const(c=-1))
         kh = 0
         curved_domain = False
