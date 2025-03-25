@@ -210,7 +210,7 @@ if (d==3 and 1==0):
 
     print("Number of I_copy entries on domain boundary (should be 0): " + str(len(I_dir)))
 """
-"""
+
 # Test DtN_loc accuracy:
 if d==3:
     # Here we'll test our DtN operators on a known function. First we define the known function and its
@@ -350,37 +350,50 @@ if d==3:
     result = result[interior]
 
     max_result = torch.linalg.norm(result, ord=np.inf)
+
+    print("Max result is " + str(max_result))
     
     h = round(a[0] * 2, 2)
-"""
-    #import matplotlib.pyplot as plt
-    #plt.rc('text',usetex=True)
-    #plt.rc('font',**{'family':'serif','size':18})
-    #plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
-    #fig = plt.figure(figsize=(12, 12))
-    #ax = fig.add_subplot(projection='3d')
-    #ax.view_init(azim=-30)
-    #ax.view_init(elev=5, azim=-5)
-    #ax.view_init(elev=95, azim=-90)
-    #sc = ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals, c=result, marker='.', cmap="seismic", vmin=-max_result, vmax=max_result)
-"""
-    ax.set_xticks([-1.0, 3.0])
-    ax.set_xticklabels(["-1.0", "3.0"])
-    ax.set_yticks([-3.0, 1.0])
-    ax.set_yticklabels(["-3.0", "1.0"])
-    ax.set_zticks([-.9, -.7])
-    ax.set_zticklabels(["-.9", "-.7"])
-"""
+
+    import matplotlib.pyplot as plt
+    plt.rc('text',usetex=True)
+    plt.rc('font',**{'family':'serif','size':18})
+    plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
+    fig = plt.figure(figsize=(12, 12))
+    ax = fig.add_subplot(projection='3d')
+    ax.view_init(azim=-30)
+    ax.view_init(elev=5, azim=-5)
+    ax.view_init(elev=75, azim=-90)
+    #ax.view_init(vertical_axis="x", elev=0, azim=0)
+    sc = ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals, c=result, marker='.', cmap="Reds", vmin=0, vmax=max_result)
+
+    #ax.set_xticks([-1.0, 3.0])
+    #ax.set_xticklabels(["-1.0", "3.0"])
+    #ax.set_yticks([-3.0, 1.0])
+    #ax.set_yticklabels(["-3.0", "1.0"])
+    #ax.set_zticks([-.9, -.7])
+    #ax.set_zticklabels(["-.9", "-.7"])
+
     #ax.set_xticks([1.4, 1.6])
     #ax.set_xticklabels(["1.4", "1.6"])
 
-    #plt.title("Helmholtz Equation: $\kappa = $" + str(kh) + ", $p = $" + str(p) + ", $h$ = 0.625 x 0.5 x 0.5")
-    #plt.xlabel("x")
-    #plt.ylabel("  y")
-    #plt.colorbar(sc, shrink=0.5)
-    #plt.rcParams['figure.figsize'] = [14, 6]
-    #plt.savefig("convection-diffusion-dt2-p10-h3-500step.png")
-    #plt.show()
+    # For convection-diffusion:
+    ax.set_xticks([-0.5, 0.5])
+    ax.set_xticklabels(["-0.5", "0.5"])
+    ax.set_yticks([-0.5, 0.5])
+    ax.set_yticklabels(["-0.5", "0.5"])
+    ax.set_zticks([-0.5, 0.5])
+    ax.set_zticklabels(["-0.5", "0.5"])
+
+    plt.title("$\mathbf{u}(t=5)$: $p=10, h=1/4, \Delta t = 0.01$")
+    plt.xlabel("x")
+    plt.ylabel("  y")
+    plt.colorbar(sc, shrink=0.5)
+    plt.rcParams['figure.figsize'] = [14, 6]
+    filename = "convection-diffusion-dt-2-p10-h4-500step"
+    plt.savefig(filename + ".png")
+    plt.savefig(filename + ".pdf")
+    plt.show()
 
 # Printing out sparsity pattern:
 #import matplotlib.pyplot as plt

@@ -176,14 +176,14 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             #print(Jc.shape)
             uu_sol[:,Jx,:nrhs] = data[box_start:box_end]
             uu_sol[:,Jc,:nrhs] = -Aloc[:,Jc[:,None],Jx] @ data[box_start:box_end]
-            uu_sol[:,Jc,:nrhs] += f_body
+            uu_sol[:,Jc,:nrhs] += f_body                           # MULTIPLY BY A^r using formula here
             uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, uu_sol[:,Jc,:nrhs])
             #print(uu_sol)#[:,Jc,:nrhs])
         else:
             # Need to make this Jxunique like here:
             uu_sol[:,Jxun,:nrhs] = Intmap_unq.unsqueeze(0) @ data[box_start:box_end]
             uu_sol[:,Jc,:nrhs]   = -Aloc[:,Jc[:,None],Jxun] @ uu_sol[:,Jxun,:nrhs]
-            uu_sol[:,Jc,:nrhs]  += f_body
+            uu_sol[:,Jc,:nrhs]  += f_body                           # MULTIPLY BY A^r using formula here
             uu_sol[:,Jc,:nrhs]   = torch.linalg.solve(Acc, uu_sol[:,Jc,:nrhs])
             
         # calculate residual
@@ -203,7 +203,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         if ff_body_vec is not None:
             f_body += ff_body_vec[box_start:box_end].reshape((box_end-box_start)*p**d,1)
 
-        f_body = f_body.reshape(box_end-box_start,p**d,1)
+        f_body = f_body.reshape(box_end-box_start,p**d,1) # I Think we need to apply A^r here, can use similar trick to above
         #print(f_body.shape)
         #print(torch.linalg.solve(Acc,f_body[:,Jc]).shape)
         #print(Nx.unsqueeze(0).shape)

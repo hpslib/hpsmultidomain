@@ -150,7 +150,7 @@ def configure_pde_domain(args):
                 raise ValueError("num_timesteps must be specified for parabolic problem")
             # MAKE THIS PROPER GIVEN OUR B (KEEP IN MIND DOMAIN IS [0,10], NOT [-5,5])
 
-            kappa = 0.001 # Diffusivity
+            kappa = 0.0001 # Diffusivity
 
             def c1(xx):
                 return delta_t * convection_b1(xx)
