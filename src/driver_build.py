@@ -153,13 +153,13 @@ def configure_pde_domain(args):
             kappa = 0.0001 # Diffusivity
 
             def c1(xx):
-                return delta_t * convection_b1(xx)
+                return delta_t * convection_b1(xx) / 2
             def c2(xx):
-                return delta_t * convection_b2(xx)
+                return delta_t * convection_b2(xx) / 2
             def c(xx):
-                return delta_t * convection_bdiv(xx) + 1
+                return delta_t * convection_bdiv(xx) / 2 + 1
 
-            op = pdo.PDO_3d(pdo.const(c=delta_t*kappa),pdo.const(c=delta_t*kappa),pdo.const(c=delta_t*kappa),
+            op = pdo.PDO_3d(pdo.const(c=delta_t*kappa*0.5),pdo.const(c=delta_t*kappa*0.5),pdo.const(c=delta_t*kappa*0.5),
                             #c1=pdo.const(c=delta_t*0.1),c2=pdo.const(c=delta_t*0.2),
                             #c=pdo.const())
                             c1=c1,c2=c2,c=c)
