@@ -19,8 +19,8 @@ p_list = [12, 14]
 
 domain = "square"
 pde = "poisson"
-bc = "free_space"
-ppw = 10
+bc = "log_dist"
+ppw = None
 kh = None
 delta_t = None
 
