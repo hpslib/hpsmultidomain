@@ -322,7 +322,8 @@ if d==3:
     tol = 1e-8
     interior0 = torch.logical_and((xx[:, 0] > 0.3 + tol), (xx[:, 0] < 0.5 + tol))
     #interior1 = torch.logical_and((xx[:, 1] > 0 + tol), (xx[:, 1] < 1 - tol))
-    interior2 = torch.logical_and((xx[:, 2] > 0.3 + tol), (xx[:, 2] < 0.5 + tol))
+    #interior2 = torch.logical_and((xx[:, 2] > 0.3 + tol), (xx[:, 2] < 0.5 + tol))
+    interior2 = torch.logical_and((xx[:, 2] > 0.5 - tol), (xx[:, 2] < 0.5 + tol))
 
     interior = interior2 #torch.logical_and(torch.logical_and(interior0, interior1), interior2)
 
@@ -349,7 +350,22 @@ if d==3:
     sequence_containing_z_vals = sequence_containing_z_vals[interior]
     result = result[interior]
 
+    hinv = 3 # NEED TO CHANGE THIS
     max_result = torch.linalg.norm(result, ord=np.inf)
+
+    inputs = np.vstack((sequence_containing_x_vals,
+                        sequence_containing_y_vals,
+                        result))
+
+    inputs = np.unique(inputs, axis=1) # This sorts
+
+    #sequence_containing_x_vals = np.reshape(sequence_containing_x_vals, (p*hinv, p*hinv))
+    #sequence_containing_y_vals = np.reshape(sequence_containing_y_vals, (p*hinv, p*hinv))
+    #result                     = np.reshape(result, (p*hinv, p*hinv))
+
+    #print(sequence_containing_x_vals[:,0])
+    #print(sequence_containing_y_vals[0,:])
+    #print(result)
 
     print("Max result is " + str(max_result))
     
@@ -360,13 +376,17 @@ if d==3:
     plt.rc('font',**{'family':'serif','size':18})
     plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
     fig = plt.figure(figsize=(12, 12))
-    ax = fig.add_subplot(projection='3d')
-    ax.view_init(azim=-30)
-    ax.view_init(elev=5, azim=-5)
-    ax.view_init(elev=75, azim=-90)
+    #ax = fig.add_subplot(projection='3d')
+    #ax.view_init(azim=-30)
+    #ax.view_init(elev=5, azim=-5)
+    #ax.view_init(elev=75, azim=-90)
     #ax.view_init(vertical_axis="x", elev=0, azim=0)
-    sc = ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals, c=result, marker='.', cmap="Reds", vmin=0, vmax=max_result)
+    #sc = ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals, c=result, marker='.', cmap="Reds", vmin=0, vmax=max_result)
 
+    plt.pcolor(np.unique(inputs[0]), np.unique(inputs[1]),
+               np.reshape(inputs[2], (len(np.unique(inputs[0])), -1)).T,
+               cmap="Reds", vmin=0, vmax=max_result)
+    """
     #ax.set_xticks([-1.0, 3.0])
     #ax.set_xticklabels(["-1.0", "3.0"])
     #ax.set_yticks([-3.0, 1.0])
@@ -384,15 +404,17 @@ if d==3:
     ax.set_yticklabels(["-0.5", "0.5"])
     ax.set_zticks([-0.5, 0.5])
     ax.set_zticklabels(["-0.5", "0.5"])
+    """
 
-    plt.title("$\mathbf{u}(t=5)$: $p=10, h=1/4, \Delta t = 0.01$")
+    #plt.title("$\mathbf{u}(t=5)$: $p=10, h=1/4, \Delta t = 0.01$")
     plt.xlabel("x")
     plt.ylabel("  y")
-    plt.colorbar(sc, shrink=0.5)
+    #plt.colorbar(sc, shrink=0.5)
+    plt.colorbar()
     plt.rcParams['figure.figsize'] = [14, 6]
-    filename = "convection-diffusion-dt-1-p16-h2-10step"
-    #plt.savefig(filename + ".png")
-    #plt.savefig(filename + ".pdf")
+    filename = "convection-diffusion-dt-1-p10-h4-50step"
+    plt.savefig(filename + ".png")
+    plt.savefig(filename + ".pdf")
     plt.show()
 
 # Printing out sparsity pattern:
