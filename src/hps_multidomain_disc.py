@@ -482,6 +482,9 @@ class HPS_Multidomain:
         f = 0.8e9 # 1 * 0.8 = 0.8 GB in bytes
         chunk_max = int(f / ((2*d*size_face)**2 * 8)) # Size of DtN matrix * number of bytes per double
         chunk_size = leaf_ops.get_nearest_div(nboxes,chunk_max)
+
+        print("nboxes, chunk max, chunk size:")
+        print((nboxes, chunk_max, chunk_size))
         
         assert np.mod(nboxes,chunk_size) == 0
         Aloc_chunkinit = np.min([50,int(nboxes/4)])
