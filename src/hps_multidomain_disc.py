@@ -486,7 +486,6 @@ class HPS_Multidomain:
         print("nboxes, chunk max, chunk size:")
         print((nboxes, chunk_max, chunk_size))
         
-        assert np.mod(nboxes,chunk_size) == 0
         Aloc_chunkinit = np.min([50,int(nboxes/4)])
         if d==3:
             Aloc_chunkinit = np.max([int(0.2e9 / ((q**6 + 12*q**5 + 72*q**4) * 8)), 1])
