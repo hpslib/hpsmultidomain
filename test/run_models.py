@@ -13,23 +13,23 @@ from test_3d import run_test_via_argparse
 #p_list = [10,12,14,16,18,20,22]
 #p_list = [18,20,22] 
 #p_list = [20,22]
-p_list = [10]
+p_list = [12, 14]
 
 #p_list = [9,11,13,15,17,19,21]
 
 domain = "square"
-pde = "bfield_constant"
+pde = "poisson"
 bc = "free_space"
 ppw = 10
 kh = None
 delta_t = None
 
-output_path = "output/helmholtz_10ppw_0211"
+output_path = "output/poisson_0327"
 
 for p in p_list:
-    #n_list = list(range(2*(p-2), 200, p-2))
+    n_list = list(range(2*(p-2), 210, p-2))
     
-    n_list = list(range(200, 250, p-2))
+    #n_list = list(range(200, 250, p-2))
     #n_list = list(range(2*(p-2), 10*(p-2)+1, p-2))
     
     for n in n_list:

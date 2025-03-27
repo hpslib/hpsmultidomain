@@ -210,7 +210,7 @@ if (d==3 and 1==0):
 
     print("Number of I_copy entries on domain boundary (should be 0): " + str(len(I_dir)))
 """
-
+"""
 # Test DtN_loc accuracy:
 if d==3:
     # Here we'll test our DtN operators on a known function. First we define the known function and its
@@ -342,35 +342,37 @@ if d==3:
     result = uu_sol.flatten() #uu_sol[:,Jx].flatten()
 
     max_result = torch.linalg.norm(result, ord=np.inf)
-    
-
     """
+
+"""
     # Eliminates the domain exterior points
     sequence_containing_x_vals = sequence_containing_x_vals[interior]
     sequence_containing_y_vals = sequence_containing_y_vals[interior]
     sequence_containing_z_vals = sequence_containing_z_vals[interior]
     result = result[interior]
-    """
-    h = round(a[0] * 2, 2)
+"""
+    #h = round(a[0] * 2, 2)
 
-    import matplotlib.pyplot as plt
-    plt.rc('text',usetex=True)
-    plt.rc('font',**{'family':'serif','size':18})
-    plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
+    #import matplotlib.pyplot as plt
+    #plt.rc('text',usetex=True)
+    #plt.rc('font',**{'family':'serif','size':18})
+    #plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
+"""
     fig = plt.figure(figsize=(12, 12))
     ax = fig.add_subplot(projection='3d')
     #ax.view_init(azim=-30)
     #ax.view_init(elev=5, azim=-5)
     ax.view_init(elev=95, azim=-90)
     sc = ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals, c=result, marker='.', cmap="seismic", vmin=-max_result, vmax=max_result)
-    """
+"""
+"""
     ax.set_xticks([-1.0, 3.0])
     ax.set_xticklabels(["-1.0", "3.0"])
     ax.set_yticks([-3.0, 1.0])
     ax.set_yticklabels(["-3.0", "1.0"])
     ax.set_zticks([-.9, -.7])
     ax.set_zticklabels(["-.9", "-.7"])
-    """
+
     #ax.set_xticks([1.4, 1.6])
     #ax.set_xticklabels(["1.4", "1.6"])
 
@@ -381,7 +383,7 @@ if d==3:
     plt.rcParams['figure.figsize'] = [14, 6]
     #plt.savefig("3D-domain-faces-annulus-p18-h16x2x2.png")
     plt.show()
-
+"""
 # Printing out sparsity pattern:
 #import matplotlib.pyplot as plt
 #plt.rc('text',usetex=True)
