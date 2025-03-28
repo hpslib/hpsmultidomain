@@ -271,7 +271,7 @@ p_list_poisson   = [6, 8, 10, 12, 14]
 p_list_helmholtz = [10,12,14,16,18,20,22]
 
 
-path_poisson   = "gpu_output/poisson_scaling_new_slices_0123/"
+path_poisson   = "gpu_output/poisson_0327/"
 path_helmholtz = "gpu_output/helmholtz_10ppw_0211/"
 
 p_results_poisson = make_p_results(path_poisson, p_list_poisson)
