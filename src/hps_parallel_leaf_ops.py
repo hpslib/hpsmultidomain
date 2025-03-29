@@ -212,7 +212,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             uu_sol[:,Jc,nrhs:] = Aloc[:,Jc] @ uu_true[box_start:box_end] - f_body
         return uu_sol
     
-def get_DtN_chunksize(p,d,device):
+def get_DtN_chunksize(p,d,device,mode):
     q = p-2
     if (device == torch.device('cuda')):
         r = torch.cuda.memory_reserved(0)
@@ -223,7 +223,10 @@ def get_DtN_chunksize(p,d,device):
         f = 10e9 # 10 GB in bytes
     chunk_max = int(f / (4*p**(2*d) * 8)) # 8 bytes in 64 bits memory
     if d == 3:
-        chunk_max = int(f / ((2*p**6 + q**6 + 12*q**5 + 72*q**4) * 8)) # 8 bytes in 64 bits memory
+        chunk_max = int(f / ((p**6 + q**6 + 12*q**5 + 72*q**4) * 8)) # 8 bytes in 64 bits memory
+        if mode=="solve":
+            # Need a little extra overhead for Aloc in this case
+            chunk_max = int(f / ((2*p**6 + q**6 + 12*q**5 + 72*q**4) * 8))
         if p >= 16:
             chunk_max = 1
     return np.max([chunk_max, 1])
@@ -254,21 +257,21 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_
         b1 = box_curr + box_start
         b2 = np.min([box_end, b1 + chunk_size])
 
-        
+        """
         print("box_curr = " + str(box_curr))
         print("b1 = " + str(b1))
         print("b2 = " + str(b2))
         print("box_end = " + str(box_end))
         print("b1 + chunk_size = " + str(b1 + chunk_size))
         #print(torch.cuda.memory_summary())
-        
+        """
 
         tmp = form_DtNs(*args,b1,b2,device,mode,interpolate,data,ff_body_func,ff_body_vec,uu_true)
         
         DtNs[box_curr:box_curr + chunk_size] = tmp
         box_curr += chunk_size
 
-        chunk_size = get_DtN_chunksize(p,d,device) #np.max([get_DtN_chunksize(p,d,device),chunk_init])
+        chunk_size = get_DtN_chunksize(p,d,device,mode) #np.max([get_DtN_chunksize(p,d,device),chunk_init])
         chunk_list[nchunks] = b2-b1
         nchunks += 1
     return DtNs.cpu(),chunk_list[:nchunks]
