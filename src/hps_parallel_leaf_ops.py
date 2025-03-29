@@ -250,8 +250,8 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_
     chunk_list = torch.zeros(int(nboxes/chunk_init)+100,device=device).int(); 
     box_curr = 0; nchunks = 0
     
-    print("Now in get_DtNs_helper")
-    print("nboxes = " + str(nboxes))
+    #print("Now in get_DtNs_helper")
+    #print("nboxes = " + str(nboxes))
 
     while(box_curr < nboxes):
         b1 = box_curr + box_start
