@@ -247,21 +247,21 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_
     chunk_list = torch.zeros(int(nboxes/chunk_init)+100,device=device).int(); 
     box_curr = 0; nchunks = 0
     
-    #print("Now in get_DtNs_helper")
-    #print("nboxes = " + str(nboxes))
+    print("Now in get_DtNs_helper")
+    print("nboxes = " + str(nboxes))
 
     while(box_curr < nboxes):
         b1 = box_curr + box_start
         b2 = np.min([box_end, b1 + chunk_size])
 
-        """
+        
         print("box_curr = " + str(box_curr))
         print("b1 = " + str(b1))
         print("b2 = " + str(b2))
         print("box_end = " + str(box_end))
         print("b1 + chunk_size = " + str(b1 + chunk_size))
         #print(torch.cuda.memory_summary())
-        """
+        
 
         tmp = form_DtNs(*args,b1,b2,device,mode,interpolate,data,ff_body_func,ff_body_vec,uu_true)
         
