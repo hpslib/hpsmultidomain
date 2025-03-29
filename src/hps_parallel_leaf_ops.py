@@ -223,7 +223,7 @@ def get_DtN_chunksize(p,d,device):
         f = 10e9 # 10 GB in bytes
     chunk_max = int(f / (4*p**(2*d) * 8)) # 8 bytes in 64 bits memory
     if d == 3:
-        chunk_max = int(f / ((p**6 + q**6 + 12*q**5 + 72*q**4) * 8)) # 8 bytes in 64 bits memory
+        chunk_max = int(f / ((2*p**6 + q**6 + 12*q**5 + 72*q**4) * 8)) # 8 bytes in 64 bits memory
         if p >= 16:
             chunk_max = 1
     return np.max([chunk_max, 1])
