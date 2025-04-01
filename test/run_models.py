@@ -8,9 +8,9 @@ from test_3d import run_test_via_argparse
 #p_list = [10, 12, 14, 16, 18, 20, 22]#, 24, 26]
 #p_list = [30]
 #p_list = [10, 12, 14, 16, 18]
-#p_list = [22]
+p_list = [14]
 
-p_list = [10,12,14,16,18,20,22]
+#p_list = [10,12,14,16,18,20,22]
 #p_list = [18,20,22] 
 #p_list = [20,22]
 #p_list = [6, 8, 10, 12, 14]
@@ -18,19 +18,20 @@ p_list = [10,12,14,16,18,20,22]
 #p_list = [9,11,13,15,17,19,21]
 
 domain = "square"
-pde = "bfield_constant"
-bc = "free_space"
-ppw = 10
+pde = "poisson"
+bc = "log_dist"
+ppw = None
 kh = None
 delta_t = None
 store_sol = False
 
-output_path = "output/helmholtz_10ppw_0327"
+output_path = "output/poisson_0328"
 
 for p in p_list:
-    n_list = list(range(2*(p-2), 210, p-2))
-    
-    #n_list = list(range(200, 250, p-2))
+    #n_list = list(range(2*(p-2), 210, p-2))
+
+    #n_list = [152]
+    n_list = list(range(84, 210, p-2))
     #n_list = list(range(2*(p-2), 10*(p-2)+1, p-2))
     
     for n in n_list:
