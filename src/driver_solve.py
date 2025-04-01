@@ -121,7 +121,7 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
                 raise ValueError("multiple time steps means either convection-diffusion or parabolic laplace")
             uu_sol_old = uu_sol
 
-        uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,known_sol=known_sol)
+        uu_sol,res, true_res,resloc_hps,toc_system_solve,toc_leaf_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,known_sol=known_sol)
         if i > 0:
             change = torch.linalg.norm(uu_sol - uu_sol_old) / torch.linalg.norm(uu_sol_old)
             sol_norm = torch.linalg.norm(uu_sol)
@@ -134,23 +134,25 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
 
     if (args.solver == 'superLU'):
         print("\t--SuperLU solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\
-            %(res,true_res,resloc_hps,toc_solve))
-        solve_info['res_solve_superLU']            = res
-        solve_info['trueres_solve_superLU']        = true_res
-        solve_info['resloc_hps_solve_superLU']     = resloc_hps
-        solve_info['toc_solve_superLU']            = toc_solve
+            %(res,true_res,resloc_hps,toc_system_solve+toc_leaf_solve))
+        solve_info['res_solve_superLU']         = res
+        solve_info['trueres_solve_superLU']     = true_res
+        solve_info['resloc_hps_solve_superLU']  = toc_system_solve
+        solve_info['toc_solve_leaf']            = toc_leaf_solve
 
         solve_info['forward_bdry_error'] = forward_bdry_error
         solve_info['reverse_bdry_error'] = reverse_bdry_error
     else:
         print("\t--Builtin solver %s solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\
-            %(args.solver,res,true_res,resloc_hps,toc_solve))
-        solve_info['res_solve_petsc']            = res
-        solve_info['trueres_solve_petsc']        = true_res
-        solve_info['resloc_hps_solve_petsc']     = resloc_hps
-        solve_info['toc_solve_petsc']            = toc_solve
+            %(args.solver,res,true_res,resloc_hps,toc_system_solve+toc_leaf_solve))
+        solve_info['res_solve_petsc']         = res
+        solve_info['trueres_solve_petsc']     = true_res
+        solve_info['resloc_hps_solve_petsc']  = resloc_hps
+        solve_info['toc_solve_petsc']         = toc_system_solve
+        solve_info['toc_solve_leaf']          = toc_leaf_solve
+
 
         solve_info['forward_bdry_error'] = forward_bdry_error
         solve_info['reverse_bdry_error'] = reverse_bdry_error
 
-    return uu_dir, uu_sol,res, sol_norm,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error, solve_info
+    return uu_dir, uu_sol,res, sol_norm,resloc_hps,toc_system_solve+toc_leaf_solve,forward_bdry_error,reverse_bdry_error, solve_info
