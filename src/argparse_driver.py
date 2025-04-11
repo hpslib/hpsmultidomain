@@ -412,9 +412,9 @@ if d==3:
     #plt.colorbar(sc, shrink=0.5)
     plt.colorbar()
     plt.rcParams['figure.figsize'] = [14, 6]
-    filename = "convection-diffusion-dt-1-p10-h4-50step"
+    filename = "offdiag-convection-diffusion-dt-2-p17-h3-100step"
     plt.savefig(filename + ".png")
-    plt.savefig(filename + ".pdf")
+    #plt.savefig(filename + ".pdf")
     plt.show()
 
 # Printing out sparsity pattern:
