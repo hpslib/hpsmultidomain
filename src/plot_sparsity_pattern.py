@@ -18,7 +18,8 @@ plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
 # Let's start with just 5 boxes in a row, arranged in 1D
 #
 d = 2
-p = 6
+p = 8
+nrows = 2 # Total number of rows
 nboxes = 4 # number of boxes along one dimension
 kh = 3
 a = 1 / nboxes
@@ -39,106 +40,174 @@ A_block = Ds.D11 + Ds.D22 + kh * np.eye(Ds.D11.shape[0], Ds.D11.shape[0])
 A_block_true = A_block
 A_block = np.abs(A_block)
 
-# First let's set Jl and Jd equal to Neumann derivatives:
-A_block[JJ.Jl] = -np.abs(Nx[:p-2])
-A_block[JJ.Jr] = np.abs(Nx[p-2:2*(p-2)])
-A_block[JJ.Jd] = -np.abs(Nx[2*(p-2):3*(p-2)])
-A_block[JJ.Ju] = np.abs(Nx[3*(p-2):4*(p-2)])
+# First let's set Jl, Jr, Jd, Ju equal to Neumann derivatives:
+A_block[JJ.Jl] = Nx[:p-2]
+A_block[JJ.Jr] = Nx[p-2:2*(p-2)]
+A_block[JJ.Jd] = Nx[2*(p-2):3*(p-2)]
+A_block[JJ.Ju] = Nx[3*(p-2):4*(p-2)]
 
-A_block_true[JJ.Jl] = Nx[:p-2]
-A_block_true[JJ.Jd] = Nx[2*(p-2):3*(p-2)]
-A_block_true[JJ.Ju] = 0
+# Then we mask with 1 (interior) and -1 (boundary) points
+A_block[A_block != 0] = 1
+A_block[JJ.Jl] *= -1
+A_block[JJ.Jr] *= -1
+A_block[JJ.Jd] *= -1
+A_block[JJ.Ju] *= -1
 
-# Now let's delete Jr rows:
-A_block = A_block[:-p]
-A_block_true = A_block_true[:-p]
+# Here we denote the corner nodes as 0. We will delete them later:
+A_block[0,:]   = 0 #*= -2
+A_block[p-1,:] = 0 #*= -2
+A_block[-p,:]  = 0 #*= -2
+A_block[-1,:]  = 0 #*= -2
 
-# Also delete the bottom two corner nodes:
-A_block = np.delete(A_block, (0, p-1), axis=0)
-A_block_true = np.delete(A_block_true, (0, p-1), axis=0)
-# Here we delete corners from columns:
-A_block = np.delete(A_block, (0, p-1, -p, -1), axis=1)
-A_block_true = np.delete(A_block_true, (0, p-1, -p, -1), axis=1)
+A_block[:,0]   = 0 #*= -2
+A_block[:,p-1] = 0 #*= -2
+A_block[:,-p]  = 0 #*= -2
+A_block[:,-1]  = 0 #*= -2
 
-print(A_block.shape)
-print(Nx.shape)
+# Now we set boundary columns equal to -1 too:
+A_block = np.minimum(A_block, A_block.T)
+
+#plt.imshow(A_block, cmap='bwr', vmin=-2, vmax=2)
+#plt.show()
 
 A_row = block_diag([A_block] * nboxes)
 A_row = A_row.toarray()
 
-A_row_true = block_diag([A_block_true] * nboxes)
-A_row_true = A_row_true.toarray()
+#plt.imshow(A_row, cmap='bwr', vmin=-2, vmax=2)
+#plt.show()
 
-box_size = p**2 - 4
-edge_no_corner = p-2
-
-# What remains: shift Jr columns to next box, then add Nr from previous box to current one
-
-# Add Nr from previous box to current one:
-Nx_no_corner = np.delete(Nx, (0,p-1,-p,-1), axis=1)
+# Now we need to "shift" Jl to Jr from previous box:
 for j in range(1, nboxes):
-    A_row[j*(box_size-edge_no_corner):j*(box_size-edge_no_corner)+edge_no_corner,(j-1)*box_size:j*box_size] = -np.abs(Nx_no_corner[edge_no_corner:2*edge_no_corner])
-    A_row_true[j*(box_size-edge_no_corner):j*(box_size-edge_no_corner)+edge_no_corner,(j-1)*box_size:j*box_size] = Nx_no_corner[edge_no_corner:2*edge_no_corner]
+    # Rows:
+    A_row[j*(p**2)-p:j*(p**2)]   += A_row[j*(p**2):j*(p**2)+p]
+    # Then columns:
+    A_row[j*(p**2):(j+1)*(p**2),j*(p**2)-p:j*(p**2)] += A_row[j*(p**2):(j+1)*(p**2),j*(p**2):j*(p**2)+p]
 
-# Shift Jr columns to next box:
-for j in range(1, nboxes):
-    A_row[:,j*box_size-edge_no_corner:j*box_size] += A_row[:,j*box_size:j*box_size+edge_no_corner]
-    A_row_true[:,j*box_size-edge_no_corner:j*box_size] += A_row_true[:,j*box_size:j*box_size+edge_no_corner]
-
-
-# Delete redundant columns:
-for j in range(nboxes-1, 0, -1):
-    A_row = np.delete(A_row, range(j*box_size,j*box_size+edge_no_corner), axis=1)
-    A_row_true = np.delete(A_row_true, range(j*box_size,j*box_size+edge_no_corner), axis=1)
+#plt.imshow(A_row, cmap='bwr', vmin=-2, vmax=2)
+#plt.show()
 
 
-# Now delete that firstsection corresponding to far left edge:
-A_row = A_row[edge_no_corner:,edge_no_corner:]
-A_row = A_row[:,:-edge_no_corner]
+# Optional for now: set redundant rows and columns correlating to Jl to 0:
+for j in range(nboxes):
+    A_row[j*(p**2):j*(p**2)+p]   = 0
+    A_row[:,j*(p**2):j*(p**2)+p] = 0
 
-A_row_true = A_row_true[edge_no_corner:,edge_no_corner:]
-A_row_true = A_row_true[:,:-edge_no_corner]
+# Plus set right side of last box to 0:
+A_row[-p:] = 0
+A_row[:,-p:] = 0
 
-A_row[A_row > 0] = 1.0
-A_row[A_row < 0] = -1.0
+#plt.imshow(A_row, cmap='bwr', vmin=-2, vmax=2)
+#plt.show()
 
-A_row = np.minimum(A_row, A_row.T)
 
-A_row_max = np.max(np.abs(A_row))
-A_row_true_max = np.max(np.abs(A_row_true))
-plt.imshow(A_row, cmap='bwr', vmin=-A_row_max, vmax=A_row_max)
-plt.savefig("A_naive_denoted.pdf")
-plt.show()
-
-plt.imshow(A_row_true, cmap='seismic', vmin=-0.1*A_row_true_max, vmax=0.1*A_row_true_max)
-plt.colorbar()
-plt.savefig("A_naive_values.pdf")
-plt.show()
-
-#
-# Now let's create the entire sparsity matrix with multiple rows.
-#
-nrows = 2
-
-A_offdiag = A_row.copy()
-A_offdiag[A_offdiag > 0] = 0
-
-plt.imshow(A_offdiag, cmap='bwr', vmin=-A_row_max, vmax=A_row_max)
-plt.show()
+# Next step: stack two of these rows together
 
 A = block_diag([A_row] * nrows)
 A = A.toarray()
 
-A[:A_row.shape[0],A_row.shape[0]:] = A_offdiag
-A[A_row.shape[0]:,:A_row.shape[0]] = A_offdiag.T
+#plt.imshow(A, cmap='bwr', vmin=-2, vmax=2)
+#plt.show()
 
-plt.imshow(A, cmap='bwr', vmin=-A_row_max, vmax=A_row_max)
+# We need to set the off-diagonal that has the interaction between down and up Neumann faces.
+# Let's do this with the shift approach from above:
+for j in range(nboxes*(nrows-1)):
+    A[JJ.Ju + j*(p**2)] += A[JJ.Jd + (j+nboxes)*(p**2)]
+    A[:,JJ.Ju + j*(p**2)] += A[:,JJ.Jd + (j+nboxes)*(p**2)]
+
+# Correct a redundant stacking here:
+A[A==-2] = -1
+
+#plt.imshow(A, cmap='bwr', vmin=-2, vmax=2)
+#plt.show()
+
+# Now let's set all down faces to 0:
+for j in range(nboxes*nrows):
+    A[JJ.Jd + j*(p**2)]   = 0
+    A[:,JJ.Jd + j*(p**2)] = 0
+
+# And let's set up faces from top row (last row) to 0:
+for j in range(nboxes*(nrows-1), nboxes*nrows):
+    A[JJ.Ju + j*(p**2)]   = 0
+    A[:,JJ.Ju + j*(p**2)] = 0
+
+#plt.imshow(A, cmap='bwr', vmin=-2, vmax=2)
+#plt.show()
+
+# Finally to create A, let's delete all rows of only 0s. These are redundant entries we do not
+# need to compute:
+zero_rows = np.where(np.all(A == 0, axis=1))[0]
+zero_cols = np.where(np.all(A.T == 0, axis=1))[0]
+
+print(zero_rows == zero_cols) # Sanity check
+
+A = np.delete(A, zero_rows, axis=0)
+A = np.delete(A, zero_cols, axis=1)
+
+plt.imshow(A, cmap='bwr', vmin=-1, vmax=1)
+plt.savefig("A_naive_denoted.pdf")
 plt.show()
 
+#
+# With A now created, let's permute it
+#
+
+# First by rows:
+A_positive = A[(A > 0).any(axis=1)]
+A_negative = A[(A <= 0).all(axis=1)]
+
+A = np.concatenate((A_positive, A_negative))
+
+# Now by columns:
+A = A.T
+A_positive = A[(A > 0).any(axis=1)]
+A_negative = A[(A <= 0).all(axis=1)]
+
+A = np.concatenate((A_positive, A_negative))
+A = A.T
 
 
+plt.imshow(A, cmap='bwr', vmin=-1, vmax=1)
+plt.savefig("A_rearranged_denoted.pdf")
+plt.show()
 
+# Now we can set up the block LDU decomposition:
+I = A_positive.shape[0]
 
+A_II = A[:I,:I]
+A_IB = A[:I,I:]
+N_I  = A[I:,:I]
+N_B  = A[I:,I:]
+
+S = -np.linalg.inv(A_II) @ A_IB
+
+L = np.zeros(A.shape)
+L[I:,:I]  = N_I @ np.linalg.inv(A_II) # Get structure of N_I * A_II^-1
+L[L != 0] = -1 # Set N_I * A_II^-1 to -1
+L = L + np.eye(A.shape[0])
+
+plt.imshow(L, cmap='bwr', vmin=-1, vmax=1)
+plt.savefig("L_denoted.pdf")
+plt.show()
+
+T = N_I @ S + N_B
+T[T != 0] = -1
+
+D = np.zeros(A.shape)
+D[:I,:I] = A_II
+D[I:,I:] = T
+
+plt.imshow(D, cmap='bwr', vmin=-1, vmax=1)
+plt.savefig("D_denoted.pdf")
+plt.show()
+
+U = np.zeros(A.shape)
+U[:I,I:]  = -S
+U[U != 0] = -1
+U = U + np.eye(A.shape[0])
+
+plt.imshow(U, cmap='bwr', vmin=-1, vmax=1)
+plt.savefig("U_denoted.pdf")
+plt.show()
 
 """
 print(A_row.shape)
