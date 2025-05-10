@@ -25,10 +25,10 @@ kh = None
 delta_t = None
 store_sol = False
 
-output_path = "output/helmholtz_10ppw_no_sparse_mat_0509"
+output_path = "output/helmholtz_10ppw_no_sparse_mat_0510"
 
 for p in p_list:
-    n_list = list(range(5*(p-2), 210, p-2))
+    n_list = list(range(5*(p-2), 260, p-2))
 
     #n_list = [152]
     #n_list = list(range(156, 210, p-2))
