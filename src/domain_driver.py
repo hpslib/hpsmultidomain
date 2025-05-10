@@ -394,7 +394,7 @@ class Domain_Driver:
         # this is right
         uu_dir = uu_dir_func(self.XX[I_Xtot,:])
 
-        ff_body = np.zeros(I_Ctot.shape)
+        ff_body = np.zeros((I_Ctot.shape[0], 1))
         
         return ff_body
     
