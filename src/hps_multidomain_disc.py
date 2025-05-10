@@ -217,8 +217,6 @@ class HPS_Multidomain:
             toc_flatten = time() - tic
             #print("Flattened data")
         """
-        print("Type of numpy row_data:")
-        print(row_data.detach().cpu().numpy().dtype)
         
         tic = time()
         #sp_mat = sp.coo_matrix((data.detach().cpu().numpy(),(row_data.detach().cpu().numpy(),col_data.detach().cpu().numpy())))
