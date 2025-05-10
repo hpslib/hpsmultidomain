@@ -47,7 +47,7 @@ def make_p_results(mypath, p_list):
                 x = pickle.load(f)
                 n.append(x["n"])
                 #delta_t.append(x["delta_t"])
-                toc_invert.append(x["toc_build_blackbox"])
+                toc_invert.append(-1.0)
                 toc_build_dtn.append(x["toc_assembly"])
                 toc_system_solve.append(x["toc_solve_petsc"]) # Old
                 toc_leaf_solve.append(x["toc_solve_leaf"])
@@ -275,7 +275,7 @@ p_list_helmholtz = [10,12,14,16,18,20,22]
 
 
 path_poisson   = "gpu_output/poisson_0401/"
-path_helmholtz = "gpu_output/helmholtz_10ppw_0401/"
+path_helmholtz = "gpu_output/helmholtz_10ppw_no_sparse_mat_0509/"
 
 p_results_poisson = make_p_results(path_poisson, p_list_poisson)
 
@@ -292,7 +292,7 @@ plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmhol
 title     = "Matrix factorization time for Poisson and Helmholtz Equation"
 ylabel    = "Seconds"
 filename  = "poisson_helmholtz_factor_time_gpu.pdf"
-plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_invert", filename)
+#plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_invert", filename)
 
 title     = "DtN build time for Poisson and Helmholtz Equation"
 filename  = "poisson_helmholtz_DtN_time_gpu.pdf"
@@ -304,7 +304,7 @@ plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmhol
 
 title     = "Facotrized system solve time for Poisson and Helmholtz Equation"
 filename  = "poisson_helmholtz_system_solve_time_gpu.pdf"
-plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_system_solve", filename)
+#plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_system_solve", filename)
 
 """
 path_kh16 = "gpu_output/helmholtz_kh_16_new_slices_0129/"
