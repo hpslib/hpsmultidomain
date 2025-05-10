@@ -10,7 +10,7 @@ from test_3d import run_test_via_argparse
 #p_list = [10, 12, 14, 16, 18]
 #p_list = [14]
 
-p_list = [10,12,14,16,18,20,22]
+p_list = [8, 10,12,14,16,18,20,22]
 #p_list = [18,20,22] 
 #p_list = [10, 12, 14]
 #p_list = [6, 8, 10, 12, 14]
@@ -25,10 +25,10 @@ kh = None
 delta_t = None
 store_sol = False
 
-output_path = "output/helmholtz_10ppw_0401"
+output_path = "output/helmholtz_10ppw_no_sparse_mat_0509"
 
 for p in p_list:
-    n_list = list(range(2*(p-2), 210, p-2))
+    n_list = list(range(5*(p-2), 210, p-2))
 
     #n_list = [152]
     #n_list = list(range(156, 210, p-2))
