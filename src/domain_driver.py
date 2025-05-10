@@ -462,7 +462,7 @@ class Domain_Driver:
             # Just temporary to test DtN runs:
             sol = np.ones(ff_body.shape)
 
-        res     = self.A_CC @ sol - ff_body
+        res     = sol - ff_body
         relerr  = np.linalg.norm(res,ord=2)/np.linalg.norm(ff_body,ord=2)
         print("NORM OF RESIDUAL for solver %5.2e" % relerr)
 
