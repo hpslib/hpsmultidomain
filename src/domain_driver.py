@@ -522,7 +522,7 @@ class Domain_Driver:
             
             true_c_sol = uu_dir_func(self.hps.xx_active[self.I_Ctot])
 
-            forward_bdry_error = np.linalg.norm(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body)
+            forward_bdry_error = np.linalg.norm(true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body)
             forward_bdry_error = forward_bdry_error.item()
             reverse_bdry_error = torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)
             reverse_bdry_error = reverse_bdry_error.item()
