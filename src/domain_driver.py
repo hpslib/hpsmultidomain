@@ -394,31 +394,7 @@ class Domain_Driver:
         # this is right
         uu_dir = uu_dir_func(self.XX[I_Xtot,:])
 
-        # body load on I_Ctot
-        if self.d==2:
-            ff_body = -apply_sparse_lowmem(self.A,I_Ctot,I_Xtot,uu_dir)
-        else:
-            I_copy1  = self.hps.I_copy1
-            I_copy2  = self.hps.I_copy2
-
-            ff_body  = -apply_sparse_lowmem(self.A,I_copy1,self.I_Xtot_in_unique,uu_dir)
-            ff_body  = ff_body - apply_sparse_lowmem(self.A,I_copy2,self.I_Xtot_in_unique,uu_dir)
-        if (ff_body_func is not None) or (ff_body_vec is not None):
-
-            if (self.sparse_assembly == 'reduced_gpu'):
-                device = torch.device('cuda')
-            elif (self.sparse_assembly == 'reduced_cpu'):
-                device = torch.device('cpu')
-            
-            if self.d==2:
-                ff_body += self.hps.reduce_body(device,ff_body_func,ff_body_vec)[I_Ctot]
-            elif self.d==3:
-                ff_body += self.hps.reduce_body(device,ff_body_func,ff_body_vec)[I_Ctot]
-        
-        # adjust to sum body load on left and right boundaries
-        if (self.d==2) and (self.periodic_bc and sum_body_load):
-            ff_body[self.I_Ctot_copy1] += ff_body[self.I_Ctot_copy2]
-            ff_body = ff_body[self.I_Ctot_unique]
+        ff_body = np.zeros(I_Ctot.shape)
         
         return ff_body
     
@@ -513,7 +489,7 @@ class Domain_Driver:
                 raise ValueError("not included in this version")
             else:
                 sol,rel_err,toc_system_solve, ff_body = self.solve_helper_blackbox(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
-                #print(sol)
+                print("Nah on solve")
 
             # self.A is black box matrix:
             sol_tot = torch.zeros(len(self.hps.I_unique),1)
