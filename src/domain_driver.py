@@ -332,6 +332,7 @@ class Domain_Driver:
         elif (sparse_assembly == 'reduced_gpu'):
             device = torch.device('cuda')
 
+        
         #print("About to build sparse matrix")
         tic = time()
         self.A,assembly_time_dict = self.hps.sparse_mat(device,verbose)
@@ -352,6 +353,7 @@ class Domain_Driver:
                 self.hps.sparse_mat(device,verbose)
         
         print(prof.key_averages(group_by_input_shape=False).table(sort_by=sort_by_keyword, row_limit=12))
+        """
         """
         #print("Built sparse matrix A")
         csr_stor  = self.A.data.nbytes
@@ -376,7 +378,8 @@ class Domain_Driver:
             #if ('toc_build_blackbox' in info_dict):
             #    info_dict['toc_build_blackbox'] += toc_assembly_tot
             print("Nah")
-                    
+        """
+        info_dict = dict()            
         info_dict['toc_assembly'] = assembly_time_dict['toc_DtN']
         return info_dict
                 

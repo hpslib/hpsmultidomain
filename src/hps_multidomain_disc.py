@@ -134,6 +134,7 @@ class HPS_Multidomain:
                 self.get_DtNs(device,'build')
         print(prof.key_averages(group_by_input_shape=False).table(sort_by=sort_by_keyword, row_limit=12))
         """
+        """
         #print("Built DtNs")
         if self.d==2:
             size_face = self.p-2; size_ext = 4*size_face
@@ -215,13 +216,13 @@ class HPS_Multidomain:
             #print(len(torch.unique(col_data)))
             toc_flatten = time() - tic
             #print("Flattened data")
-
+        """
         print("Type of numpy row_data:")
         print(row_data.detach().cpu().numpy().dtype)
         
         tic = time()
-        sp_mat = sp.coo_matrix((data.detach().cpu().numpy(),(row_data.detach().cpu().numpy(),col_data.detach().cpu().numpy())))
-        sp_mat = sp_mat.tocsr()
+        #sp_mat = sp.coo_matrix((data.detach().cpu().numpy(),(row_data.detach().cpu().numpy(),col_data.detach().cpu().numpy())))
+        #sp_mat = sp_mat.tocsr()
         toc_csr_scipy = time() - tic
 
         print("Assembled sparse matrix")
@@ -231,19 +232,10 @@ class HPS_Multidomain:
         #dense_mat = sp_mat.toarray()
         #print(dense_mat.shape)
 
-        if self.d==2:
-            if (verbose) and (self.d==2):
-                print("\t--time to do for loop (alloc,index, flatten) (%5.2f,%5.2f,%5.2f)"\
-                    %(toc_alloc,toc_index,toc_flatten))
-                print("\t--time to assemble sparse HPS (DtN ops, for loop, csr_scipy) (%5.2f,%5.2f,%5.2f)"\
-                    %(toc_DtN,toc_forloop,toc_csr_scipy))
         t_dict = dict()
         t_dict['toc_DtN'] = toc_DtN
-        if self.d==2:
-            t_dict['toc_forloop'] = toc_forloop
-        if self.d==3:
-            t_dict['toc_indices'] = toc_flatten
         t_dict['toc_sparse'] = toc_csr_scipy
+        sp_mat = -1
         return sp_mat,t_dict
     
     def get_grid(self):
