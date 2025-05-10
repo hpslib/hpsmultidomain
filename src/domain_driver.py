@@ -372,9 +372,10 @@ class Domain_Driver:
         if (solver_type == 'slabLU'):
             raise ValueError("not included in this version")
         else:
-            info_dict = self.build_blackboxsolver(solver_type,verbose)
-            if ('toc_build_blackbox' in info_dict):
-                info_dict['toc_build_blackbox'] += toc_assembly_tot
+            #info_dict = self.build_blackboxsolver(solver_type,verbose)
+            #if ('toc_build_blackbox' in info_dict):
+            #    info_dict['toc_build_blackbox'] += toc_assembly_tot
+            print("Nah")
                     
         info_dict['toc_assembly'] = assembly_time_dict['toc_DtN']
         return info_dict
@@ -453,10 +454,13 @@ class Domain_Driver:
         if (not petsc_available):
             sol = self.superLU.solve(ff_body)
         else:
-            psol = PETSc.Vec().createWithArray(np.ones(ff_body.shape))
-            pb   = PETSc.Vec().createWithArray(ff_body.copy())
-            self.petsc_LU.solve(pb,psol)
-            sol  = psol.getArray().reshape(ff_body.shape)
+            #psol = PETSc.Vec().createWithArray(np.ones(ff_body.shape))
+            #pb   = PETSc.Vec().createWithArray(ff_body.copy())
+            #self.petsc_LU.solve(pb,psol)
+            #sol  = psol.getArray().reshape(ff_body.shape)
+
+            # Just temporary to test DtN runs:
+            sol = np.ones(ff_body.shape)
 
         res     = self.A_CC @ sol - ff_body
         relerr  = np.linalg.norm(res,ord=2)/np.linalg.norm(ff_body,ord=2)
