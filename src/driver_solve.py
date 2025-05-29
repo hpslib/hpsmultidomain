@@ -147,7 +147,7 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
         solve_info['reverse_bdry_error'] = reverse_bdry_error
     else:
         print("\t--Builtin solver %s solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\
-            %(args.solver,res,true_res,resloc_hps,toc_solve))
+            %(args.solver,res,true_res,resloc_hps,total_toc_solve))
         solve_info['res_solve_petsc']            = res
         solve_info['trueres_solve_petsc']        = true_res
         solve_info['resloc_hps_solve_petsc']     = resloc_hps
