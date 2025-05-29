@@ -114,8 +114,8 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
             ff_body_vec  = uu_sol
             ff_body_func = None
             # Update the Dirichlet BC for the new timestep (parabolic heat only):
-            if (args.bc == 'convection_diffusion'):
-                uu_dir = lambda xx: uu_dir_func_convection(xx, delta_t*(i+1))
+            #if (args.bc == 'convection_diffusion'):
+            #    uu_dir = lambda xx: uu_dir_func_convection(xx, delta_t*(i+1))
             if (args.bc == 'parabolic_heat'):
                 uu_dir = lambda xx: uu_dir_func_parabolic_heat(xx, delta_t*(i+1))
             #else:
