@@ -8,9 +8,9 @@ from test_3d import run_test_via_argparse
 #p_list = [10, 12, 14, 16, 18, 20, 22]#, 24, 26]
 #p_list = [30]
 #p_list = [10, 12, 14, 16, 18]
-#p_list = [14]
+p_list = [6]
 
-p_list = [8, 10,12,14,16,18,20,22]
+#p_list = [8, 10,12,14,16,18,20,22]
 #p_list = [18,20,22] 
 #p_list = [10, 12, 14]
 #p_list = [6, 8, 10, 12, 14]
