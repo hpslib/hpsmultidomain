@@ -19,10 +19,10 @@ p_list = [10, 14]
 
 domain = "square"
 pde = "convection_diffusion"
-bc = "free_space"
+bc = "convection_diffusion"
 ppw = None
 kh = None
-delta_t = "convection_diffusion"
+delta_t = 0.1
 
 output_path = "output/convection_diffusion_dte1/"
 
