@@ -343,3 +343,23 @@ def uu_dir_func_periodic(xx,kh=0):
     #uu_exact = np.sin(2*np.pi*xx[:,1]) * np.exp(-2*np.pi*xx[:,2])
     #uu_exact = (xx[:,0] - xx[:,0]) + 1.
     return uu_exact.unsqueeze(-1)
+
+def convection_b1(xx):
+    b = -torch.cos(xx[:,0] - 0.5) * torch.sin(xx[:,1] - 0.5) * torch.exp(-((xx[:,2]-0.5)**2 / 0.002))
+    return b.unsqueeze(-1)
+
+def convection_b2(xx):
+    b = torch.sin(xx[:,0] - 0.5) * torch.cos(xx[:,1] - 0.5) * torch.exp(-((xx[:,2]-0.5)**2 / 0.002))
+    #b = 0.01 + 0.0 * xx[:,1]
+    return b.unsqueeze(-1)
+
+def convection_bdiv(xx):
+    b = (torch.sin(xx[:,0] - 0.5) * torch.sin(xx[:,1] - 0.5) + torch.cos(xx[:,0] - 0.5) * torch.cos(xx[:,1] - 0.5)) * torch.exp(-((xx[:,2]-0.5)**2 / 0.002))
+    #b = np.sin(xx[:,0] - 0.5) * np.sin(xx[:,1] - 0.5)# * xx[:,2]
+    return b.unsqueeze(-1)
+
+def convection_u_init(xx):
+    #u = np.exp(-((xx[:,2]-0.5)**2 / 0.002) - ((xx[:,0]-0.5)**2 + (xx[:,1]-0.2)**2) / 0.002)
+    u = torch.exp(-((xx[:,2]-0.5)**2 / 0.002) - ((xx[:,0]-0.1)**2 + (xx[:,1]-0.1)**2) / 0.002)
+    u[u < 1e-2] = 0.0
+    return u.unsqueeze(-1)

@@ -83,9 +83,9 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
             raise ValueError("Convection_diffusion is 3D only")
         if (args.pde == 'convection_diffusion'):
             # Dirichlet BC is from the time step we are solving for now:
-            uu_dir        = lambda xx: uu_dir_func_convection(xx, delta_t)
-            known_sol     = True
-            ff_body       = lambda xx: -uu_dir_func_convection(xx, 0)
+            uu_dir        = lambda xx: torch.zeros(xx.shape[0], 1)
+            known_sol     = False
+            ff_body       = lambda xx: convection_u_init(xx)
         else:
             raise ValueError
     elif (args.bc == 'parabolic_heat'):
@@ -107,50 +107,51 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
 
     ff_body_func = ff_body
     ff_body_vec  = None
+    total_toc_solve = 0
     for i in range(num_timesteps):
         print("\nFOR the %d timestep:\n" % i)
         if i > 0:
-            ff_body_vec  = -uu_sol
+            ff_body_vec  = uu_sol
             ff_body_func = None
-            # Update the Dirichlet BC for the new timestep:
-            if (args.bc == 'convection_diffusion'):
-                uu_dir = lambda xx: uu_dir_func_convection(xx, delta_t*(i+1))
-            elif (args.bc == 'parabolic_heat'):
+            # Update the Dirichlet BC for the new timestep (parabolic heat only):
+            #if (args.bc == 'convection_diffusion'):
+            #    uu_dir = lambda xx: uu_dir_func_convection(xx, delta_t*(i+1))
+            if (args.bc == 'parabolic_heat'):
                 uu_dir = lambda xx: uu_dir_func_parabolic_heat(xx, delta_t*(i+1))
-            else:
-                raise ValueError("multiple time steps means either convection-diffusion or parabolic laplace")
+            #else:
+            #    raise ValueError("multiple time steps means either convection-diffusion or parabolic laplace")
             uu_sol_old = uu_sol
 
-        uu_sol,res, true_res,resloc_hps,toc_system_solve,toc_leaf_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,known_sol=known_sol)
+        uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,known_sol=known_sol)
+        total_toc_solve = total_toc_solve + toc_solve
+        
         if i > 0:
-            change = torch.linalg.norm(uu_sol - uu_sol_old) / torch.linalg.norm(uu_sol_old)
-            sol_norm = torch.linalg.norm(uu_sol)
-            print("Change in u from previous timestep is " + str(change.item()))
-            print("With current vector norm of " + str(sol_norm.item()))
-        else:
-            sol_norm = torch.linalg.norm(uu_sol)
+        #    change = torch.linalg.norm(uu_sol - uu_sol_old) / torch.linalg.norm(uu_sol_old)
+            sol_norm = torch.linalg.norm(uu_sol, ord=1)
+        #    print("Change in u from previous timestep is " + str(change.item()))
+            print("With current vector 1-norm of " + str(sol_norm.item()))
+
+    sol_norm = torch.linalg.norm(uu_sol)
 
     print("\n\n")
 
     if (args.solver == 'superLU'):
         print("\t--SuperLU solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\
-            %(res,true_res,resloc_hps,toc_system_solve+toc_leaf_solve))
-        solve_info['res_solve_superLU']         = res
-        solve_info['trueres_solve_superLU']     = true_res
-        solve_info['resloc_hps_solve_superLU']  = toc_system_solve
-        solve_info['toc_solve_leaf']            = toc_leaf_solve
+            %(res,true_res,resloc_hps,toc_solve))
+        solve_info['res_solve_superLU']            = res
+        solve_info['trueres_solve_superLU']        = true_res
+        solve_info['resloc_hps_solve_superLU']     = resloc_hps
+        solve_info['toc_solve_superLU']            = total_toc_solve
 
         solve_info['forward_bdry_error'] = forward_bdry_error
         solve_info['reverse_bdry_error'] = reverse_bdry_error
     else:
         print("\t--Builtin solver %s solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\
-            %(args.solver,res,true_res,resloc_hps,toc_system_solve+toc_leaf_solve))
-        solve_info['res_solve_petsc']         = res
-        solve_info['trueres_solve_petsc']     = true_res
-        solve_info['resloc_hps_solve_petsc']  = resloc_hps
-        solve_info['toc_solve_petsc']         = toc_system_solve
-        solve_info['toc_solve_leaf']          = toc_leaf_solve
-
+            %(args.solver,res,true_res,resloc_hps,toc_solve))
+        solve_info['res_solve_petsc']            = res
+        solve_info['trueres_solve_petsc']        = true_res
+        solve_info['resloc_hps_solve_petsc']     = resloc_hps
+        solve_info['toc_solve_petsc']            = total_toc_solve
 
         solve_info['forward_bdry_error'] = forward_bdry_error
         solve_info['reverse_bdry_error'] = reverse_bdry_error

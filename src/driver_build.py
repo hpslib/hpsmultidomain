@@ -148,9 +148,21 @@ def configure_pde_domain(args):
                 raise ValueError("delta_t must be specified for parabolic problem")
             if num_timesteps is None:
                 raise ValueError("num_timesteps must be specified for parabolic problem")
-            op = pdo.PDO_3d(pdo.const(c=-delta_t),pdo.const(c=-delta_t),pdo.const(c=-delta_t),
-                            c3=pdo.const(c=-62*delta_t),
-                            c=pdo.const(c=-1))
+            # MAKE THIS PROPER GIVEN OUR B (KEEP IN MIND DOMAIN IS [0,10], NOT [-5,5])
+
+            kappa = 0.0001 # Diffusivity
+
+            def c1(xx):
+                return delta_t * convection_b1(xx) / 2
+            def c2(xx):
+                return delta_t * convection_b2(xx) / 2
+            def c(xx):
+                return delta_t * convection_bdiv(xx) / 2 + 1
+
+            op = pdo.PDO_3d(pdo.const(c=delta_t*kappa*0.5),pdo.const(c=delta_t*kappa*0.5),pdo.const(c=delta_t*kappa*0.5),
+                            #c1=pdo.const(c=delta_t*0.1),c2=pdo.const(c=delta_t*0.2),
+                            #c=pdo.const())
+                            c1=c1,c2=c2,c=c)
         kh = 0
         curved_domain = False
 

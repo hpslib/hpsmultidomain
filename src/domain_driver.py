@@ -399,7 +399,7 @@ class Domain_Driver:
 
             ff_body  = -apply_sparse_lowmem(self.A,I_copy1,self.I_Xtot_in_unique,uu_dir)
             ff_body  = ff_body - apply_sparse_lowmem(self.A,I_copy2,self.I_Xtot_in_unique,uu_dir)
-        if (ff_body_func is not None) or (ff_body_vec is not None):
+        if (ff_body_func is not None) or (ff_body_vec is not None):    # THIS NEEDS TO CHANGE FOR C-N
 
             if (self.sparse_assembly == 'reduced_gpu'):
                 device = torch.device('cuda')
@@ -542,7 +542,6 @@ class Domain_Driver:
         for i in range(GridX.shape[0]):
             uu_true[i] = uu_dir_func(GridX[i])
         
-
         tic = time()
         sol_tot,resloc_hps = self.hps.solve(device,sol_tot,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
         toc_leaf_solve = time() - tic

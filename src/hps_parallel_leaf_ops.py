@@ -143,6 +143,9 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         Aloc = get_Aloc_3d(*args,device)
     Acc = Aloc[:,Jc[:,None],Jc]
 
+    if ff_body_vec is not None:
+        ff_body_vec = ff_body_vec.to(device)
+
     #print(device)
     #print("Got local arrays for form_DtNs")
     if (mode == 'build'):
@@ -177,11 +180,13 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         f_body = torch.zeros(box_end-box_start,Jc.shape[0],nrhs,device=device)
         if (ff_body_func is not None):
             xx_flat = xxloc[box_start:box_end].reshape((box_end-box_start)*p**d,d)
-            tmp = ff_body_func(xx_flat)
-            f_body += tmp.reshape(box_end-box_start,p**d,nrhs)[:,Jc]
+            tmp     = ff_body_func(xx_flat).reshape(box_end-box_start,p**d,nrhs)
+            Atmp    = Aloc @ tmp
+            f_body += 2*tmp[:,Jc] - Atmp[:,Jc]
         if (ff_body_vec is not None):
             f_body_vec_part = ff_body_vec[box_start:box_end].unsqueeze(-1)
-            f_body += f_body_vec_part[:,Jc]
+            Atmp            = Aloc @ f_body_vec_part
+            f_body         += 2*f_body_vec_part[:,Jc] - Atmp[:,Jc]
         
        
         uu_sol = torch.zeros(box_end-box_start,p**d,2*nrhs,device=device)
@@ -195,14 +200,14 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             #print(Jc.shape)
             uu_sol[:,Jx,:nrhs] = data[box_start:box_end]
             uu_sol[:,Jc,:nrhs] = -Aloc[:,Jc[:,None],Jx] @ data[box_start:box_end]
-            uu_sol[:,Jc,:nrhs] += f_body
+            uu_sol[:,Jc,:nrhs] += f_body                           # MULTIPLY BY A^r using formula here
             uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, uu_sol[:,Jc,:nrhs])
             #print(uu_sol)#[:,Jc,:nrhs])
         else:
             # Need to make this Jxunique like here:
             uu_sol[:,Jxun,:nrhs] = Intmap_unq.unsqueeze(0) @ data[box_start:box_end]
             uu_sol[:,Jc,:nrhs]   = -Aloc[:,Jc[:,None],Jxun] @ uu_sol[:,Jxun,:nrhs]
-            uu_sol[:,Jc,:nrhs]  += f_body
+            uu_sol[:,Jc,:nrhs]  += f_body                           # MULTIPLY BY A^r using formula here
             uu_sol[:,Jc,:nrhs]   = torch.linalg.solve(Acc, uu_sol[:,Jc,:nrhs])
             
         # calculate residual
@@ -211,6 +216,25 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         else:
             uu_sol[:,Jc,nrhs:] = Aloc[:,Jc] @ uu_true[box_start:box_end] - f_body
         return uu_sol
+                                                      
+    elif (mode == 'reduce_body'):
+        # assume that the data is a function that you can apply to
+        # xx locations
+        xx_flat = xxloc[box_start:box_end].reshape((box_end-box_start)*p**d,d)
+        f_body  = torch.zeros((box_end-box_start)*p**d,device=device).unsqueeze(-1)
+        if ff_body_func is not None:
+            f_body += ff_body_func(xx_flat)
+        if ff_body_vec is not None:
+            f_body += ff_body_vec[box_start:box_end].reshape((box_end-box_start)*p**d,1) #TRY RESHAPING THIS
+
+        f_body = f_body.reshape(box_end-box_start,p**d,1) # I Think we need to apply A^r here, can use similar trick to above
+        Atmp   = Aloc @ f_body
+        f_body = 2*f_body[:,Jc] - Atmp[:,Jc]
+
+        #print(f_body.shape)
+        #print(torch.linalg.solve(Acc,f_body[:,Jc]).shape)
+        #print(Nx.unsqueeze(0).shape)
+        return -Nx[:,Jc].unsqueeze(0) @ torch.linalg.solve(Acc,f_body)
     
 def get_DtN_chunksize(p,d,device,mode):
     q = p-2
