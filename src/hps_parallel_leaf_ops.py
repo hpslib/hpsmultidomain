@@ -124,7 +124,8 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         Aloc = get_Aloc_3d(*args,device)
     Acc = Aloc[:,Jc[:,None],Jc]
 
-    ff_body_vec = ff_body_vec.to(device)
+    if ff_body_vec is not None:
+        ff_body_vec = ff_body_vec.to(device)
 
     #print(device)
     #print("Got local arrays for form_DtNs")
