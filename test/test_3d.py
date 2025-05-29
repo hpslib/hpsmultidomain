@@ -35,7 +35,7 @@ def run_test_via_argparse(domain, pde, bc, disc_n, p, box_xlim=1.0, box_ylim=1.0
         s += ' --delta_t %f' % (delta_t)
     
     if num_timesteps is not None:
-        s += ' --num_timesteps %f' % (num_timesteps)
+        s += ' --num_timesteps %d' % (num_timesteps)
 
     if store_sol:
         s += ' --store_sol'
