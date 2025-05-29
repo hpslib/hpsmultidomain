@@ -267,6 +267,22 @@ def plot_trio_results(p_list1, p_list2, p_list3,
     plt.savefig(filename)
     plt.show()
 
+
+p_list_dt1 = [10, 14]
+p_list_dt2 = [10]
+
+path_dt1 = "gpu_output/convection_diffusion_dte1/"
+path_dt2 = "gpu_output/convection_diffusion_dte2/"
+
+subtitle1 = "dt = 0.1, 10 timesteps"
+subtitle2 = "dt = 0.01, 100 timesteps"
+title     = "Solve times for Convection-Diffusion Equation"
+ylabel    = "Total Solve Time (for boundaries and leaves)"
+filename  = "convection_diffusionsolve_times_gpu.pdf"
+plot_paired_results(p_list_dt1, p_list_dt2, path_dt1, path_dt2, subtitle1, subtitle2, title, ylabel, "toc_leaf_solve", filename, type="plot")
+plot_paired_results(p_list_dt1, p_list_dt2, path_dt1, path_dt2, subtitle1, subtitle2, title, ylabel, "toc_leaf_solve", filename, type="plot")
+
+"""
 p_list_poisson   = [6, 8, 10, 12, 14]
 p_list_helmholtz = [10,12,14,16,18,20,22]
 
@@ -316,7 +332,7 @@ title     = "Relative Errors for Homogeneous Poisson and Helmholtz Equation"
 ylabel    = "Relative Error"
 filename  = "poisson_helmholtz_3_accuracy_gpu.pdf"
 plot_trio_results(p_list_poisson, p_list_helmholtz, p_list_helmholtz, path_poisson, path_helmholtz, path_kh30, subtitle1, subtitle2, subtitle3, title, ylabel, "true_res", filename)
-
+"""
 
 """
 path_poisson_flags = "gpu_output/poisson_gpu_with_flags_1212/"
