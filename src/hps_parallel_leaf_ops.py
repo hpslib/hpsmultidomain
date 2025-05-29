@@ -119,23 +119,6 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
           box_start,box_end,device,mode,interpolate,data,ff_body_func,ff_body_vec,uu_true):
     args = p,xxloc,Ds,pdo,box_start,box_end
 
-    # This one doesn't require Aloc
-    if (mode == 'reduce_body'):
-        # assume that the data is a function that you can apply to
-        # xx locations
-        xx_flat = xxloc[box_start:box_end].reshape((box_end-box_start)*p**d,d)
-        f_body  = torch.zeros((box_end-box_start)*p**d,device=device).unsqueeze(-1)
-        if ff_body_func is not None:
-            f_body += ff_body_func(xx_flat)
-        if ff_body_vec is not None:
-            f_body += ff_body_vec[box_start:box_end].reshape((box_end-box_start)*p**d,1)
-
-        f_body = f_body.reshape(box_end-box_start,p**d,1)
-        #print(f_body.shape)
-        #print(torch.linalg.solve(Acc,f_body[:,Jc]).shape)
-        #print(Nx.unsqueeze(0).shape)
-        return -Nx[:,Jc].unsqueeze(0) @ torch.linalg.solve(Acc,f_body[:,Jc])
-
     # Otherwise we need Aloc:
     if (d == 2):
         Aloc = get_Aloc_2d(*args,device)
