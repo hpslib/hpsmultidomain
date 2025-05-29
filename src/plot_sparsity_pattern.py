@@ -181,7 +181,7 @@ N_B  = A[I:,I:]
 S = -np.linalg.inv(A_II) @ A_IB
 
 L = np.zeros(A.shape)
-L[I:,:I]  = N_I @ np.linalg.inv(A_II) # Get structure of N_I * A_II^-1
+L[I:,:I]  = N_I # Get structure of N_I
 L[L != 0] = -1 # Set N_I * A_II^-1 to -1
 L = L + np.eye(A.shape[0])
 
@@ -193,11 +193,19 @@ T = N_I @ S + N_B
 T[T != 0] = -1
 
 D = np.zeros(A.shape)
-D[:I,:I] = A_II
+D[:I,:I] = np.eye(A_II.shape[0])
 D[I:,I:] = T
 
 plt.imshow(D, cmap='bwr', vmin=-1, vmax=1)
 plt.savefig("D_denoted.pdf")
+plt.show()
+
+Aii = np.zeros(A.shape)
+Aii[:I,:I] = A_II
+Aii[I:,I:] = np.eye(N_B.shape[0])
+
+plt.imshow(Aii, cmap='bwr', vmin=-1, vmax=1)
+plt.savefig("Aii_denoted.pdf")
 plt.show()
 
 U = np.zeros(A.shape)

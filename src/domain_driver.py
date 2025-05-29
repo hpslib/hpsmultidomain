@@ -535,13 +535,13 @@ class Domain_Driver:
             device=torch.device('cuda')
         else:
             device = torch.device('cpu')
-        tic = time()
 
         GridX = self.hps.grid_xx.clone()
         uu_true = torch.zeros((GridX.shape[0], GridX.shape[1],1), device=device)
         for i in range(GridX.shape[0]):
             uu_true[i] = uu_dir_func(GridX[i])
         
+        tic = time()
         sol_tot,resloc_hps = self.hps.solve(device,sol_tot,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
         toc_solve += time() - tic
         sol_tot = sol_tot.cpu()

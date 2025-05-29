@@ -107,6 +107,7 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
 
     ff_body_func = ff_body
     ff_body_vec  = None
+    total_toc_solve = 0
     for i in range(num_timesteps):
         print("\nFOR the %d timestep:\n" % i)
         if i > 0:
@@ -122,6 +123,8 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
             uu_sol_old = uu_sol
 
         uu_sol,res, true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,known_sol=known_sol)
+        total_toc_solve = total_toc_solve + toc_solve
+        
         if i > 0:
         #    change = torch.linalg.norm(uu_sol - uu_sol_old) / torch.linalg.norm(uu_sol_old)
             sol_norm = torch.linalg.norm(uu_sol, ord=1)
@@ -138,7 +141,7 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
         solve_info['res_solve_superLU']            = res
         solve_info['trueres_solve_superLU']        = true_res
         solve_info['resloc_hps_solve_superLU']     = resloc_hps
-        solve_info['toc_solve_superLU']            = toc_solve
+        solve_info['toc_solve_superLU']            = total_toc_solve
 
         solve_info['forward_bdry_error'] = forward_bdry_error
         solve_info['reverse_bdry_error'] = reverse_bdry_error
@@ -148,7 +151,7 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
         solve_info['res_solve_petsc']            = res
         solve_info['trueres_solve_petsc']        = true_res
         solve_info['resloc_hps_solve_petsc']     = resloc_hps
-        solve_info['toc_solve_petsc']            = toc_solve
+        solve_info['toc_solve_petsc']            = total_toc_solve
 
         solve_info['forward_bdry_error'] = forward_bdry_error
         solve_info['reverse_bdry_error'] = reverse_bdry_error
