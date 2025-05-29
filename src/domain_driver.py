@@ -505,7 +505,7 @@ class Domain_Driver:
             if (self.solver_type == 'slabLU'):
                 raise ValueError("not included in this version")
             else:
-                sol,rel_err,toc_solve, ff_body = self.solve_helper_blackbox(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
+                sol,rel_err,toc_system_solve, ff_body = self.solve_helper_blackbox(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
                 #print(sol)
 
             # self.A is black box matrix:
@@ -536,6 +536,7 @@ class Domain_Driver:
         else:
             device = torch.device('cpu')
 
+        # Creating the true solution for comparison's sake.
         GridX = self.hps.grid_xx.clone()
         uu_true = torch.zeros((GridX.shape[0], GridX.shape[1],1), device=device)
         for i in range(GridX.shape[0]):
@@ -543,7 +544,7 @@ class Domain_Driver:
         
         tic = time()
         sol_tot,resloc_hps = self.hps.solve(device,sol_tot,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
-        toc_solve += time() - tic
+        toc_leaf_solve = time() - tic
         sol_tot = sol_tot.cpu()
 
         sol_tot = torch.reshape(sol_tot, (self.hps.nboxes,self.hps.p**3))
@@ -568,4 +569,4 @@ class Domain_Driver:
             del uu_true
             true_err = true_err.item()
 
-        return sol_tot,rel_err,true_err,resloc_hps,toc_solve, forward_bdry_error, reverse_bdry_error
+        return sol_tot,rel_err,true_err,resloc_hps,toc_system_solve,toc_leaf_solve,forward_bdry_error, reverse_bdry_error

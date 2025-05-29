@@ -480,27 +480,33 @@ class HPS_Multidomain:
         
         # reserve at most 1GB memory for stored DtNs at a time
         f = 0.8e9 # 1 * 0.8 = 0.8 GB in bytes
-        chunk_max = int(f / ((2*d*size_face)**2 * 8)) # Size of DtN matrix * number of bytes per double
-        chunk_size = leaf_ops.get_nearest_div(nboxes,chunk_max)
+        if mode == 'solve':
+            chunk_max = int(f / ((p**d)*2*data.shape[-1] * 8)) # Size of leaf solution * # RHS * number of bytes per double
+        elif mode == 'reduce_body':
+            chunk_max = int(f / ((2*d*size_face) * 8)) # Size of reduction * number of bytes per double
+        else: #if mode == 'build'
+            chunk_max = int(f / ((2*d*size_face)**2 * 8)) # Size of DtN matrix * number of bytes per double
+        chunk_size = chunk_max #leaf_ops.get_nearest_div(nboxes,chunk_max)
+
+        print("nboxes, chunk max, chunk size:")
+        print((nboxes, chunk_max, chunk_size))
         
-        assert np.mod(nboxes,chunk_size) == 0
         Aloc_chunkinit = np.min([50,int(nboxes/4)])
         if d==3:
             Aloc_chunkinit = np.max([int(0.2e9 / ((q**6 + 12*q**5 + 72*q**4) * 8)), 1])
-        #print("chunk_max = " + str(chunk_max))
-        #print("chunk_size based on mod = " + str(chunk_size))
-        #print("Handled memory chunks")
-        for j in range(int(nboxes / chunk_size)):
-            #print("Indices: " + str(j*chunk_size) + " to " + str((j+1)*chunk_size))
-            DtNs[j*chunk_size:(j+1)*chunk_size],Aloc_chunklist = \
-            leaf_ops.get_DtNs_helper(*args,j*chunk_size,(j+1)*chunk_size, Aloc_chunkinit,device,\
+
+        # TODO: replace this with a while loop, end when index reaches nboxes
+        j = 0
+        while j < nboxes:
+            chunk_size = min(chunk_max, nboxes - j)
+
+            DtNs[j:j+chunk_size],Aloc_chunklist = \
+            leaf_ops.get_DtNs_helper(*args,j,j+chunk_size, Aloc_chunkinit,device,\
                                     mode,self.interpolate,data,ff_body_func,ff_body_vec,uu_true)
 
             #print("Did chunk " + str(j))
             Aloc_chunkinit = int(Aloc_chunklist[0])
-        #print("DtNs interior = " + str(DtNs[:,Jc]))
-        #print("DtNs exterior = " + str(DtNs[:,Jx]))
-        #print("Whole DtN = " + str(DtNs))
+            j += chunk_size
         return DtNs
 
     # Input: uu_sol on I_unique

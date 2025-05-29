@@ -118,6 +118,25 @@ def Aloc_acc(p, d, nboxes, xx_flat, Aloc, func, D, c=1.):
 def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
           box_start,box_end,device,mode,interpolate,data,ff_body_func,ff_body_vec,uu_true):
     args = p,xxloc,Ds,pdo,box_start,box_end
+
+    # This one doesn't require Aloc
+    if (mode == 'reduce_body'):
+        # assume that the data is a function that you can apply to
+        # xx locations
+        xx_flat = xxloc[box_start:box_end].reshape((box_end-box_start)*p**d,d)
+        f_body  = torch.zeros((box_end-box_start)*p**d,device=device).unsqueeze(-1)
+        if ff_body_func is not None:
+            f_body += ff_body_func(xx_flat)
+        if ff_body_vec is not None:
+            f_body += ff_body_vec[box_start:box_end].reshape((box_end-box_start)*p**d,1)
+
+        f_body = f_body.reshape(box_end-box_start,p**d,1)
+        #print(f_body.shape)
+        #print(torch.linalg.solve(Acc,f_body[:,Jc]).shape)
+        #print(Nx.unsqueeze(0).shape)
+        return -Nx[:,Jc].unsqueeze(0) @ torch.linalg.solve(Acc,f_body[:,Jc])
+
+    # Otherwise we need Aloc:
     if (d == 2):
         Aloc = get_Aloc_2d(*args,device)
     else:
@@ -217,7 +236,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         #print(Nx.unsqueeze(0).shape)
         return -Nx[:,Jc].unsqueeze(0) @ torch.linalg.solve(Acc,f_body)
     
-def get_DtN_chunksize(p,d,device):
+def get_DtN_chunksize(p,d,device,mode):
     q = p-2
     if (device == torch.device('cuda')):
         r = torch.cuda.memory_reserved(0)
@@ -229,6 +248,9 @@ def get_DtN_chunksize(p,d,device):
     chunk_max = int(f / (4*p**(2*d) * 8)) # 8 bytes in 64 bits memory
     if d == 3:
         chunk_max = int(f / ((p**6 + q**6 + 12*q**5 + 72*q**4) * 8)) # 8 bytes in 64 bits memory
+        if mode=="solve":
+            # Need a little extra overhead for Aloc in this case
+            chunk_max = int(f / ((2*p**6 + q**6 + 12*q**5 + 72*q**4) * 8))
         if p >= 16:
             chunk_max = 1
     return np.max([chunk_max, 1])
@@ -273,7 +295,7 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_
         DtNs[box_curr:box_curr + chunk_size] = tmp
         box_curr += chunk_size
 
-        chunk_size = get_DtN_chunksize(p,d,device) #np.max([get_DtN_chunksize(p,d,device),chunk_init])
+        chunk_size = get_DtN_chunksize(p,d,device,mode) #np.max([get_DtN_chunksize(p,d,device),chunk_init])
         chunk_list[nchunks] = b2-b1
         nchunks += 1
     return DtNs.cpu(),chunk_list[:nchunks]

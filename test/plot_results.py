@@ -26,6 +26,7 @@ def make_p_results(mypath, p_list):
         toc_invert = []
         toc_build_dtn = []
         toc_leaf_solve = []
+        toc_system_solve = []
         sparse_solve_res = []
         true_res = []
         leaf_res = []
@@ -48,7 +49,8 @@ def make_p_results(mypath, p_list):
                 #delta_t.append(x["delta_t"])
                 toc_invert.append(x["toc_build_blackbox"])
                 toc_build_dtn.append(x["toc_assembly"])
-                toc_leaf_solve.append(x["toc_solve_petsc"])
+                toc_system_solve.append(x["toc_solve_petsc"]) # Old
+                toc_leaf_solve.append(x["toc_solve_leaf"])
                 sparse_solve_res.append(x["res_solve_petsc"])
                 true_res.append(x["trueres_solve_petsc"])
                 leaf_res.append(x["resloc_hps_solve_petsc"])
@@ -67,7 +69,8 @@ def make_p_results(mypath, p_list):
                 dtn_cond.append(x["dtn_cond"])"""
             
         p_result = dict(n=n, toc_invert=toc_invert, toc_build_dtn=toc_build_dtn, toc_leaf_solve=toc_leaf_solve,
-                        sparse_solve_res=sparse_solve_res, true_res=true_res, leaf_res=leaf_res)
+                        sparse_solve_res=sparse_solve_res, true_res=true_res, leaf_res=leaf_res,
+                        toc_system_solve=toc_system_solve)
                         #delta_t=delta_t)
                         #forward_bdry_error=forward_bdry_error, reverse_bdry_error=reverse_bdry_error,
                         #GtC_error=GtC_error, CtG_error=CtG_error, GtC_cond=GtC_cond,CtG_cond=CtG_cond, #INTERPOLATION
@@ -159,7 +162,7 @@ def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, ti
     plt.rc('font',**{'family':'serif','size':18})
     plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
 
-    fig.suptitle(title)
+    #fig.suptitle(title)
     for i in range(len(p_list1)):
         if type == "loglog":
             ax1.loglog(p_results_poisson[i].index**3, p_results_poisson[i][data_col], '.-')
@@ -173,7 +176,7 @@ def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, ti
     ax1.legend(["$p$ = " + str(_) for _ in p_list1])# + ["trend for N**{1.5} scaling"])
     ax1.set_xlabel("$N$")
     ax1.set_ylabel(ylabel)
-    ax1.set_title(subtitle1)
+    #ax1.set_title(subtitle1)
     ax1.grid(True)
 
     for i in range(len(p_list2)):
@@ -190,7 +193,7 @@ def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, ti
     #ax2.loglog(p_results_helmholtz[-1].index**3, (p_results_helmholtz[-1].index)**6)
     ax2.legend(["$p$ = " + str(_) for _ in p_list2])# + ["trend for N**{1.5} scaling"])
     ax2.set_xlabel("$N$")
-    ax2.set_title(subtitle2)
+    #ax2.set_title(subtitle2)
     ax2.grid(True)
 
     plt.savefig(filename)
@@ -271,8 +274,8 @@ p_list_poisson   = [6, 8, 10, 12, 14]
 p_list_helmholtz = [10,12,14,16,18,20,22]
 
 
-path_poisson   = "gpu_output/poisson_scaling_new_slices_0123/"
-path_helmholtz = "gpu_output/helmholtz_10ppw_0211/"
+path_poisson   = "gpu_output/poisson_0401/"
+path_helmholtz = "gpu_output/helmholtz_10ppw_0401/"
 
 p_results_poisson = make_p_results(path_poisson, p_list_poisson)
 
@@ -299,7 +302,11 @@ title     = "Leaf solve time for Poisson and Helmholtz Equation"
 filename  = "poisson_helmholtz_leaf_time_gpu.pdf"
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_leaf_solve", filename, type="plot")
 
+title     = "Facotrized system solve time for Poisson and Helmholtz Equation"
+filename  = "poisson_helmholtz_system_solve_time_gpu.pdf"
+plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_system_solve", filename)
 
+"""
 path_kh16 = "gpu_output/helmholtz_kh_16_new_slices_0129/"
 path_kh30 = "gpu_output/helmholtz_kh_30_new_slices_0129/"
 subtitle1 = "$\kappa = 16$"
@@ -316,7 +323,7 @@ title     = "Relative Errors for Homogeneous Poisson and Helmholtz Equation"
 ylabel    = "Relative Error"
 filename  = "poisson_helmholtz_3_accuracy_gpu.pdf"
 plot_trio_results(p_list_poisson, p_list_helmholtz, p_list_helmholtz, path_poisson, path_helmholtz, path_kh30, subtitle1, subtitle2, subtitle3, title, ylabel, "true_res", filename)
-
+"""
 
 """
 path_poisson_flags = "gpu_output/poisson_gpu_with_flags_1212/"
