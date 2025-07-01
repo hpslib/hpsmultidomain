@@ -118,18 +118,66 @@ def uu_dir_pulse(xx,kh):
     uu_dir[inds_left] = c * torch.exp( - width * (xx[inds_left,1] - 0.5)**2).unsqueeze(-1)
     return uu_dir
 
-def uu_dir_func_greens(xx,kh,center=torch.tensor([-0.1,+0.5])):
+def uu_dir_func_greens(d,xx,kh,center=torch.tensor([-1.1,+1.,+1.2])):
+    """
+    Green's functions for the Poisson and Helmholtz equations.
+    kh=0 defaults to Poisson, kh>0 is Helmholtz
+    These are used for the Dirichlet BC in Poisson and Helmholtz examples to produce a manufactured solution
+    for testing.
+    """
     
-    dd0 = xx[:,0] - center[0];
-    dd1 = xx[:,1] - center[1]; 
+    dd0 = xx[:,0] - center[0]
+    dd1 = xx[:,1] - center[1]
     ddsq = np.multiply(dd0,dd0) + np.multiply(dd1,dd1)
+    if d==3:
+        dd2 = xx[:,2] - center[2]
+        ddsq += np.multiply(dd2,dd2)
     if (kh == 0):
-        uu_exact = (1/np.pi) * np.log(ddsq);
+        if d==2:
+            uu_exact = (1/np.pi) * np.log(ddsq)
+        else:
+            uu_exact = 1 / (4 * np.pi * np.sqrt(ddsq))
     else:
-        dist_x = np.sqrt(ddsq)
-        uu_exact = (1j/4) * hankel1(0,kh*dist_x);
-        uu_exact = np.real(uu_exact)
+        if d==2:
+            dist_x = np.sqrt(ddsq)
+            uu_exact = (1j/4) * hankel1(0,kh*dist_x)
+            uu_exact = np.real(uu_exact)
+        else:
+            dist_x = np.sqrt(ddsq)
+            uu_exact = np.cos(kh * dist_x) / (4*np.pi * dist_x)
     return uu_exact.unsqueeze(-1)
+
+def uu_true_variable_helmholtz(d,xx,kh,center=torch.tensor([-1.1,+2.,+2.2])):
+    """
+    Manufactured solution for a variable-coefficient Helmholtz equation.
+    """
+    uu_exact = np.sin(kh * xx[:,0]) * xx[:,1] * xx[:,1]
+    if d==3:
+        uu_exact = uu_exact * xx[:,2] * xx[:,2]
+    return uu_exact.unsqueeze(-1)
+
+def du_dir_func_greens(deriv,d,xx,kh,center=torch.tensor([-1.1,+1.,+1.2])):
+    """
+    First order derrivative for Green's functions for the Poisson and Helmholtz equations.
+    kh=0 defaults to Poisson, kh>0 is Helmholtz
+    These are used for some unit tests.
+    """
+
+    if d==2:
+        print("Error! This is only for d=3")
+    dd0 = xx[:,0] - center[0]
+    dd1 = xx[:,1] - center[1]
+    dd2 = xx[:,2] - center[2]
+    ddsq = np.multiply(dd0,dd0) + np.multiply(dd1,dd1) + np.multiply(dd2,dd2)
+    if kh==0:
+        dd = np.sqrt(ddsq)
+        du_exact = -(xx[:,deriv] - center[deriv]) / (4*np.pi * dd**3)
+        return du_exact
+    else:
+        dd = np.sqrt(ddsq)
+        du_exact = (xx[:,deriv] - center[deriv]) * (kh*dd*np.sin(kh*dd) + np.cos(kh*dd))
+        du_exact = du_exact / (4*np.pi * dd**3)
+        return du_exact
 
 def ff_body_pulse(xx,kh):
     
@@ -141,6 +189,9 @@ def ff_body_pulse(xx,kh):
 def bfield_constant(xx,kh):
     return -(kh**2) * torch.ones(xx.shape[0],device=xx.device)
 
+def bfield_variable(xx,kh):
+    return -(kh**2 - 2 / (xx[:,1]*xx[:,1]) - 2 / (xx[:,2]*xx[:,2])).unsqueeze(-1)
+
 def bfield_bumpy(xx,kh):
     
     return -(kh**2 * (1 - (torch.sin(4*np.pi*xx[:,0]) \
@@ -148,8 +199,8 @@ def bfield_bumpy(xx,kh):
     
 def bfield_crystal(xx,kh,crystal_start=0.2,crystal_end=0.8,dist=0.05):
     
-    mag   = 1.0;
-    width = 1500;
+    mag   = 1.0
+    width = 1500
     
     b = torch.zeros(xx.shape[0],device=xx.device)
     
@@ -289,3 +340,41 @@ def bfield_cavity_scattering(xx,kh):
     
     kh_fun = -kh**2 * (1 - b)
     return kh_fun.unsqueeze(-1)
+
+def bfield_gravity(xx, kh, center=np.array([-1.1,+1.,+1.2])):
+    gravity_fun = -kh**2 * (1 - (xx[:,2] - center[2]))
+    return gravity_fun.unsqueeze(-1)
+
+def uu_dir_func_convection(xx, t):
+    uu_exact = np.cos(8*xx[:,0]) * (1 - 2*xx[:,1]) * np.exp(-xx[:,2]) * np.exp(-t)
+    return uu_exact.unsqueeze(-1)
+
+def uu_dir_func_parabolic_heat(xx, t):
+    uu_exact = np.cos(np.sqrt(2) * xx[:,0]) * (1 - 2*xx[:,1]) * np.exp(xx[:,2]) * np.exp(-t)
+    return uu_exact.unsqueeze(-1)
+
+def uu_dir_func_periodic(xx,kh=0):
+    uu_exact = np.sin(2*np.pi*xx[:,0]) * xx[:,1] * np.exp(-2*np.pi*xx[:,2])
+    #uu_exact = np.sin(2*np.pi*xx[:,1]) * np.exp(-2*np.pi*xx[:,2])
+    #uu_exact = (xx[:,0] - xx[:,0]) + 1.
+    return uu_exact.unsqueeze(-1)
+
+def convection_b1(xx):
+    b = -torch.cos(xx[:,0] - 0.5) * torch.sin(xx[:,1] - 0.5) * torch.exp(-((xx[:,2]-0.5)**2 / 0.002))
+    return b.unsqueeze(-1)
+
+def convection_b2(xx):
+    b = torch.sin(xx[:,0] - 0.5) * torch.cos(xx[:,1] - 0.5) * torch.exp(-((xx[:,2]-0.5)**2 / 0.002))
+    #b = 0.01 + 0.0 * xx[:,1]
+    return b.unsqueeze(-1)
+
+def convection_bdiv(xx):
+    b = (torch.sin(xx[:,0] - 0.5) * torch.sin(xx[:,1] - 0.5) + torch.cos(xx[:,0] - 0.5) * torch.cos(xx[:,1] - 0.5)) * torch.exp(-((xx[:,2]-0.5)**2 / 0.002))
+    #b = np.sin(xx[:,0] - 0.5) * np.sin(xx[:,1] - 0.5)# * xx[:,2]
+    return b.unsqueeze(-1)
+
+def convection_u_init(xx):
+    #u = np.exp(-((xx[:,2]-0.5)**2 / 0.002) - ((xx[:,0]-0.5)**2 + (xx[:,1]-0.2)**2) / 0.002)
+    u = torch.exp(-((xx[:,2]-0.5)**2 / 0.002) - ((xx[:,0]-0.1)**2 + (xx[:,1]-0.1)**2) / 0.002)
+    u[u < 1e-2] = 0.0
+    return u.unsqueeze(-1)
