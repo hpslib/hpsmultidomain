@@ -118,6 +118,11 @@ def Aloc_acc(p, d, nboxes, xx_flat, Aloc, func, D, c=1.):
 def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
           box_start,box_end,device,mode,interpolate,data,ff_body_func,ff_body_vec,uu_true):
     args = p,xxloc,Ds,pdo,box_start,box_end
+    """
+    Do (potentially GPU) operations on PyTorch tensors.
+    Modes correspond to different operations: computing DtNs, leaf solves, or redcuing the condensed RHS.
+    All tensors should be small enough to fit on the GPU (if using one)
+    """
 
     # This one doesn't require Aloc
     if (mode == 'reduce_body'):
@@ -131,9 +136,6 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             f_body += ff_body_vec[box_start:box_end].reshape((box_end-box_start)*p**d,1)
 
         f_body = f_body.reshape(box_end-box_start,p**d,1)
-        #print(f_body.shape)
-        #print(torch.linalg.solve(Acc,f_body[:,Jc]).shape)
-        #print(Nx.unsqueeze(0).shape)
         return -Nx[:,Jc].unsqueeze(0) @ torch.linalg.solve(Acc,f_body[:,Jc])
 
     # Otherwise we need Aloc:
@@ -146,28 +148,20 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
     if ff_body_vec is not None:
         ff_body_vec = ff_body_vec.to(device)
 
-    #print(device)
-    #print("Got local arrays for form_DtNs")
     if (mode == 'build'):
         nrhs = data.shape[-1]
         
+        # Slightly different operations depending on if we use Gaussian interpolation or not:
         if interpolate == False:
             S_tmp  = -torch.linalg.solve(Acc, Aloc[:,Jc[:,None],Jx])
             Irep   = torch.eye(Jx.shape[0],device=device).unsqueeze(0).repeat(box_end-box_start,1,1)
             S_full = torch.concat((S_tmp,Irep),dim=1)
 
-            # Alternative approach that might be more memory-efficient:
-            #S_full = torch.zeros(Aloc.shape[0], Jc.shape[0] + Jx.shape[0], Jx.shape[0])
-            #S_full[:,0:Jc.shape[0],:] = -torch.linalg.solve(Acc, Aloc[:,Jc][...,Jx])
-            #S_full[:,Jc.shape[0]:Jc.shape[0]+Jx.shape[0],:] += torch.eye(Jx.shape[0],device=device).unsqueeze(0)
-
-            #print("Made S_full")
             Jtot = torch.hstack((Jc,Jx))
             DtN  = Nx[...,Jtot].unsqueeze(0) @ S_full
 
         else:
-            S_tmp   = -torch.linalg.solve(Acc, Aloc[:,Jc[:,None],Jxun]) # Should append Identity here and not repeat Intmap
-            # Might need to apply intmap_unq here:
+            S_tmp   = -torch.linalg.solve(Acc, Aloc[:,Jc[:,None],Jxun])
             Intmap_repeat = Intmap_unq.unsqueeze(0).repeat(box_end-box_start,1,1)
             S_full        = torch.concat((S_tmp @ Intmap_unq.unsqueeze(0),Intmap_repeat),dim=1) # Applying interpolation to both identity and S
             
@@ -175,68 +169,51 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             DtN  = Nx[:,Jtot].unsqueeze(0) @ S_full
             DtN  = Intmap_rev.unsqueeze(0) @ DtN
         return DtN
+    
+    # Solve for the subdomain interiors:
     elif (mode == 'solve'):
+
+        # First we may need to compute the RHS if it has a body load:
         nrhs   = data.shape[-1]
         f_body = torch.zeros(box_end-box_start,Jc.shape[0],nrhs,device=device)
         if (ff_body_func is not None):
             xx_flat = xxloc[box_start:box_end].reshape((box_end-box_start)*p**d,d)
-            tmp     = ff_body_func(xx_flat).reshape(box_end-box_start,p**d,nrhs)
-            Atmp    = Aloc @ tmp
-            f_body += 2*tmp[:,Jc] - Atmp[:,Jc]
+            f_body += Aloc @ ff_body_func(xx_flat).reshape(box_end-box_start,p**d,nrhs)
         if (ff_body_vec is not None):
             f_body_vec_part = ff_body_vec[box_start:box_end].unsqueeze(-1)
-            Atmp            = Aloc @ f_body_vec_part
-            f_body         += 2*f_body_vec_part[:,Jc] - Atmp[:,Jc]
+            f_body         += Aloc @ f_body_vec_part[:,Jc]
         
-       
+
         uu_sol = torch.zeros(box_end-box_start,p**d,2*nrhs,device=device)
         
+        # We use different indexing schemes for 2D, 3D dropped corners, and 3D Gaussian:
         if d==2:
             uu_sol[:,Jxreo,:nrhs] = Intmap.unsqueeze(0) @ data[box_start:box_end]
         elif interpolate == False:
-            #print(nrhs)
-            #print((f_body - Aloc[:,Jc][...,Jx] @ data[box_start:box_end]).shape)
-            #print(Acc.shape)
-            #print(Jc.shape)
             uu_sol[:,Jx,:nrhs] = data[box_start:box_end]
             uu_sol[:,Jc,:nrhs] = -Aloc[:,Jc[:,None],Jx] @ data[box_start:box_end]
-            uu_sol[:,Jc,:nrhs] += f_body                           # MULTIPLY BY A^r using formula here
+            uu_sol[:,Jc,:nrhs] += f_body
             uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, uu_sol[:,Jc,:nrhs])
-            #print(uu_sol)#[:,Jc,:nrhs])
         else:
-            # Need to make this Jxunique like here:
+            # Need to make this Jxunique:
             uu_sol[:,Jxun,:nrhs] = Intmap_unq.unsqueeze(0) @ data[box_start:box_end]
             uu_sol[:,Jc,:nrhs]   = -Aloc[:,Jc[:,None],Jxun] @ uu_sol[:,Jxun,:nrhs]
-            uu_sol[:,Jc,:nrhs]  += f_body                           # MULTIPLY BY A^r using formula here
+            uu_sol[:,Jc,:nrhs]  += f_body
             uu_sol[:,Jc,:nrhs]   = torch.linalg.solve(Acc, uu_sol[:,Jc,:nrhs])
             
-        # calculate residual
+        # calculate residual if there is a true solution available
         if uu_true is None:
             uu_sol[:,Jc,nrhs:] = Aloc[:,Jc] @ uu_sol[...,:nrhs] - f_body
         else:
             uu_sol[:,Jc,nrhs:] = Aloc[:,Jc] @ uu_true[box_start:box_end] - f_body
         return uu_sol
-                                                      
-    elif (mode == 'reduce_body'):
-        # assume that the data is a function that you can apply to
-        # xx locations
-        xx_flat = xxloc[box_start:box_end].reshape((box_end-box_start)*p**d,d)
-        f_body  = torch.zeros((box_end-box_start)*p**d,device=device).unsqueeze(-1)
-        if ff_body_func is not None:
-            f_body += ff_body_func(xx_flat)
-        if ff_body_vec is not None:
-            f_body += ff_body_vec[box_start:box_end].reshape((box_end-box_start)*p**d,1) #TRY RESHAPING THIS
-
-        f_body = f_body.reshape(box_end-box_start,p**d,1) # I Think we need to apply A^r here, can use similar trick to above
-        Atmp   = Aloc @ f_body
-        f_body = 2*f_body[:,Jc] - Atmp[:,Jc]
-
-        #print(f_body.shape)
-        #print(torch.linalg.solve(Acc,f_body[:,Jc]).shape)
-        #print(Nx.unsqueeze(0).shape)
-        return -Nx[:,Jc].unsqueeze(0) @ torch.linalg.solve(Acc,f_body)
     
 def get_DtN_chunksize(p,d,device,mode):
+    """
+    Computing leaf solves or DtNs requires significant memory overhead beyond the cost of storing
+    the DtNs / solutions themselves. Here the free space on the GPU is computed to determine how many 
+    can be done at once without erroring.
+    """
     q = p-2
     if (device == torch.device('cuda')):
         r = torch.cuda.memory_reserved(0)
@@ -258,6 +235,10 @@ def get_DtN_chunksize(p,d,device,mode):
 
 def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,\
                     box_start,box_end,chunk_init,device,mode,interpolate,data,ff_body_func,ff_body_vec,uu_true):
+    """
+    Handles the batch scheduling for computing DtNs and leaf solves - designates how many
+    are computed at once, and transfers results to CPU as needed.
+    """
     nboxes = box_end - box_start
     size_face = (p-2)**(d-1)
     if d==3:
@@ -273,22 +254,10 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_
     args = p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
     chunk_list = torch.zeros(int(nboxes/chunk_init)+100,device=device).int(); 
     box_curr = 0; nchunks = 0
-    
-    #print("Now in get_DtNs_helper")
-    #print("nboxes = " + str(nboxes))
 
     while(box_curr < nboxes):
         b1 = box_curr + box_start
         b2 = np.min([box_end, b1 + chunk_size])
-
-        """
-        print("box_curr = " + str(box_curr))
-        print("b1 = " + str(b1))
-        print("b2 = " + str(b2))
-        print("box_end = " + str(box_end))
-        print("b1 + chunk_size = " + str(b1 + chunk_size))
-        #print(torch.cuda.memory_summary())
-        """
 
         tmp = form_DtNs(*args,b1,b2,device,mode,interpolate,data,ff_body_func,ff_body_vec,uu_true)
         

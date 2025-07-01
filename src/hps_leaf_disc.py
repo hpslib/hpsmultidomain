@@ -191,19 +191,16 @@ def leaf_discretization_2d(a,p):
 
 #################################### 3D discretization ##########################################
 
-###
-# Given polynomial order p and element size a,
-# Returns chebyshev collocation points on [-a,a]^3 and corresponding differentiation operators.
-###
 def cheb_3d(a,p):
+    """
+    Given polynomial order p and element size a,
+    returns chebyshev collocation points on [-a,a]^3 and corresponding differentiation operators.
+    """
     D,xvec = cheb(p-1) # should this be p? We need p+1 points for a degree p polynomial
     xvec1 = a[0] * np.flip(xvec)
     xvec2 = a[1] * np.flip(xvec)
     xvec3 = a[2] * np.flip(xvec)
 
-    # TODO: get the proper components D1, D2, D3, D11, D22, D33, D12, D13, D23
-    # Note that Kronecker product is associative
-    # Could replace some of these with np.eye(p**2)
     D_axis1 = (1/a[0]) * D
     D_axis2 = (1/a[1]) * D
     D_axis3 = (1/a[2]) * D
@@ -229,11 +226,11 @@ def cheb_3d(a,p):
 
     return zz, Ds
 
-###
-# Given polynomial order p and element size a,
-# Returns Gaussian collocation points on [-a,a]^3
-###
 def gauss_3d(a,p):
+    """
+    Given polynomial order p and element size a,
+    returns Gaussian collocation points on [-a,a]^3
+    """
     xvec  = gauss(p) # should this be p? We need p+1 points for a degree p polynomial
     xvec1 = a[0] * xvec
     xvec2 = a[1] * xvec
@@ -253,6 +250,8 @@ def gauss_3d(a,p):
 def leaf_discretization_3d(a,p,q):
     """
     Performs leaf-level discretization for a 3D domain.
+    Returns the discretization points, interpolated surface points,
+    index arrays for parts of the disc., and the correct operators.
     """
     zz,Ds = cheb_3d(a,p)
     zzG   = gauss_3d(a,q)
@@ -345,6 +344,9 @@ def leaf_discretization_3d(a,p,q):
     return zz,Ds,JJ,hmin,zzG
 
 def get_diff_ops(Ds,JJ,d):
+    """
+    Forms Neumann derivative matrix.
+    """
     if (d == 2):
         Nl = Ds.D1[JJ.Jl]
         Nr = Ds.D1[JJ.Jr]
@@ -397,8 +399,10 @@ class HPS_Disc:
         Nx, Nxc = get_diff_ops(self.Ds, self.JJ, d)
         self.Nx = Nx; self.Nxc = Nxc
         
-    ## Interpolation from data on Ix to Ix_reorder
     def _get_interp_mat(self):
+        """
+        Interpolation from data on Ix to Ix_reorder (aka Chebyshev to dropped corners / gaussian)
+        """
         
         p = self.p; q = self.q; a = self.a
         
@@ -416,16 +420,10 @@ class HPS_Disc:
                 else:
                     q += 10
             toc = time() - tic
-
-            #print(Interp_loc)
-            #print(Interp_loc.shape)
-
-            # TODO: for 3d, we need to extend this from edge-to-edge to face-to-face. Given p, the final size should be
-            # 6*(p-2)^2 + 12*(p) - 8 X 6*(p-2)^2
             
             # Expand the dimensions of Interp_loc once then repeat it four times
             Interp_mat_chebfleg = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc,0),4,axis=0))
-            #print(Interp_mat_chebfleg.shape)
+            
             # Reorder the columns
             perm = np.hstack((np.arange(p-2),\
                             np.arange(p-2)+3*(p-2),\

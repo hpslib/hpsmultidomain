@@ -5,10 +5,15 @@ from domain_driver import *  # Importing domain driver utilities for PDE solving
 from built_in_funcs import *  # Importing built-in functions for specific PDEs or conditions
 
 def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_timesteps=1):
+    """
+    Once we have defined a domain and constrcuted a sparse system for solving the boundaries of
+    the subdomains, we use this function to solve.
+    """
     print("SOLVE RESULTS")
     solve_info = dict()
     d = args.d
 
+    # We determine the Dirichlet BC and body load based on our pde and domain:
     if (args.bc == 'free_space'):
         if (args.pde == 'bfield_constant'):
             ff_body = None; known_sol = True
@@ -105,38 +110,40 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
     if (args.solver == 'slabLU'):
         raise ValueError("this code is not included in this version")
 
+
     ff_body_func = ff_body
     ff_body_vec  = None
     total_toc_system_solve = 0
     total_toc_leaf_solve   = 0
+
+    # For elliptic PDEs this loop runs only once. For parabolic PDEs it executes for the desired number of time steps,
+    # saving the final result.
     for i in range(num_timesteps):
         print("\nFOR the %d timestep:\n" % i)
+
+        # Modifyinh body load and DBC for ne time step if needed
         if i > 0:
             ff_body_vec  = uu_sol
             ff_body_func = None
             # Update the Dirichlet BC for the new timestep (parabolic heat only):
-            #if (args.bc == 'convection_diffusion'):
-            #    uu_dir = lambda xx: uu_dir_func_convection(xx, delta_t*(i+1))
             if (args.bc == 'parabolic_heat'):
                 uu_dir = lambda xx: uu_dir_func_parabolic_heat(xx, delta_t*(i+1))
-            #else:
-            #    raise ValueError("multiple time steps means either convection-diffusion or parabolic laplace")
-            uu_sol_old = uu_sol
 
+        # Solving the system and gathering both the system solve and leaf solve times:
         uu_sol,res, true_res,resloc_hps,toc_system_solve,toc_leaf_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,known_sol=known_sol)
         total_toc_system_solve += toc_system_solve
         total_toc_leaf_solve += toc_leaf_solve
         
+        # Observing norm change in u for parabolic problems to see if unrealistic accumulation happens:
         if i > 0:
-        #    change = torch.linalg.norm(uu_sol - uu_sol_old) / torch.linalg.norm(uu_sol_old)
             sol_norm = torch.linalg.norm(uu_sol, ord=1)
-        #    print("Change in u from previous timestep is " + str(change.item()))
             print("With current vector 1-norm of " + str(sol_norm.item()))
 
     sol_norm = torch.linalg.norm(uu_sol)
 
     print("\n\n")
 
+    # Saving solve info:
     if (args.solver == 'superLU'):
         print("\t--SuperLU solved Ax=b residual %5.2e with known solution residual %5.2e and resloc_HPS %5.2e in time %5.2f s"\
             %(res,true_res,resloc_hps,total_toc_system_solve+total_toc_leaf_solve))

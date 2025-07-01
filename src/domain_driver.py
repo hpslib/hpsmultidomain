@@ -165,11 +165,13 @@ class Domain_Driver:
             self.I_Xtot_in_unique = self.hps.I_unique[self.I_Xtot]
 
             # Note that I_Xtot and I_Ctot are both out of all XX, not just the unique
-            # boundaries. I might want to redefine this later.
+            # boundaries.
             
     
-    # ONLY NEEDED FOR SPARSE SOLVE
     def build_superLU(self,verbose):
+        """
+        Constructs the sparse system using superLU from scipy.sparse. Used if PETSc is not avaialble.
+        """
         info_dict = dict()
         try:
             tic = time()
@@ -196,8 +198,11 @@ class Domain_Driver:
             print("SuperLU had an error.")
         return info_dict
     
-    # ONLY NEEDED FOR SPARSE SOLVE
+    
     def build_petsc(self,solvertype,verbose):
+        """
+        Constructs the sparse system using MUMPS from petsc4py. Preferred.
+        """
         #
         # Here we will try setting different MUMPS parameters to improve speed
         #
@@ -244,8 +249,9 @@ class Domain_Driver:
 
         return info_dict
     
-    # Builds the sparse matrix that encodes the colutions to boundary points.
+    # Builds the sparse matrix that encodes the solutions to boundary points.
     def build_blackboxsolver(self,solvertype,verbose):
+
         info_dict = dict()
         #print("Made it to build_blackboxsolver")
         if self.d==2:
@@ -269,40 +275,18 @@ class Domain_Driver:
             A_CC = self.A[I_copy1] + self.A[I_copy2]
             A_CC = A_CC[:,I_copy1] + A_CC[:,I_copy2]
 
-            #self.dense_A_CC = A_CC.toarray()
-            
-            #print("\n\nCondition number of A_CC: " + str(np.linalg.cond(self.dense_A_CC)) + "\n\n")
-            """
-            print("Singular values of A_CC:")
-            U, S, _ = np.linalg.svd(self.dense_A_CC)
-            print(S)
-            abs_dense_A_CC = np.abs(self.dense_A_CC)
-            largest = np.max(abs_dense_A_CC)
-            smallest = np.min(abs_dense_A_CC)
-            arglargest = np.argmax(abs_dense_A_CC)
-            argsmallest = np.argmin(abs_dense_A_CC)
-            print("Largest / smallest entry is " + str(largest) + ", " + str(smallest))
-            print("Where is " + str(arglargest) + ", " + str(argsmallest))
-            print(self.dense_A_CC.shape)
-            """
-            #import sys
-            #np.set_printoptions(threshold=sys.maxsize)
-            #print(self.dense_A_CC)
-            #print(self.dense_A_CC.shape)
-            #print(np.linalg.det(self.dense_A_CC))
-
         self.A_CC = A_CC
-        print("Trimmed the unnecessary parts to make A_CC, now assembly with PETSc")
+        print("Trimmed the unnecessary parts to make A_CC, now assembly with PETSc (or maybe SuperLU)")
         if (not petsc_available):
             info_dict = self.build_superLU(verbose)
         else:
-            #info_dict = self.build_superLU(verbose)
             info_dict = self.build_petsc(solvertype,verbose)
         return info_dict
 
-    # MOSTLY NEEDED FOR SPARSE SOLVE
-    def build(self,sparse_assembly,
-              solver_type,verbose=True):
+    def build(self,sparse_assembly, solver_type,verbose=True):
+        """
+        Assembles the sparse system, then factorizes it using build_blackboxsolver
+        """
         
         self.sparse_assembly = sparse_assembly
         self.solver_type     = solver_type
@@ -343,8 +327,10 @@ class Domain_Driver:
         info_dict['toc_assembly'] = assembly_time_dict['toc_DtN']
         return info_dict
                 
-    # Used to get the RHS
     def get_rhs(self,uu_dir_func,ff_body_func=None,ff_body_vec=None,sum_body_load=True):
+        """
+        Obtains the right-hand-side of a solve based on body loads and Dirichlet BCs.
+        """
         I_Ctot   = self.I_Ctot
         I_Xtot   = self.I_Xtot
         nrhs = 1
@@ -382,8 +368,10 @@ class Domain_Driver:
         
         return ff_body
     
-    # This takes our computed solution sol and plugs it into A to get the difference, A sol - f
     def solve_residual_calc(self,sol,ff_body):
+        """
+        This takes our computed solution sol and plugs it into A to get the difference, A (sol) - f
+        """
         if (self.d==3) or (not self.periodic_bc):
             if self.d==2:
                 res = apply_sparse_lowmem(self.A,self.I_Ctot,self.I_Ctot,sol) - ff_body
@@ -407,8 +395,10 @@ class Domain_Driver:
                                        self.I_Ctot[self.I_Ctot_copy2], sol[self.I_Ctot_copy1])
         return res
     
-    # This solves for the box boundaries using either superLU or PETSC
     def solve_helper_blackbox(self,uu_dir_func,ff_body_func=None,ff_body_vec=None):
+        """
+        This solves for the box boundaries using either superLU or PETSC.
+        """
         
         tic = time()
         ff_body = self.get_rhs(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
@@ -426,18 +416,6 @@ class Domain_Driver:
         relerr  = np.linalg.norm(res,ord=2)/np.linalg.norm(ff_body,ord=2)
         print("NORM OF RESIDUAL for solver %5.2e" % relerr)
 
-        ##### note that you were previously calling GMRES without a preconditioner
-        """
-        solve_op = spla.LinearOperator(shape=self.A_CC.shape, matvec = self.superLU.solve)
-        sol = spla.gmres(self.A_CC,ff_body,M=solve_op,rtol=1e-13,maxiter=10)[0]
-        if (ff_body.ndim ==2):
-            sol = sol[:,np.newaxis]
-
-        res     = self.A_CC @ sol - ff_body
-        relerr  = np.linalg.norm(res,ord=2)/np.linalg.norm(ff_body,ord=2)
-        print("NORM OF RESIDUAL for solver with PRECONDITIONED gmres %5.2e" % relerr)
-        """
-
         sol = torch.tensor(sol); ff_body = torch.tensor(ff_body)
         toc_solve = time() - tic
         true_c_sol = uu_dir_func(self.hps.xx_active[self.I_Ctot])
@@ -446,10 +424,11 @@ class Domain_Driver:
         rel_err = 0. #torch.linalg.norm(res) / torch.linalg.norm(ff_body)
         return sol,rel_err,toc_solve, ff_body
         
-    """
-    The main function that solves the sparse system and leaf interiors.
-    """
+
     def solve(self,uu_dir_func,ff_body_func=None,ff_body_vec=None,known_sol=False):
+        """
+        The main function that solves the sparse system and leaf interiors.
+        """
         if self.d==2:
             if (self.solver_type == 'slabLU'):
                 raise ValueError("not included in this version")

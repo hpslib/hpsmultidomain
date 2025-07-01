@@ -8,7 +8,7 @@ plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
 
 # This is a function that produces a plot of the solution to the given PDE
 # Several variables reuqire manual editing to get the best visual results
-# - such as center, interior, and the x, y, and x bounds
+# - such as center, interior, and the x, y, and z bounds
 
 def visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh=0):
 

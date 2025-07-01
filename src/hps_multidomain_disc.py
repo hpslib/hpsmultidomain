@@ -194,10 +194,6 @@ class HPS_Multidomain:
             #col_data[3*size_face:4*size_face] += n2*size_ext - size_face
             #col_data[5*size_face:]            += size_ext - size_face
 
-            # This might cause problems for the RUF edges on the domain... should modify this to
-            # avoid accidentally hitting those. That said, these accidental hits should be on
-            # boundaries that aren't touched by A_CC anyway
-
 
             row_data = torch.repeat_interleave(col_data, size_ext)
             col_data = col_data.repeat((size_ext))
@@ -207,17 +203,10 @@ class HPS_Multidomain:
 
             row_data = box_range + row_data
             col_data = box_range + col_data
-            #print("Built row and column data")
             data = DtN_loc.flatten()
             row_data = row_data.flatten()
             col_data = col_data.flatten()
-            #print(len(torch.unique(row_data)))
-            #print(len(torch.unique(col_data)))
             toc_flatten = time() - tic
-            #print("Flattened data")
-
-        print("Type of numpy row_data:")
-        print(row_data.detach().cpu().numpy().dtype)
         
         tic = time()
         sp_mat = sp.coo_matrix((data.detach().cpu().numpy(),(row_data.detach().cpu().numpy(),col_data.detach().cpu().numpy())))
@@ -225,11 +214,6 @@ class HPS_Multidomain:
         toc_csr_scipy = time() - tic
 
         print("Assembled sparse matrix")
-
-        #import sys
-        #np.set_printoptions(threshold=sys.maxsize)
-        #dense_mat = sp_mat.toarray()
-        #print(dense_mat.shape)
 
         if self.d==2:
             if (verbose) and (self.d==2):
@@ -431,8 +415,6 @@ class HPS_Multidomain:
             I_copy2[:,:,0,4*size_face:5*size_face] = -1 # Eliminate back faces on back edge
             I_copy2 = I_copy2.flatten()
             I_copy2 = I_copy2[I_copy2 > -1]
-            #print("I_copy2 shape is " + str(I_copy2.shape))
-            #print(I_copy2)
 
         return I_unique,I_copy1,I_copy2
     
@@ -440,6 +422,11 @@ class HPS_Multidomain:
     ########################################## DtN multidomain build and solve ###################################
         
     def get_DtNs(self,device,mode='build',data=0,ff_body_func=None,ff_body_vec=None,uu_true=None):
+        """
+        Organizes and batches linear algebra operations to be run on GPUs.
+        Most prominently this is for the assembly of DtN maps used to make the sparse system,
+        but it also handles interior leaf solves and the computation of the RHS in some cases.
+        """
         p = self.p; q = self.q; nboxes = self.nboxes; d = self.d
         pdo = self.pdo
         
@@ -511,6 +498,10 @@ class HPS_Multidomain:
 
     # Input: uu_sol on I_unique
     def solve(self,device,uu_sol,ff_body_func=None,ff_body_vec=None,uu_true=None):
+        """
+        Given the solution to the subdomain boundaries (present in uu_sol), this computes
+        the solution on the subdomain interiors. It also does error analysis if a true solution is known.
+        """
         nrhs     = uu_sol.shape[-1] # almost always 1, guessing this if for solving multiple rhs in parallel
         size_ext = 4*(self.q)
         if self.d==3:
@@ -519,46 +510,25 @@ class HPS_Multidomain:
         nboxes   = torch.prod(self.n)
         uu_sol   = uu_sol.to(device)
         
+        # Put the solution on all subdomain boundaries (inclduing global DBC) into one array:
         uu_sol_bnd = torch.zeros(nboxes*size_ext,nrhs,device=device)
         uu_sol_bnd[self.I_unique] = uu_sol
         uu_sol_bnd[self.I_copy2]  = uu_sol_bnd[self.I_copy1]
-
-        torch.set_printoptions(threshold=10_000)
-        #print(uu_sol_bnd)
         
-        uu_sol_bnd = uu_sol_bnd.reshape(nboxes,size_ext,nrhs)
-        #print(uu_sol_bnd)
-        uu_sol_tot = self.get_DtNs(device,mode='solve',data=uu_sol_bnd,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
-        #print(uu_sol_tot)
-        """
-        from torch.profiler import profile, record_function, ProfilerActivity
-        activities = [ProfilerActivity.CPU]
-        if torch.cuda.is_available():
-            device_string = 'cuda'
-            activities += [ProfilerActivity.CUDA]
-        else:
-            device_string = 'cpu'
-        sort_by_keyword = device_string + "_time_total"
-        with profile(activities=activities, record_shapes=True) as prof:
-            with record_function("get_DtNs"):
-                self.get_DtNs(device,mode='solve',data=uu_sol_bnd,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
-        print(prof.key_averages(group_by_input_shape=False).table(sort_by=sort_by_keyword, row_limit=12))
-        """
+        # Compute the subdomain interiors using get_DtNs, then flatten:
+        uu_sol_bnd  = uu_sol_bnd.reshape(nboxes,size_ext,nrhs)
+        uu_sol_tot  = self.get_DtNs(device,mode='solve',data=uu_sol_bnd,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
         uu_sol_flat = uu_sol_tot[...,:nrhs].flatten(start_dim=0,end_dim=-2)
-
-        #print(uu_sol_tot[...,nrhs:].shape)
-        #print("Residual on boundary:")
-        #print(uu_sol_tot[:,self.H.JJ.Jxunique,nrhs:])
-        #print("Max is " + str(torch.max(uu_sol_tot[:,self.H.JJ.Jxunique,nrhs:])))
-        #print("Residual on interior. Shape is " + str(uu_sol_tot[:,self.H.JJ.Jc,nrhs:].shape))
-        #print(uu_sol_tot[:,self.H.JJ.Jc,nrhs:])
-        #print("Max is " + str(torch.max(uu_sol_tot[:,self.H.JJ.Jc,nrhs:])))
 
         resvec_blocks = torch.linalg.norm(uu_sol_tot[...,nrhs:])
         res_lochps = torch.max(resvec_blocks).item()
         return uu_sol_flat, res_lochps
     
     def reduce_body(self,device,ff_body_func,ff_body_vec):
+        """
+        This forms the RHS using the body load. GPUs are used to compute the statically-condensed load
+        on the subdomain boundaries more efficiently.
+        """
         ff_red = self.get_DtNs(device,mode='reduce_body',ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
         
         ff_red_flatten = ff_red.flatten(start_dim=0,end_dim=-2)

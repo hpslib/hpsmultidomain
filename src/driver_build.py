@@ -6,10 +6,10 @@ from built_in_funcs import *  # Importing built-in functions for specific PDEs o
 
 torch.set_printoptions(precision=16)
 
-#
-# Configure the PDE operator and domain based on specified arguments
-#
 def configure_pde_domain(args):
+    """
+    Configure the PDE operator and domain based on the given command-line arguments
+    """
     param_map     = None
     inv_param_map = None
     curved_domain = False
@@ -189,10 +189,11 @@ def configure_pde_domain(args):
 
     return op, param_map, inv_param_map, curved_domain, kh, delta_t, num_timesteps
 
-#
-# Given a domain decomposition, constructs the operator needed for the HPS computation:
-#
 def build_operator_with_info(dom, args, box_geom, kh=0):
+    """
+    Given a domain decomposition, constructs the operator needed for the HPS computation.
+    This also stores outut in 'build_info'
+    """
     N = (args.p-2) * (args.p*dom.hps.n[0]*dom.hps.n[1] + dom.hps.n[0] + dom.hps.n[1])
 
     build_info = dom.build(sparse_assembly=args.sparse_assembly,\
