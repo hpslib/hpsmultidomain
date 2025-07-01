@@ -4,33 +4,22 @@
 
 from test_3d import run_test_via_argparse
 
-# First we'll run a suite of Poisson problems for different n and p:
-#p_list = [10, 12, 14, 16, 18, 20, 22]#, 24, 26]
-#p_list = [30]
-#p_list = [10, 12, 14, 16, 18]
-#p_list = [14]
-
+# Can set different parameters for a longer test here:
+# ranges of p, domain shape, pde and bc of choice,
+# and more (depending on the PDE you wish to solve)
 p_list = [10,12,14,16,18,20,22]
-#p_list = [18,20,22] 
-#p_list = [20,22]
-p_list = [10, 14]
-
-#p_list = [9,11,13,15,17,19,21]
 
 domain = "square"
-pde = "convection_diffusion"
-bc = "convection_diffusion"
+pde = "poisson"
+bc = "log_dist"
 ppw = None
 kh = None
-delta_t = 0.1
+delta_t = None
 
-output_path = "output/convection_diffusion_dte1/"
+output_path = "output/poisson_test/" # Folder needs to exist
 
 for p in p_list:
     n_list = list(range(2*(p-2), 200, p-2))
-    
-    #n_list = list(range(200, 250, p-2))
-    #n_list = list(range(2*(p-2), 10*(p-2)+1, p-2))
     
     for n in n_list:
         print("\nRunning " + str(p) + ", " + str(n) + "\n")
