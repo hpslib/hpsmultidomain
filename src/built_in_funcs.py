@@ -119,6 +119,12 @@ def uu_dir_pulse(xx,kh):
     return uu_dir
 
 def uu_dir_func_greens(d,xx,kh,center=torch.tensor([-1.1,+1.,+1.2])):
+    """
+    Green's functions for the Poisson and Helmholtz equations.
+    kh=0 defaults to Poisson, kh>0 is Helmholtz
+    These are used for the Dirichlet BC in Poisson and Helmholtz examples to produce a manufactured solution
+    for testing.
+    """
     
     dd0 = xx[:,0] - center[0]
     dd1 = xx[:,1] - center[1]
@@ -142,12 +148,21 @@ def uu_dir_func_greens(d,xx,kh,center=torch.tensor([-1.1,+1.,+1.2])):
     return uu_exact.unsqueeze(-1)
 
 def uu_true_variable_helmholtz(d,xx,kh,center=torch.tensor([-1.1,+2.,+2.2])):
+    """
+    Manufactured solution for a variable-coefficient Helmholtz equation.
+    """
     uu_exact = np.sin(kh * xx[:,0]) * xx[:,1] * xx[:,1]
     if d==3:
         uu_exact = uu_exact * xx[:,2] * xx[:,2]
     return uu_exact.unsqueeze(-1)
 
 def du_dir_func_greens(deriv,d,xx,kh,center=torch.tensor([-1.1,+1.,+1.2])):
+    """
+    First order derrivative for Green's functions for the Poisson and Helmholtz equations.
+    kh=0 defaults to Poisson, kh>0 is Helmholtz
+    These are used for some unit tests.
+    """
+
     if d==2:
         print("Error! This is only for d=3")
     dd0 = xx[:,0] - center[0]

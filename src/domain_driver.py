@@ -53,26 +53,6 @@ def to_torch_csr(A, device=torch.device('cpu')):
     A.sort_indices()
     return torch.sparse_csr_tensor(A.indptr, A.indices, A.data, size=(A.shape[0], A.shape[1]), device=device)
 
-def get_nearest_div(n, x):
-    """
-    Finds the divisor of n that is nearest to x. In case of a tie, chooses the larger divisor.
-    
-    Parameters:
-    - n: The number to find divisors of.
-    - x: The target value to approximate through divisors of n.
-    
-    Returns:
-    - The divisor of n nearest to x.
-    """
-    factors = list(reduce(list.__add__, ([i, n//i] for i in range(1, int(n**0.5) + 1) if n % i == 0)))
-    factors = torch.tensor(factors)
-    nearest_div, dist = n, np.abs(n - x)
-    for f in factors:
-        dist_f = np.abs(f - x)
-        if dist_f < dist or (dist_f == dist and f > nearest_div):
-            nearest_div, dist = f, dist_f
-    return nearest_div.item()
-
 def apply_sparse_lowmem(A, I, J, v, transpose=False):
     """
     Applies a sparse matrix to a vector or batch of vectors with minimal memory usage,
@@ -264,7 +244,7 @@ class Domain_Driver:
 
         return info_dict
     
-    # ONLY NEEDED FOR SPARSE SOLVE
+    # Builds the sparse matrix that encodes the colutions to boundary points.
     def build_blackboxsolver(self,solvertype,verbose):
         info_dict = dict()
         #print("Made it to build_blackboxsolver")
@@ -336,23 +316,7 @@ class Domain_Driver:
         tic = time()
         self.A,assembly_time_dict = self.hps.sparse_mat(device,verbose)
         toc_assembly_tot = time() - tic
-        """
-        from torch.profiler import profile, record_function, ProfilerActivity
 
-        activities = [ProfilerActivity.CPU]
-        if torch.cuda.is_available():
-            device_string = 'cuda'
-            activities += [ProfilerActivity.CUDA]
-        else:
-            device_string = 'cpu'
-        sort_by_keyword = device_string + "_time_total"
-        
-        with profile(activities=activities, record_shapes=True) as prof:
-            with record_function("sparse_mat"):
-                self.hps.sparse_mat(device,verbose)
-        
-        print(prof.key_averages(group_by_input_shape=False).table(sort_by=sort_by_keyword, row_limit=12))
-        """
         #print("Built sparse matrix A")
         csr_stor  = self.A.data.nbytes
         csr_stor += self.A.indices.nbytes + self.A.indptr.nbytes
@@ -379,7 +343,7 @@ class Domain_Driver:
         info_dict['toc_assembly'] = assembly_time_dict['toc_DtN']
         return info_dict
                 
-    # ONLY NEEDED FOR SPARSE SOLVE
+    # Used to get the RHS
     def get_rhs(self,uu_dir_func,ff_body_func=None,ff_body_vec=None,sum_body_load=True):
         I_Ctot   = self.I_Ctot
         I_Xtot   = self.I_Xtot
@@ -443,7 +407,7 @@ class Domain_Driver:
                                        self.I_Ctot[self.I_Ctot_copy2], sol[self.I_Ctot_copy1])
         return res
     
-    # ONLY NEEDED FOR SPARSE SOLVE
+    # This solves for the box boundaries using either superLU or PETSC
     def solve_helper_blackbox(self,uu_dir_func,ff_body_func=None,ff_body_vec=None):
         
         tic = time()
@@ -482,7 +446,9 @@ class Domain_Driver:
         rel_err = 0. #torch.linalg.norm(res) / torch.linalg.norm(ff_body)
         return sol,rel_err,toc_solve, ff_body
         
-        
+    """
+    The main function that solves the sparse system and leaf interiors.
+    """
     def solve(self,uu_dir_func,ff_body_func=None,ff_body_vec=None,known_sol=False):
         if self.d==2:
             if (self.solver_type == 'slabLU'):
@@ -506,13 +472,11 @@ class Domain_Driver:
                 raise ValueError("not included in this version")
             else:
                 sol,rel_err,toc_system_solve, ff_body = self.solve_helper_blackbox(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
-                #print(sol)
 
-            # self.A is black box matrix:
+            # We set the solution on the subdomain boundaries to the result of our sparse system.
             sol_tot = torch.zeros(len(self.hps.I_unique),1)
-            
-            # Replace this with sol to do full system solve:
-            sol_tot[self.I_Ctot] = sol #uu_dir_func(self.hps.xx_active[self.I_Ctot])
+            sol_tot[self.I_Ctot] = sol
+
             # Here we set the true exterior to the given data:
             sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
             
@@ -522,10 +486,6 @@ class Domain_Driver:
             forward_bdry_error = forward_bdry_error.item()
             reverse_bdry_error = torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)
             reverse_bdry_error = reverse_bdry_error.item()
-
-            #np.set_printoptions(threshold=sys.maxsize)
-            #print(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy())
-            #print(sol.cpu().detach().numpy())
 
             print("Relative error when applying the sparse system as a FORWARD operator on the true solution, i.e. ||A u_true - b||: %5.2e" % forward_bdry_error)
             print("Relative error when using the factorized sparse system to solve, i.e. ||A^-1 b - u_true||: %5.2e" % reverse_bdry_error)
@@ -556,16 +516,14 @@ class Domain_Driver:
             if self.d==2:
                 true_err = torch.linalg.norm(sol_tot-uu_true) / torch.linalg.norm(uu_true)
             if self.d==3:
-                # special protocol for 3D case, temporarily avoiding edges of boxes:
-                #sol_tot = torch.reshape(sol_tot, (self.hps.nboxes,self.hps.p**3))
+                # special protocol for 3D case, needed due to the dropped corners in Chebyshev nodes:
                 uu_true = torch.reshape(uu_true, (self.hps.nboxes,self.hps.p**3))
 
                 Jx   = torch.tensor(self.hps.H.JJ.Jx)#.to(device)
                 Jc   = torch.tensor(self.hps.H.JJ.Jc)#.to(device)
                 Jtot = torch.hstack((Jc,Jx))
                 true_err = torch.linalg.norm(sol_tot[:,Jtot]-uu_true[:,Jtot]) / torch.linalg.norm(uu_true[:,Jtot])
-                #print(uu_true[:,Jtot])
-                #print(sol_tot[:,Jtot])
+
             del uu_true
             true_err = true_err.item()
 
