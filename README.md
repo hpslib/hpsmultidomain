@@ -15,7 +15,12 @@ The Hierarchical Poincaré-Steklov (HPS) Solver is a high-performance computing 
 - [SciPy](https://scipy.org/): For sparse matrix operations and linear algebra.
 - [PETSc](https://www.mcs.anl.gov/petsc/) (Optional): For parallel linear algebra operations. The solver can fall back to SciPy if PETSc is not available.
 
-Example usage:
+Example usage.
+For a 2D problem:
 ```
-python argparse_driver.py --disc hps --pde poisson --domain square --bc log_dist --n 1000 --p 12 --solver superLU
+python argparse_driver.py --disc hps --pde poisson --domain square --bc log_dist --n 1000 --p 12 --d 2 --solver superLU
+```
+And for a 3D problem:
+```
+python src/argparse_driver.py --pde poisson --domain square --bc log_dist --n 50 --p 12 --d 3 --solver MUMPS
 ```
