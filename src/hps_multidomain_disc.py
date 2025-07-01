@@ -507,7 +507,7 @@ class HPS_Multidomain:
         Given the solution to the subdomain boundaries (present in uu_sol), this computes
         the solution on the subdomain interiors. It also does error analysis if a true solution is known.
         """
-        nrhs     = uu_sol.shape[-1] # almost always 1, guessing this if for solving multiple rhs in parallel
+        nrhs     = uu_sol.shape[-1]
         size_ext = 4*(self.q)
         if self.d==3:
             size_ext = 6*(self.q**2)

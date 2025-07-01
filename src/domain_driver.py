@@ -208,10 +208,11 @@ class Domain_Driver:
         #
 
         # Set the blocksize using icntl(15) to the size of a face (q**2)
-        PETSc.Options()['mat_mumps_icntl_15'] = -self.hps.q**2
+        if self.d==3:
+            PETSc.Options()['mat_mumps_icntl_15'] = -self.hps.q**2
 
         info_dict = dict()
-        tmp = self.A_CC #.tocsr()
+        tmp = self.A_CC
         pA = PETSc.Mat().createAIJ(tmp.shape, csr=(tmp.indptr,tmp.indices,tmp.data),comm=PETSc.COMM_WORLD)
         
         ksp = PETSc.KSP().create(comm=PETSc.COMM_WORLD)
@@ -257,9 +258,9 @@ class Domain_Driver:
                 A_copy[np.ix_(self.I_Ctot_copy1,self.I_Ctot_copy1)] += \
                 A_copy[np.ix_(self.I_Ctot_copy2,self.I_Ctot_copy2)]
                 
-                A_CC = A_copy[np.ix_(self.I_Ctot_unique,self.I_Ctot_unique)].tocsc()
+                A_CC = A_copy[np.ix_(self.I_Ctot_unique,self.I_Ctot_unique)].tocsr()
             else: # not periodic
-                A_CC = self.A[self.I_Ctot][:,self.I_Ctot].tocsc()
+                A_CC = self.A[self.I_Ctot][:,self.I_Ctot].tocsr()
         else: #self.d==3. Same for periodic and not since the change is in I_copy1, I_copy2:
             I_copy1 = self.hps.I_copy1.detach().cpu().numpy()
             I_copy2 = self.hps.I_copy2.detach().cpu().numpy()
@@ -410,9 +411,10 @@ class Domain_Driver:
         sol = torch.tensor(sol); ff_body = torch.tensor(ff_body)
         toc_solve = time() - tic
         true_c_sol = uu_dir_func(self.hps.xx_active[self.I_Ctot])
-        #res = self.solve_residual_calc(true_c_sol,ff_body)
+        res = np.linalg.norm(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body)
         
-        rel_err = 0. #torch.linalg.norm(res) / torch.linalg.norm(ff_body)
+        rel_err = torch.linalg.norm(res) / torch.linalg.norm(ff_body)
+
         return sol,rel_err,toc_solve, ff_body
         
 
@@ -424,7 +426,7 @@ class Domain_Driver:
             if (self.solver_type == 'slabLU'):
                 raise ValueError("not included in this version")
             else:
-                sol,rel_err,toc_system_solve, _ = self.solve_helper_blackbox(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
+                sol,rel_err,toc_system_solve, ff_body = self.solve_helper_blackbox(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
 
             # self.A is black box matrix:
             sol_tot = torch.zeros(self.A.shape[0],1)
@@ -437,9 +439,14 @@ class Domain_Driver:
             # Here we set the true exterior to the given data:
             sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
 
-            # These intermediate checks aren't used in 2D:
-            forward_bdry_error = 0
-            reverse_bdry_error = 0
+            true_c_sol = uu_dir_func(self.hps.xx_active[self.I_Ctot])
+
+            forward_bdry_error = rel_err
+            reverse_bdry_error = torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)
+            reverse_bdry_error = reverse_bdry_error.item()
+
+            print("Relative error when applying the sparse system as a FORWARD operator on the true solution, i.e. ||A u_true - b||: %5.2e" % forward_bdry_error)
+            print("Relative error when using the factorized sparse system to solve, i.e. ||A^-1 b - u_true||: %5.2e" % reverse_bdry_error)
 
             del sol
         else: # 3D
@@ -457,8 +464,7 @@ class Domain_Driver:
             
             true_c_sol = uu_dir_func(self.hps.xx_active[self.I_Ctot])
 
-            forward_bdry_error = np.linalg.norm(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body)
-            forward_bdry_error = forward_bdry_error.item()
+            forward_bdry_error = rel_err
             reverse_bdry_error = torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)
             reverse_bdry_error = reverse_bdry_error.item()
 
