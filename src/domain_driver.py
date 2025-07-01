@@ -238,15 +238,6 @@ class Domain_Driver:
         
         self.petsc_LU = ksp
 
-        #from scipy.sparse.linalg import spsolve
-        #v = np.random.rand(self.A_CC.shape[0],)
-        #result = self.A_CC @ spsolve(self.A_CC,v.copy())
-        #condest = np.linalg.cond(self.A_CC.todense())
-
-        #res = np.linalg.norm(result - v,ord=2)
-        #print("RELATIVE RESIDUAL OF SOLUTION %5.2e" % res)
-        #print("COND A_CC %5.2e" % condest)
-
         return info_dict
     
     # Builds the sparse matrix that encodes the solutions to boundary points.
@@ -433,7 +424,7 @@ class Domain_Driver:
             if (self.solver_type == 'slabLU'):
                 raise ValueError("not included in this version")
             else:
-                sol,rel_err,toc_solve, _ = self.solve_helper_blackbox(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
+                sol,rel_err,toc_system_solve, _ = self.solve_helper_blackbox(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
 
             # self.A is black box matrix:
             sol_tot = torch.zeros(self.A.shape[0],1)
@@ -445,6 +436,11 @@ class Domain_Driver:
                 sol_tot[self.I_Ctot[self.I_Ctot_copy2]]  = sol[self.I_Ctot_copy1]
             # Here we set the true exterior to the given data:
             sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
+
+            # These intermediate checks aren't used in 2D:
+            forward_bdry_error = 0
+            reverse_bdry_error = 0
+
             del sol
         else: # 3D
             if (self.solver_type == 'slabLU'):
@@ -486,13 +482,14 @@ class Domain_Driver:
         toc_leaf_solve = time() - tic
         sol_tot = sol_tot.cpu()
 
-        sol_tot = torch.reshape(sol_tot, (self.hps.nboxes,self.hps.p**3))
+        sol_tot = torch.reshape(sol_tot, (self.hps.nboxes,self.hps.p**self.d))
 
         true_err = torch.tensor([float('nan')])
         if (known_sol):
             XX = self.hps.xx_tot
             uu_true = uu_dir_func(XX.clone())
             if self.d==2:
+                uu_true = torch.reshape(uu_true, (self.hps.nboxes,self.hps.p**2))
                 true_err = torch.linalg.norm(sol_tot-uu_true) / torch.linalg.norm(uu_true)
             if self.d==3:
                 # special protocol for 3D case, needed due to the dropped corners in Chebyshev nodes:

@@ -56,9 +56,14 @@ class HPS_Multidomain:
         self.interpolate = True
         self.q = self.p - 2
 
-        if (pdo.c12 is None) and (pdo.c13 is None) and (pdo.c23 is None):
-            self.interpolate = False
-            self.q = self.p - 2
+        if d==2:
+            if (pdo.c12 is None):
+                self.interpolate = False
+                self.q = self.p - 2
+        else: # d==3
+            if (pdo.c12 is None) and (pdo.c13 is None) and (pdo.c23 is None):
+                self.interpolate = False
+                self.q = self.p - 2
         
         n = (self.domain[:,1] - self.domain[:,0]) / (2*self.a)
         n = torch.round(n).int()
@@ -246,8 +251,8 @@ class HPS_Multidomain:
                 if self.d==2:
                     box   = i*n[1] + j
                     zzloc = zz.clone()
-                    zzloc[:,0] += self.a + 2*self.a*i + self.domain[0,0]
-                    zzloc[:,1] += self.a + 2*self.a*j + self.domain[1,0]
+                    zzloc[:,0] += self.a[0] + 2*self.a[0]*i + self.domain[0,0]
+                    zzloc[:,1] += self.a[1] + 2*self.a[1]*j + self.domain[1,0]
                     xx[box,:,:] = zzloc
                 else:
                     for k in range(n[2]):

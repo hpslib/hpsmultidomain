@@ -64,12 +64,14 @@ param_map = None
 redundant_n = (args.n is not None) and ((args.n0 is not None) or (args.n1 is not None) or (args.n2 is not None))
 if redundant_n:
     ValueError("Cannot have n and n0,n1,n2 set")
+elif (args.n is not None) and (args.d==2):
+    args.n = np.array([args.n, args.n])
 elif args.n is not None:
     args.n = np.array([args.n, args.n, args.n])
 elif ((args.n0 is not None) and (args.n1 is not None) and (args.n2 is not None)):
     args.n = np.array([args.n0, args.n1, args.n2])
 else:
-    ValueError("Need to set either n or n0,n1,n2")
+    ValueError("Need to set either n or (for 3D only) n0,n1,n2")
 
 d = args.d
 box_geom = torch.tensor([[0,args.box_xlim],[0,args.box_ylim]])  # Domain geometry tensor

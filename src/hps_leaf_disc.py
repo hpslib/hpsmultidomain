@@ -393,7 +393,7 @@ class HPS_Disc:
         
     def _discretize(self,a,p,q,d):
         if d == 2:
-            self.zz, self.Ds, self.JJ, self.hmin = leaf_discretization_2d(a, p)
+            self.zz, self.Ds, self.JJ, self.hmin = leaf_discretization_2d(a[0], p)
         else:
             self.zz, self.Ds, self.JJ, self.hmin, self.zzG = leaf_discretization_3d(a, p, q) # Need to figure out a
         Nx, Nxc = get_diff_ops(self.Ds, self.JJ, d)
@@ -407,6 +407,7 @@ class HPS_Disc:
         p = self.p; q = self.q; a = self.a
         
         if self.d==2:
+            a = a[0]
             x_cheb = self.zz[-1,:p-1] + a
             x_cheb_nocorners  = self.zz[-1,1:p-1] + a
             
