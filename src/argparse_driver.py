@@ -51,6 +51,9 @@ parser.add_argument('--periodic_bc', action='store_true')  # Flag for periodic b
 # Components tests:
 parser.add_argument('--test_components', type=bool, required=False, default=False) # Test discretization components such as interpolation
 
+# Visualize solution?:
+parser.add_argument('--visualize', type=bool, required=False, default=False)
+
 args = parser.parse_args()  # Parse arguments from command line
 
 # Check if we test components:
@@ -138,4 +141,5 @@ if (args.pickle is not None):
     f.close()
 
 ### Optional visualization ###
-visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh)
+if args.visualize:
+    visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh)
