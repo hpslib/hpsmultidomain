@@ -121,7 +121,7 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
     for i in range(num_timesteps):
         print("\nFOR the %d timestep:\n" % i)
 
-        # Modifyinh body load and DBC for ne time step if needed
+        # Modifying body load and DBC for new time step if needed
         if i > 0:
             ff_body_vec  = uu_sol
             ff_body_func = None

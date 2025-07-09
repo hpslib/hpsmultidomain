@@ -2,6 +2,9 @@ import torch  # Used for tensor operations
 import numpy as np  # For numerical operations, especially those not directly supported by PyTorch
 import sys  # System-specific parameters and functions
 
+# Importing parent class:
+from abstract_hps_solver import AbstractHPSSolver
+
 # Importing necessary components for sparse matrix operations
 from scipy.sparse import kron, diags, block_diag, eye as speye, hstack as sp_hstack
 import scipy.sparse.linalg as spla  # For sparse linear algebra operations
@@ -95,7 +98,123 @@ class Domain_Driver:
         self.box_geom    = box_geom
         assert p > 0
         self.hps_disc(box_geom,a,p,d,pdo_op,periodic_bc)
-            
+
+    ################### Required functions for parent class AbstractHPSSolver #####################
+
+    #################################################
+    # Abstract properties defining essential data
+    #################################################
+
+    def geom(self):
+        """
+        Geometry object containing domain bounds and, optionally, a parameterization map.
+        Must have attribute `bounds` of shape (2, ndim).
+        """
+        return self.box_geom.T
+
+    # TODO: one or both of these might have to be I_unique indexed:
+
+    def XX(self):
+        """
+        Flattened array of coordinates for all boundary (exterior) nodes:
+        """
+        return self.XX_active
+
+    def XXfull(self):
+        """
+        Flattened array of coordinates for all discretization (including interiors) nodes:
+        """
+        return self.XXfull_reshape
+        
+    def p(self):
+        """
+        Polynomial degree used in each patch (number of Chebyshev nodes per direction).
+        """
+        return self.hps.p
+
+    def Ji(self):
+        """
+        Index array for interior (duplicated interface) points in the global boundary ordering.
+        """
+        return self.hps.I_copy1
+
+    def Jx(self):
+        """
+        Index array for unique exterior (non-duplicated) boundary points.
+        """
+        return self.I_Xtot
+
+    def npoints_dim(self):
+        """
+        Total number of Chebyshev points per dimension (npan_dim * p for each dimension).
+        """
+        return self.hps.n * self.p()
+
+    #################################################
+    # Abstract properties defining Schur complement blocks
+    #################################################
+
+    def Aii(self):
+        """
+        Sparse matrix block coupling interior‐interior (duplicated interface) degrees of freedom.
+        """
+        return self.A_CC
+
+    def Aix(self):
+        """
+        Sparse matrix block coupling interior (duplicated interface) to unique exterior DOFs.
+        """
+        return self.A_CX
+
+    def Axx(self):
+        """
+        Sparse matrix block coupling unique exterior DOFs to themselves.
+        """
+        return self.A_XX
+
+    def Axi(self):
+        """
+        Sparse matrix block coupling unique exterior DOFs to interior (duplicated interface) DOFs.
+        """
+        return self.A_XC
+
+    #################################################
+    # Utilities to solve the PDE
+    #################################################
+
+    # This needs to be interior only for n_int on ff_body... figure out how to reduce it
+    # Also need sol_tot to be just interiors (no global bdry or no box boundary?)
+    def solve_dir_full(self, uu_dir, ff_body=None):
+
+        nrhs = uu_dir.shape[-1]
+
+        # I think modifiyng ff_body here is fine:
+        if ff_body is not None:
+            if self.d == 2:
+                ff_body = torch.reshape(ff_body, (-1, self.p(), self.p(), nrhs))
+                ff_body = ff_body[:, 1:self.p(-1), 1:self.p(-1), nrhs]
+            else: #self.d == 3
+                ff_body = torch.reshape(ff_body, (-1, self.p(), self.p(), self.p(), nrhs))
+                ff_body = ff_body[:, 1:self.p(-1), 1:self.p(-1), 1:self.p(-1), nrhs]
+            ff_body = torch.reshape(ff_body, (-1, nrhs))
+        
+
+        sol_tot, _, _, _, _, _, _, _ = self.solve(self,uu_dir,ff_body_vec=ff_body)
+
+        #c Slice sol_tot to be right
+        if self.d == 2:
+            sol_tot = torch.reshape(sol_tot, (-1, self.p(), self.p(), nrhs))
+            sol_tot = sol_tot[:, 1:self.p(-1), 1:self.p(-1), nrhs]
+        else: #self.d == 3
+            sol_tot = torch.reshape(sol_tot, (-1, self.p(), self.p(), self.p(), nrhs))
+            sol_tot = sol_tot[:, 1:self.p(-1), 1:self.p(-1), 1:self.p(-1), nrhs]
+        ff_body = torch.reshape(sol_tot, (-1, nrhs))
+
+        return sol_tot
+
+    def verify_discretization(self, kh):
+        pass
+
             
     ############################### HPS discretization and panel split #####################
     def hps_disc(self,box_geom,a,p,d,pdo_op,periodic_bc):
@@ -105,14 +224,14 @@ class Domain_Driver:
         self.hps = HPS_multi
 
         if d==2:
-            self.XX  = self.hps.xx_active
+            self.XX_active  = self.hps.xx_active
             
-            self.ntot = self.XX.shape[0]
+            self.ntot = self.XX_active.shape[0]
             
-            I_Ldir = torch.where(self.XX[:,0] < self.box_geom[0,0] + 0.5 * self.hps.hmin)[0]
-            I_Rdir = torch.where(self.XX[:,0] > self.box_geom[0,1] - 0.5 * self.hps.hmin)[0]
-            I_Ddir = torch.where(self.XX[:,1] < self.box_geom[1,0] + 0.5 * self.hps.hmin)[0]
-            I_Udir = torch.where(self.XX[:,1] > self.box_geom[1,1] - 0.5 * self.hps.hmin)[0]
+            I_Ldir = torch.where(self.XX_active[:,0] < self.box_geom[0,0] + 0.5 * self.hps.hmin)[0]
+            I_Rdir = torch.where(self.XX_active[:,0] > self.box_geom[0,1] - 0.5 * self.hps.hmin)[0]
+            I_Ddir = torch.where(self.XX_active[:,1] < self.box_geom[1,0] + 0.5 * self.hps.hmin)[0]
+            I_Udir = torch.where(self.XX_active[:,1] > self.box_geom[1,1] - 0.5 * self.hps.hmin)[0]
             
             if periodic_bc:
                 self.I_Xtot  = torch.hstack((I_Ddir,I_Udir))
@@ -131,33 +250,33 @@ class Domain_Driver:
                 self.I_Ctot_copy1  = torch.arange(n_LR)
                 self.I_Ctot_copy2  = torch.arange(tot_unique, tot_C)
         else: # d==3
-            # self.XX consists of the unique X values of 
-            self.XX  = self.hps.xx_active
+            # self.XX_active consists of the unique X values of the subdomain boundaries
+            self.XX_active  = self.hps.xx_active
             
-            self.ntot = self.XX.shape[0]
+            self.ntot = self.XX_active.shape[0]
             
             tol = 0.01 * self.hps.hmin # Adding a tolerance to avoid potential numerical error
             if periodic_bc:
-                I_dir = torch.where((self.XX[:,1] < self.box_geom[1,0] + tol)
-                                | (self.XX[:,1] > self.box_geom[1,1] - tol)
-                                | (self.XX[:,2] < self.box_geom[2,0] + tol)
-                                | (self.XX[:,2] > self.box_geom[2,1] - tol))[0]
+                I_dir = torch.where((self.XX_active[:,1] < self.box_geom[1,0] + tol)
+                                | (self.XX_active[:,1] > self.box_geom[1,1] - tol)
+                                | (self.XX_active[:,2] < self.box_geom[2,0] + tol)
+                                | (self.XX_active[:,2] > self.box_geom[2,1] - tol))[0]
 
-                I_dir2 = torch.where((self.XX[:,0] > self.box_geom[0,1] - tol)
-                                | (self.XX[:,1] < self.box_geom[1,0] + tol)
-                                | (self.XX[:,1] > self.box_geom[1,1] - tol)
-                                | (self.XX[:,2] < self.box_geom[2,0] + tol)
-                                | (self.XX[:,2] > self.box_geom[2,1] - tol))[0]
+                I_dir2 = torch.where((self.XX_active[:,0] > self.box_geom[0,1] - tol)
+                                | (self.XX_active[:,1] < self.box_geom[1,0] + tol)
+                                | (self.XX_active[:,1] > self.box_geom[1,1] - tol)
+                                | (self.XX_active[:,2] < self.box_geom[2,0] + tol)
+                                | (self.XX_active[:,2] > self.box_geom[2,1] - tol))[0]
 
                 self.I_Xtot = I_dir
                 self.I_Ctot = torch.sort(torch_setdiff1d(torch.arange(self.ntot), I_dir2))[0]
             else:
-                I_dir = torch.where((self.XX[:,0] < self.box_geom[0,0] + tol)
-                                | (self.XX[:,0] > self.box_geom[0,1] - tol)
-                                | (self.XX[:,1] < self.box_geom[1,0] + tol)
-                                | (self.XX[:,1] > self.box_geom[1,1] - tol)
-                                | (self.XX[:,2] < self.box_geom[2,0] + tol)
-                                | (self.XX[:,2] > self.box_geom[2,1] - tol))[0]
+                I_dir = torch.where((self.XX_active[:,0] < self.box_geom[0,0] + tol)
+                                | (self.XX_active[:,0] > self.box_geom[0,1] - tol)
+                                | (self.XX_active[:,1] < self.box_geom[1,0] + tol)
+                                | (self.XX_active[:,1] > self.box_geom[1,1] - tol)
+                                | (self.XX_active[:,2] < self.box_geom[2,0] + tol)
+                                | (self.XX_active[:,2] > self.box_geom[2,1] - tol))[0]
             
                 self.I_Xtot = I_dir
                 self.I_Ctot = torch.sort(torch_setdiff1d(torch.arange(self.ntot), self.I_Xtot))[0]
@@ -166,6 +285,8 @@ class Domain_Driver:
 
             # Note that I_Xtot and I_Ctot are both out of all XX, not just the unique
             # boundaries.
+
+        self.XXfull_reshape = torch.reshape(self.hps.grid_xx, (self.hps.grid_xx.shape[0] * self.hps.grid_xx.shape[1], -1))
             
     
     def build_superLU(self,verbose):
@@ -261,13 +382,25 @@ class Domain_Driver:
                 A_CC = A_copy[np.ix_(self.I_Ctot_unique,self.I_Ctot_unique)].tocsr()
             else: # not periodic
                 A_CC = self.A[self.I_Ctot][:,self.I_Ctot].tocsr()
+                A_CX = self.A[self.I_Ctot][:,self.I_Xtot].tocsr()
+                A_XC = self.A[self.I_Xtot][:,self.I_Ctot].tocsr()
+                A_XX = self.A[self.I_Xtot][:,self.I_Xtot].tocsr()
         else: #self.d==3. Same for periodic and not since the change is in I_copy1, I_copy2:
             I_copy1 = self.hps.I_copy1.detach().cpu().numpy()
             I_copy2 = self.hps.I_copy2.detach().cpu().numpy()
+            I_ext   = self.I_Xtot_in_unique.detach().cpu().numpy()
             A_CC = self.A[I_copy1] + self.A[I_copy2]
             A_CC = A_CC[:,I_copy1] + A_CC[:,I_copy2]
+            A_CX = self.A[I_copy1] + self.A[I_copy2]
+            A_CX = A_CX[:,I_ext]
+            A_XC = self.A[I_ext]
+            A_XC = A_XC[:,I_copy1] + A_XC[:,I_copy2]
+            A_XX = self.A[I_ext][:,I_ext]
 
         self.A_CC = A_CC
+        self.A_CX = A_CX
+        self.A_XC = A_XC
+        self.A_XX = A_XX
         print("Trimmed the unnecessary parts to make A_CC, now assembly with PETSc (or maybe SuperLU)")
         if (not petsc_available):
             info_dict = self.build_superLU(verbose)
@@ -328,9 +461,9 @@ class Domain_Driver:
         nrhs = 1
             
         # Dirichlet data
-        # Note for 3D self.XX is already converted to Gaussian nodes and features unique entries, so
+        # Note for 3D self.XX_active is already converted to Gaussian nodes and features unique entries, so
         # this is right
-        uu_dir = uu_dir_func(self.XX[I_Xtot,:])
+        uu_dir = uu_dir_func(self.XX_active[I_Xtot,:])
 
         # body load on I_Ctot
         if self.d==2:

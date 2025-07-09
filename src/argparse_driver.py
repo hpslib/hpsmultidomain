@@ -145,3 +145,10 @@ if (args.pickle is not None):
 # Optional: visualization of computed solution
 if args.visualize:
     visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh)
+
+print(dom.XX().shape)
+print(dom.XXfull().shape)
+print(dom.p())
+print(dom.Ji().shape)
+print(dom.Jx().shape)
+print(dom.npoints_dim())

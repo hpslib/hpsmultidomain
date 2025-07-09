@@ -124,6 +124,9 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
     All tensors should be small enough to fit on the GPU (if using one)
     """
 
+    if ff_body_vec is not None:
+        ff_body_vec = ff_body_vec.to(device)
+
     # This one doesn't require Aloc
     if (mode == 'reduce_body'):
         # assume that the data is a function that you can apply to
@@ -144,9 +147,6 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
     else:
         Aloc = get_Aloc_3d(*args,device)
     Acc = Aloc[:,Jc[:,None],Jc]
-
-    if ff_body_vec is not None:
-        ff_body_vec = ff_body_vec.to(device)
 
     if (mode == 'build'):
         nrhs = data.shape[-1]
