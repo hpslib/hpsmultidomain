@@ -16,6 +16,7 @@ import hps_multidomain_disc
 import pdo
 from functools import reduce  # For performing cumulative operations
 import scipy.sparse.linalg as sla  # For sparse linear algebra operations, alternative variable
+from built_in_funcs import uu_dir_func_greens
 
 # Attempting to import the PETSc library for parallel computation, handling failure gracefully
 try:
@@ -78,7 +79,7 @@ def apply_sparse_lowmem(A, I, J, v, transpose=False):
     return torch.tensor(vec_full[I])
 
 # Domain_Driver class for setting up and solving the discretized PDE
-class Domain_Driver:
+class Domain_Driver(AbstractHPSSolver):
     def __init__(self, box_geom, pdo_op, kh, a, p=12, d=2, periodic_bc=False):
         """
         Initializes the domain and discretization for solving a PDE.
@@ -136,7 +137,7 @@ class Domain_Driver:
         """
         Index array for interior (duplicated interface) points in the global boundary ordering.
         """
-        return self.hps.I_copy1
+        return self.I_Ctot #self.hps.I_copy1
 
     def Jx(self):
         """
@@ -188,32 +189,38 @@ class Domain_Driver:
 
         nrhs = uu_dir.shape[-1]
 
-        # I think modifiyng ff_body here is fine:
-        if ff_body is not None:
-            if self.d == 2:
-                ff_body = torch.reshape(ff_body, (-1, self.p(), self.p(), nrhs))
-                ff_body = ff_body[:, 1:self.p(-1), 1:self.p(-1), nrhs]
-            else: #self.d == 3
-                ff_body = torch.reshape(ff_body, (-1, self.p(), self.p(), self.p(), nrhs))
-                ff_body = ff_body[:, 1:self.p(-1), 1:self.p(-1), 1:self.p(-1), nrhs]
-            ff_body = torch.reshape(ff_body, (-1, nrhs))
-        
-
-        sol_tot, _, _, _, _, _, _, _ = self.solve(self,uu_dir,ff_body_vec=ff_body)
+        sol_tot, _, _, _, _, _, _, _ = self.solve(uu_dir,uu_dir_vec=uu_dir,ff_body_vec=ff_body)
 
         #c Slice sol_tot to be right
         if self.d == 2:
             sol_tot = torch.reshape(sol_tot, (-1, self.p(), self.p(), nrhs))
-            sol_tot = sol_tot[:, 1:self.p(-1), 1:self.p(-1), nrhs]
+            sol_tot = sol_tot[:, 1:self.p()-1, 1:self.p()-1, :]
         else: #self.d == 3
             sol_tot = torch.reshape(sol_tot, (-1, self.p(), self.p(), self.p(), nrhs))
-            sol_tot = sol_tot[:, 1:self.p(-1), 1:self.p(-1), 1:self.p(-1), nrhs]
+            sol_tot = sol_tot[:, 1:self.p()-1, 1:self.p()-1, 1:self.p()-1, :]
         ff_body = torch.reshape(sol_tot, (-1, nrhs))
 
         return sol_tot
 
     def verify_discretization(self, kh):
-        pass
+        # 1) Possibly map XX through a parameterization, if geometry defines one
+        if hasattr(self.geom(), 'parameter_map'):
+            XX_mapped = self.geom().parameter_map(self.XX())
+        else:
+            XX_mapped = self.XX()
+
+        # 2) Evaluate known Green's function at boundary points, with a source placed far outside domain
+        uu = uu_dir_func_greens(self.d, XX_mapped, kh)
+
+        # 3) Extract boundary values (unique exterior) and interior true values
+        #uu_sol = self.solve_dir_full(uu[self.Jx()])
+        uu_sol, _, _ = self.solve_helper_blackbox(uu[self.Jx()],uu_dir_vec=uu[self.Jx()])
+        uu_true = uu[self.Ji()]
+
+        # 4) Compute error and relative error
+        err = np.linalg.norm(uu_sol - uu_true, ord=2)
+        relerr = err / np.linalg.norm(uu_true, ord=2)
+        return relerr
 
             
     ############################### HPS discretization and panel split #####################
@@ -452,7 +459,7 @@ class Domain_Driver:
         info_dict['toc_assembly'] = assembly_time_dict['toc_DtN']
         return info_dict
                 
-    def get_rhs(self,uu_dir_func,ff_body_func=None,ff_body_vec=None,sum_body_load=True):
+    def get_rhs(self,uu_dir_func,uu_dir_vec=None,ff_body_func=None,ff_body_vec=None,sum_body_load=True):
         """
         Obtains the right-hand-side of a solve based on body loads and Dirichlet BCs.
         """
@@ -463,7 +470,10 @@ class Domain_Driver:
         # Dirichlet data
         # Note for 3D self.XX_active is already converted to Gaussian nodes and features unique entries, so
         # this is right
-        uu_dir = uu_dir_func(self.XX_active[I_Xtot,:])
+        if uu_dir_vec is None:
+            uu_dir = uu_dir_func(self.XX_active[I_Xtot,:])
+        else:
+            uu_dir = uu_dir_vec
 
         # body load on I_Ctot
         if self.d==2:
@@ -520,13 +530,13 @@ class Domain_Driver:
                                        self.I_Ctot[self.I_Ctot_copy2], sol[self.I_Ctot_copy1])
         return res
     
-    def solve_helper_blackbox(self,uu_dir_func,ff_body_func=None,ff_body_vec=None):
+    def solve_helper_blackbox(self,uu_dir_func,uu_dir_vec=None,ff_body_func=None,ff_body_vec=None):
         """
         This solves for the box boundaries using either superLU or PETSC.
         """
         
         tic = time()
-        ff_body = self.get_rhs(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
+        ff_body = self.get_rhs(uu_dir_func,uu_dir_vec=uu_dir_vec,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
         ff_body = np.array(ff_body)
 
         if (not petsc_available):
@@ -541,17 +551,13 @@ class Domain_Driver:
         relerr  = np.linalg.norm(res,ord=2)/np.linalg.norm(ff_body,ord=2)
         print("NORM OF RESIDUAL for solver %5.2e" % relerr)
 
-        sol = torch.tensor(sol); ff_body = torch.tensor(ff_body)
+        sol       = torch.tensor(sol); ff_body = torch.tensor(ff_body)
         toc_solve = time() - tic
-        true_c_sol = uu_dir_func(self.hps.xx_active[self.I_Ctot])
-        res = np.linalg.norm(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body)
-        
-        rel_err = torch.linalg.norm(res) / torch.linalg.norm(ff_body)
 
-        return sol,rel_err,toc_solve, ff_body
+        return sol,toc_solve, ff_body
         
 
-    def solve(self,uu_dir_func,ff_body_func=None,ff_body_vec=None,known_sol=False):
+    def solve(self,uu_dir_func,uu_dir_vec=None,ff_body_func=None,ff_body_vec=None,known_sol=False):
         """
         The main function that solves the sparse system and leaf interiors.
         """
@@ -559,7 +565,7 @@ class Domain_Driver:
             if (self.solver_type == 'slabLU'):
                 raise ValueError("not included in this version")
             else:
-                sol,rel_err,toc_system_solve, ff_body = self.solve_helper_blackbox(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
+                sol,toc_system_solve, ff_body = self.solve_helper_blackbox(uu_dir_func,uu_dir_vec=uu_dir_vec,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
 
             # self.A is black box matrix:
             sol_tot = torch.zeros(self.A.shape[0],1)
@@ -569,38 +575,35 @@ class Domain_Driver:
             else:            
                 sol_tot[self.I_Ctot[self.I_Ctot_unique]] = sol
                 sol_tot[self.I_Ctot[self.I_Ctot_copy2]]  = sol[self.I_Ctot_copy1]
-            # Here we set the true exterior to the given data:
-            sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
 
-            true_c_sol = uu_dir_func(self.hps.xx_active[self.I_Ctot])
-
-            forward_bdry_error = rel_err
-            reverse_bdry_error = torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)
-            reverse_bdry_error = reverse_bdry_error.item()
-
-            print("Relative error when applying the sparse system as a FORWARD operator on the true solution, i.e. ||A u_true - b||: %5.2e" % forward_bdry_error)
-            print("Relative error when using the factorized sparse system to solve, i.e. ||A^-1 b - u_true||: %5.2e" % reverse_bdry_error)
-
-            del sol
         else: # 3D
             if (self.solver_type == 'slabLU'):
                 raise ValueError("not included in this version")
             else:
-                sol,rel_err,toc_system_solve, ff_body = self.solve_helper_blackbox(uu_dir_func,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
+                sol,toc_system_solve, ff_body = self.solve_helper_blackbox(uu_dir_func,uu_dir_vec=uu_dir_vec,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
 
             # We set the solution on the subdomain boundaries to the result of our sparse system.
             sol_tot = torch.zeros(len(self.hps.I_unique),1)
             sol_tot[self.I_Ctot] = sol
 
-            # Here we set the true exterior to the given data:
-            sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
-            
+        # Here we set the true exterior to the given data:
+        if uu_dir_vec is None:
             true_c_sol = uu_dir_func(self.hps.xx_active[self.I_Ctot])
+            sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
+        else:
+            print("We don't have a function for subdomain boundaries, so we're just assessing stability")
+            true_c_sol = sol
+            sol_tot[self.I_Xtot] = uu_dir_vec
 
-            forward_bdry_error = rel_err
-            reverse_bdry_error = torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)
-            reverse_bdry_error = reverse_bdry_error.item()
+        res = np.linalg.norm(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body)
+        forward_bdry_error = torch.linalg.norm(res) / torch.linalg.norm(ff_body)
 
+        reverse_bdry_error = torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)
+        reverse_bdry_error = reverse_bdry_error.item()
+
+        rel_err = forward_bdry_error
+
+        if known_sol:
             print("Relative error when applying the sparse system as a FORWARD operator on the true solution, i.e. ||A u_true - b||: %5.2e" % forward_bdry_error)
             print("Relative error when using the factorized sparse system to solve, i.e. ||A^-1 b - u_true||: %5.2e" % reverse_bdry_error)
 
@@ -611,10 +614,12 @@ class Domain_Driver:
             device = torch.device('cpu')
 
         # Creating the true solution for comparison's sake.
-        GridX = self.hps.grid_xx.clone()
-        uu_true = torch.zeros((GridX.shape[0], GridX.shape[1],1), device=device)
-        for i in range(GridX.shape[0]):
-            uu_true[i] = uu_dir_func(GridX[i])
+        uu_true = None
+        if known_sol and uu_dir_vec is not None:
+            GridX = self.hps.grid_xx.clone()
+            uu_true = torch.zeros((GridX.shape[0], GridX.shape[1],1), device=device)
+            for i in range(GridX.shape[0]):
+                uu_true[i] = uu_dir_func(GridX[i])
         
         tic = time()
         sol_tot,resloc_hps = self.hps.solve(device,sol_tot,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
