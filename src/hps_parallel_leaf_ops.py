@@ -131,15 +131,15 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
     if (mode == 'reduce_body'):
         # assume that the data is a function that you can apply to
         # xx locations
-        xx_flat = xxloc[box_start:box_end].reshape((box_end-box_start)*p**d,d)
-        f_body  = torch.zeros((box_end-box_start)*p**d,device=device).unsqueeze(-1)
+        xx_flat = xxloc[box_start:box_end,Jc].reshape((box_end-box_start)*(p-2)**d,d)
+        f_body  = torch.zeros((box_end-box_start)*(p-2)**d,device=device).unsqueeze(-1)
         if ff_body_func is not None:
             f_body += ff_body_func(xx_flat)
         if ff_body_vec is not None:
-            f_body += ff_body_vec[box_start:box_end].reshape((box_end-box_start)*p**d,1)
+            f_body += ff_body_vec[box_start:box_end].reshape((box_end-box_start)*(p-2)**d,1)
 
-        f_body = f_body.reshape(box_end-box_start,p**d,1)
-        return -Nx[:,Jc].unsqueeze(0) @ torch.linalg.solve(Acc,f_body[:,Jc])
+        f_body = f_body.reshape(box_end-box_start,(p-2)**d,1)
+        return -Nx[:,Jc].unsqueeze(0) @ torch.linalg.solve(Acc,f_body)
 
     # Otherwise we need Aloc:
     if (d == 2):
@@ -177,11 +177,11 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         nrhs   = data.shape[-1]
         f_body = torch.zeros(box_end-box_start,Jc.shape[0],nrhs,device=device)
         if (ff_body_func is not None):
-            xx_flat = xxloc[box_start:box_end].reshape((box_end-box_start)*p**d,d)
-            f_body += Aloc @ ff_body_func(xx_flat).reshape(box_end-box_start,p**d,nrhs)
+            xx_flat = xxloc[box_start:box_end,Jc].reshape((box_end-box_start)*(p-2)**d,d)
+            f_body += Aloc @ ff_body_func(xx_flat).reshape(box_end-box_start,(p-2)**d,nrhs)
         if (ff_body_vec is not None):
             f_body_vec_part = ff_body_vec[box_start:box_end].unsqueeze(-1)
-            f_body         += Aloc @ f_body_vec_part[:,Jc]
+            f_body         += Aloc @ f_body_vec_part
         
 
         uu_sol = torch.zeros(box_end-box_start,p**d,2*nrhs,device=device)
