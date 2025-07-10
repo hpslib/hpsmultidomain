@@ -2,6 +2,9 @@ import torch  # Used for tensor operations
 import numpy as np  # For numerical operations, especially those not directly supported by PyTorch
 import sys  # System-specific parameters and functions
 
+import sys
+sys.path.append("/Users/jkump/Desktop/hps-multidomain-disc/hps")
+
 # Importing parent class:
 from abstract_hps_solver import AbstractHPSSolver
 
@@ -210,7 +213,7 @@ class Domain_Driver(AbstractHPSSolver):
             XX_mapped = self.XX()
 
         # 2) Evaluate known Green's function at boundary points, with a source placed far outside domain
-        uu = uu_dir_func_greens(self.d, XX_mapped, kh)
+        uu = uu_dir_func_greens(self.d, XX_mapped, kh, center=self.geom()[1] + 10)
 
         # 3) Extract boundary values (unique exterior) and interior true values
         #uu_sol = self.solve_dir_full(uu[self.Jx()])
@@ -225,6 +228,9 @@ class Domain_Driver(AbstractHPSSolver):
             
     ############################### HPS discretization and panel split #####################
     def hps_disc(self,box_geom,a,p,d,pdo_op,periodic_bc):
+
+        if isinstance(a, (int, float)):
+            a = np.array([a] * d)
 
         HPS_multi = hps_multidomain_disc.HPS_Multidomain(pdo_op,box_geom,a,p,d, periodic_bc=periodic_bc)
 

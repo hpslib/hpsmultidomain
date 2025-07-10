@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod, abstractproperty
-import jax.numpy as jnp
-from hps.pdo import PDO2d, PDO3d
+import numpy as np
+#import jax.numpy as jnp # can use tis as an alternative
+from hps.pdo import PDO_2d, PDO_3d
 
 ############################################################################################
 # Abstract base class for geometries: defines minimal interface (bounds property)
@@ -112,7 +113,7 @@ class ParametrizedGeometry2D(AbstractGeometry):
         def param_map(xx):
             (z1, z2) = self.zz
             # Evaluate forward map at all points xx
-            ZZ = jnp.stack([z1(xx), z2(xx)], axis=-1)
+            ZZ = np.stack([z1(xx), z2(xx)], axis=-1)
             return ZZ
 
         return param_map
@@ -128,14 +129,14 @@ class ParametrizedGeometry2D(AbstractGeometry):
         """
         def inv_param_map(xx):
             (y1, y2) = self.yy
-            YY = jnp.stack([y1(xx), y2(xx)], axis=-1)
+            YY = np.stack([y1(xx), y2(xx)], axis=-1)
             return YY
 
         return inv_param_map
 
     def transform_helmholtz_pdo(self, bfield, kh):
         """
-        Construct and return a transformed 2D Helmholtz/Laplace PDO (PDO2d) on the curved domain.
+        Construct and return a transformed 2D Helmholtz/Laplace PDO (PDO_2d) on the curved domain.
 
         Given:
           - bfield(yy, kh): a function that returns the zeroth-order coefficient c(yy, kh) in PDE.
@@ -150,7 +151,7 @@ class ParametrizedGeometry2D(AbstractGeometry):
           c(x_curved)   = bfield(y(x_curved), kh)
 
         Returns:
-            PDO2d object with fields c11, c22, c12, c1, c2, c.
+            PDO_2d object with fields c11, c22, c12, c1, c2, c.
         """
         # Unpack derivative functions of inverse map y1, y2
         (
@@ -209,15 +210,15 @@ class ParametrizedGeometry2D(AbstractGeometry):
                 result = 0
                 for a, b in pairs:
                     if a is not None and b is not None:
-                        result += jnp.multiply(a(yy), b(yy))
+                        result += np.multiply(a(yy), b(yy))
                 return result
 
         # Zeroth-order coefficient c(x) = bfield(yy, kh)
         def c(xx):
             return bfield(self.parameter_map(xx), kh)
 
-        # Return a PDO2d with all computed coefficient functions
-        return PDO2d(c11=c11, c22=c22, c1=c1, c2=c2, c12=c12, c=c)
+        # Return a PDO_2d with all computed coefficient functions
+        return PDO_2d(c11=c11, c22=c22, c1=c1, c2=c2, c12=c12, c=c)
 
 
 #############################################################################################
@@ -310,7 +311,7 @@ class ParametrizedGeometry3D(AbstractGeometry):
         """
         def param_map(xx):
             (z1, z2, z3) = self.zz
-            ZZ = jnp.stack([z1(xx), z2(xx), z3(xx)], axis=-1)
+            ZZ = np.stack([z1(xx), z2(xx), z3(xx)], axis=-1)
             return ZZ
 
         return param_map
@@ -322,14 +323,14 @@ class ParametrizedGeometry3D(AbstractGeometry):
         """
         def inv_param_map(xx):
             (y1, y2, y3) = self.yy
-            YY = jnp.stack([y1(xx), y2(xx), y3(xx)], axis=-1)
+            YY = np.stack([y1(xx), y2(xx), y3(xx)], axis=-1)
             return YY
 
         return inv_param_map
 
     def transform_helmholtz_pdo(self, bfield, kh):
         """
-        Construct and return a transformed 3D Helmholtz/Laplace PDO (PDO3d) on the curved domain.
+        Construct and return a transformed 3D Helmholtz/Laplace PDO (PDO_3d) on the curved domain.
 
         Similar to 2D, but with six second-derivative terms and three first-derivative terms.
         The transformed PDE coefficients in curved coords are:
@@ -345,7 +346,7 @@ class ParametrizedGeometry3D(AbstractGeometry):
           c   = bfield(yy, kh)
 
         Returns:
-            PDO3d object with fields c11, c22, c33, c12, c13, c23, c1, c2, c3, c.
+            PDO_3d object with fields c11, c22, c33, c12, c13, c23, c1, c2, c3, c.
         """
         # Unpack all first and second derivative functions of inverse map y1, y2, y3
         (
@@ -409,7 +410,7 @@ class ParametrizedGeometry3D(AbstractGeometry):
                     result = 0
                     for f, g in pairs:
                         if f is not None and g is not None:
-                            result += jnp.multiply(f(yy), g(yy))
+                            result += np.multiply(f(yy), g(yy))
                     return result
                 return func
 
@@ -432,8 +433,8 @@ class ParametrizedGeometry3D(AbstractGeometry):
         def c(xx):
             return bfield(self.parameter_map(xx), kh)
 
-        # Return a PDO3d with all transformed coefficients
-        return PDO3d(
+        # Return a PDO_3d with all transformed coefficients
+        return PDO_3d(
             c11=c11,
             c22=c22,
             c33=c33,
