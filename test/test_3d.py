@@ -7,7 +7,7 @@ torch.set_default_dtype(torch.double)  # Ensure all torch tensors are double pre
 
 def run_test_via_argparse(domain, pde, bc, disc_n, p, box_xlim=1.0, box_ylim=1.0, periodic_bc=False, ppw=None, kh=None, delta_t=None, num_timesteps=None, components=False, store_sol=False, solver='superLU', assembly_type="reduced_cpu", pickle_loc='tmp_test_file'):
 
-    s = 'python src/argparse_driver.py --n %d --pde %s --bc %s --pickle %s' % (disc_n,pde,bc,pickle_loc)
+    s = 'python hps/argparse_driver.py --n %d --pde %s --bc %s --pickle %s' % (disc_n,pde,bc,pickle_loc)
 
     s += ' --p %d' % (p)    
     s += ' --domain %s' % (domain)

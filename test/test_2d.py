@@ -17,7 +17,7 @@ def run_test_via_argparse(domain, box_xlim=1.0, box_ylim=1.0, periodic_bc=False)
 
     pickle_loc = 'tmp_test_file'
 
-    s = 'python argparse_driver.py --n %d --pde %s --bc %s --pickle %s' % (disc_n,pde,bc,pickle_loc)
+    s = 'python hps/argparse_driver.py --n %d --pde %s --bc %s --pickle %s' % (disc_n,pde,bc,pickle_loc)
 
     s += ' --p %d' % (p)    
     s += ' --domain %s' % (domain)
