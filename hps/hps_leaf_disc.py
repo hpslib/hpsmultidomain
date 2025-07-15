@@ -2,13 +2,12 @@ import numpy as np
 from collections import namedtuple
 #import scipy
 from time import time
-import numpy.polynomial.chebyshev as cheb_py
 import scipy.linalg
 
 from numpy.polynomial  import legendre
 from numpy.polynomial.polynomial import polyvander2d
-from numpy.polynomial.chebyshev import chebvander2d
-from numpy.polynomial.legendre import legvander2d
+from numpy.polynomial.chebyshev import chebvander, chebvander2d
+from numpy.polynomial.legendre import legvander, legvander2d
 from scipy.interpolate import interpn
 
 from scipy.linalg import null_space
@@ -88,13 +87,52 @@ def get_loc_interp(x_cheb, x_cheb_nocorners, q):
     - err: Norm of the interpolation error
     - cond: Condition number of the interpolation matrix
     """
-    Vpoly_cheb = cheb_py.chebvander(x_cheb,q)
-    Vpoly_nocorner = cheb_py.chebvander(x_cheb_nocorners,q)
+    Vpoly_cheb = chebvander(x_cheb,q)
+    Vpoly_nocorner = chebvander(x_cheb_nocorners,q)
 
     Interp_loc = np.linalg.lstsq(Vpoly_nocorner.T,Vpoly_cheb.T,rcond=None)[0].T
     err  = np.linalg.norm(Interp_loc @ Vpoly_nocorner - Vpoly_cheb)
     cond = np.linalg.cond(Interp_loc) 
     return Interp_loc,err,cond
+
+def get_loc_interp_2d(p, q, l):
+    """
+    Computes local interpolation matrices from Chebyshev points.
+    
+    Parameters:
+    - p: The degree of the Chebyshev polynomial for interpolation
+    - q: The degree of the Gaussian polynomial for interpolation
+    
+    Returns:
+    - Interp_loc: Local interpolation matrix
+    - err: Norm of the interpolation error
+    - cond: Condition number of the interpolation matrix
+    """
+    _, croots  = cheb(p-1)
+    croots     = np.flip(croots)
+
+    #print(get_legendre_row(0, croots))
+
+    lcoeff     = np.zeros(q+1)
+    lcoeff[-1] = 1
+    lroots     = legendre.legroots(lcoeff)
+
+    # Vandermonde-based approach:
+
+    # Vandermonde-based approach with Chebyshev expansion coefficients:
+    ChebVc = chebvander(croots, l)
+    ChebVl = chebvander(lroots, l)
+
+    # Vandermonde-based approach with Gaussian expansion coefficients:
+    GaussVc = legvander(croots, q)
+    GaussVl = legvander(lroots, q)
+
+    Interp_loc_CtG = np.linalg.lstsq(ChebVc.T,ChebVl.T,rcond=None)[0].T
+    Interp_loc_GtC = np.linalg.lstsq(GaussVl.T,GaussVc.T,rcond=None)[0].T
+
+    condGtC = np.linalg.cond(Interp_loc_GtC)
+    condCtG = np.linalg.cond(Interp_loc_CtG)
+    return Interp_loc_GtC,Interp_loc_CtG,condGtC,condCtG
 
 def get_loc_interp_3d(p, q, l):
     """
