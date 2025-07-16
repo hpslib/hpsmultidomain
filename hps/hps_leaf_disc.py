@@ -16,7 +16,9 @@ from scipy.linalg import null_space
 # for both 2D and 3D problems, along with indices (JJ) for domain decomposition.
 Pdo_2d   = namedtuple('Pdo_2d',['c11','c22','c12', 'c1','c2','c'])
 Ds_2d    = namedtuple('Ds_2d', ['D11','D22','D12','D1','D2'])
-JJ_2d    = namedtuple('JJ_2d', ['Jl','Jr','Jd','Ju','Jx','Jc','Jxreorder'])
+JJ_2d    = namedtuple('JJ_2d', ['Jl','Jr','Jd','Ju','Jx', 'Jlc', 'Jrc', 'Jdc',
+                               'Juc', 'Jxreorder', 'Jxunique', 'Jc', 'Jtot',
+                               'unique_in_reorder'])
 
 Pdo_3d = namedtuple('Pdo_3d', ['c11', 'c22', 'c33', 'c12', 'c13', 'c23', 'c1', 'c2', 'c3', 'c'])
 Ds_3d  = namedtuple('Ds_3d',  ['D11', 'D22', 'D33', 'D12', 'D13', 'D23', 'D1', 'D2', 'D3'])
@@ -180,52 +182,117 @@ def get_loc_interp_3d(p, q, l):
 
 def cheb_2d(a,p):
     D,xvec = cheb(p-1)
-    xvec = a * np.flip(xvec)
-    D = (1/a) * D
-    I = np.eye(p)
-    D1 = -np.kron(D,I)
-    D2 = -np.kron(I,D)
-    Dsq = D @ D
-    D11 = np.kron(Dsq,I)
-    D22 = np.kron(I,Dsq)
-    D12 = np.kron(D,D)
+    xvec1 = a[0] * np.flip(xvec)
+    xvec2 = a[1] * np.flip(xvec)
 
-    zz1 = np.repeat(xvec,p)
-    zz2 = np.repeat(xvec,p).reshape(-1,p).T.flatten()
+    D_axis1 = (1/a[0]) * D
+    D_axis2 = (1/a[1]) * D
+    I = np.eye(p)
+
+    D1 = -np.kron(D_axis1,I)
+    D2 = -np.kron(I,D_axis2)
+
+    D11 = np.kron(D_axis1 @ D_axis1, I)
+    D22 = np.kron(I, D_axis2 @ D_axis2)
+    D12 = np.kron(D_axis1, D_axis2)
+
+    zz1 = np.repeat(xvec1,p)
+    zz2 = np.repeat(xvec2,p).reshape(-1,p).T.flatten()
     zz = np.vstack((zz1,zz2))
     Ds = Ds_2d(D1= D1, D2= D2, D11= D11, D22= D22, D12= D12)
     return zz, Ds 
 
-def leaf_discretization_2d(a,p):
-    zz,Ds = cheb_2d(a,p)
-    hmin  = zz[1,1] - zz[0,1]
+def gauss_2d(a,p):
+    """
+    Given polynomial order p and element size a,
+    returns Gaussian collocation points on [-a,a]^3
+    """
+    xvec  = gauss(p) # should this be p? We need p+1 points for a degree p polynomial
+    xvec1 = a[0] * xvec
+    xvec2 = a[1] * xvec
 
-    Jc0   = np.abs(zz[0,:]) < a - 0.5*hmin
-    Jc1   = np.abs(zz[1,:]) < a - 0.5*hmin
-    Jl    = np.argwhere(np.logical_and(zz[0,:] < - a + 0.5 * hmin,Jc1))
-    Jl    = Jl.copy().reshape(p-2,)
-    Jr    = np.argwhere(np.logical_and(zz[0,:] > + a - 0.5 * hmin,Jc1))
-    Jr    = Jr.copy().reshape(p-2,)
-    Jd    = np.argwhere(np.logical_and(zz[1,:] < - a + 0.5 * hmin,Jc0))
-    Jd    = Jd.copy().reshape(p-2,)
-    Ju    = np.argwhere(np.logical_and(zz[1,:] > + a - 0.5 * hmin,Jc0))
-    Ju    = Ju.copy().reshape(p-2,)
-    Jc    = np.argwhere(np.logical_and(Jc0,Jc1))
+    # TODO: get the proper components D1, D2, D3, D11, D22, D33, D12, D13, D23
+    # Note that Kronecker product is associative
+    # Could replace some of these with np.eye(p**2)
+
+    zz1 = np.repeat(xvec1,p)
+    zz2 = np.repeat(xvec2,p).reshape(-1,p).T.flatten()
+    zz  = np.vstack((zz1,zz2))
+
+    return zz
+
+def leaf_discretization_2d(a,p,q):
+    """
+    Performs leaf-level discretization for a 3D domain.
+    Returns the discretization points, interpolated surface points,
+    index arrays for parts of the disc., and the correct operators.
+    """
+    zz,Ds = cheb_2d(a,p)
+    zzG   = gauss_2d(a,q)
+
+    hmin0 = zz[0,p] - zz[0,0]
+    hmin1 = zz[1,1] - zz[1,0]
+
+    # Jl, Jr, Jd, Ju are RLDU as expected, with no corners
+    # Jc is interior, Jx is all boundaries without corners
+    # Jb, Jf are back and front
+    Jc0   = np.abs(zz[0,:]) < a[0] - 0.5*hmin0
+    Jc1   = np.abs(zz[1,:]) < a[1] - 0.5*hmin1
+    Jl    = np.argwhere(np.logical_and(zz[0,:] < - a[0] + 0.5 * hmin0, Jc1))
+    Jl    = Jl.copy().reshape((p-2),)
+    Jr    = np.argwhere(np.logical_and(zz[0,:] > + a[0] - 0.5 * hmin0, Jc1))
+    Jr    = Jr.copy().reshape((p-2),)
+    Jd    = np.argwhere(np.logical_and(zz[1,:] < - a[1] + 0.5 * hmin1, Jc0))
+    Jd    = Jd.copy().reshape((p-2),)
+    Ju    = np.argwhere(np.logical_and(zz[1,:] > + a[1] - 0.5 * hmin1, Jc0))
+    Ju    = Ju.copy().reshape((p-2),)
+
+    Jc    = np.argwhere(np.logical_and(Jc0, Jc1))
     Jc    = Jc.copy().reshape((p-2)**2,)
     Jx    = np.concatenate((Jl,Jr,Jd,Ju))
 
-    Jcorner = np.setdiff1d(np.arange(p**2),np.hstack((Jc,Jx)))
+    Jl_corner    = np.argwhere(zz[0,:] < - a[0] + 0.5 * hmin0)
+    Jl_corner    = Jl_corner.copy().reshape(p,)
+    Jr_corner    = np.argwhere(zz[0,:] > + a[0] - 0.5 * hmin0)
+    Jr_corner    = Jr_corner.copy().reshape(p,)
+    Jd_corner    = np.argwhere(zz[1,:] < - a[1] + 0.5 * hmin1)
+    Jd_corner    = Jd_corner.copy().reshape(p,)
+    Ju_corner    = np.argwhere(zz[1,:] > + a[1] - 0.5 * hmin1)
+    Ju_corner    = Ju_corner.copy().reshape(p,)
 
-    Jl_corner = np.hstack((Jcorner[0],   Jl))
-    Ju_corner = np.hstack((Jcorner[0+1], Ju))
-    Jr_corner = np.hstack((Jcorner[0+3], np.flip(Jr,0)))
-    Jd_corner = np.hstack((Jcorner[0+2], np.flip(Jd,0)))
+    # TODO: figure out corners / switch to Legendre for this
+    Jxreorder = np.concatenate((Jl_corner,Jr_corner,Jd_corner,Ju_corner))
+    Jxunique, unique_in_reorder  = np.unique(Jxreorder, return_index=True)
+    Jtot  = np.concatenate((Jx,Jc))
 
-    Jxreorder = np.hstack((Jl_corner,Ju_corner,Jr_corner,Jd_corner))
+    # Take only necessary surface values for Gaussian nodes:
+    a_gauss0 = np.max(zzG[0,:])
+    a_gauss1 = np.max(zzG[1,:])
+    Jl_gauss = np.argwhere(zzG[0,:] < - a_gauss0 + 0.5 * hmin0)
+    Jl_gauss = Jl_gauss.copy().reshape(q,)
+    Jr_gauss = np.argwhere(zzG[0,:] > + a_gauss0 - 0.5 * hmin0)
+    Jr_gauss = Jr_gauss.copy().reshape(q,)
+    Jd_gauss = np.argwhere(zzG[1,:] < - a_gauss1 + 0.5 * hmin1)
+    Jd_gauss = Jd_gauss.copy().reshape(q,)
+    Ju_gauss = np.argwhere(zzG[1,:] > + a_gauss1 - 0.5 * hmin1)
+    Ju_gauss = Ju_gauss.copy().reshape(q,)
+    Jgauss = np.concatenate((Jl_gauss,Jr_gauss,Jd_gauss,Ju_gauss))
+    zzG = zzG.T[Jgauss,:]
+    # Need to do a little surface cleaning to make sure the faces of our Gaussian box 
+    # line up with the faces of our Chebyshev box:
+    zzG[:q,0]      = -a[0]
+    zzG[q:2*q,0]   =  a[0]
+    zzG[2*q:3*q,1] = -a[1]
+    zzG[3*q:4*q,1] =  a[1]
 
-    JJ    = JJ_2d(Jl= Jl, Jr= Jr, Ju= Ju, Jd= Jd, 
-              Jx= Jx, Jc= Jc, Jxreorder=Jxreorder)
-    return zz,Ds,JJ,hmin
+    JJ    = JJ_2d(Jl= Jl, Jr= Jr, Ju= Ju, Jd= Jd, Jx=Jx,
+                  Jlc=Jl_corner, Jrc=Jr_corner, Jdc=Jd_corner, Juc=Ju_corner,
+                  Jxreorder=Jxreorder, Jxunique=Jxunique, Jc=Jc, Jtot=Jtot,
+                  unique_in_reorder = unique_in_reorder)
+
+    hmin = np.min([hmin0, hmin1])
+    
+    return zz,Ds,JJ,hmin,zzG
 
 #################################### 3D discretization ##########################################
 
@@ -247,7 +314,7 @@ def cheb_3d(a,p):
     D1 = -np.kron(D_axis1, np.kron(I, I))
     D2 = -np.kron(I, np.kron(D_axis2, I))
     D3 = -np.kron(I, np.kron(I, D_axis3))
-    Dsq = D @ D
+
     D11 = np.kron(D_axis1 @ D_axis1, np.kron(I, I))
     D22 = np.kron(I, np.kron(D_axis2 @ D_axis2, I))
     D33 = np.kron(I, np.kron(I, D_axis3 @ D_axis3))
@@ -431,7 +498,7 @@ class HPS_Disc:
         
     def _discretize(self,a,p,q,d):
         if d == 2:
-            self.zz, self.Ds, self.JJ, self.hmin = leaf_discretization_2d(a[0], p)
+            self.zz, self.Ds, self.JJ, self.hmin, self.zzG = leaf_discretization_2d(a, p, q)
         else:
             self.zz, self.Ds, self.JJ, self.hmin, self.zzG = leaf_discretization_3d(a, p, q) # Need to figure out a
         Nx, Nxc = get_diff_ops(self.Ds, self.JJ, d)
@@ -445,37 +512,40 @@ class HPS_Disc:
         p = self.p; q = self.q; a = self.a
         
         if self.d==2:
-            a = a[0]
-            x_cheb = self.zz[-1,:p-1] + a
-            x_cheb_nocorners  = self.zz[-1,1:p-1] + a
+            tic = time()
+            l = p
+            Interp_loc_GtC,Interp_loc_CtG,err,cond = get_loc_interp_2d(p, q, l)
+            self.Interp_mat         = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_GtC,0),4,axis=0))
+            self.Interp_mat_reverse = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_CtG,0),4,axis=0))
+
+            # Form averaging operator P. Currently we have two approaches, one is local averaging (P)
+            # and the other is orthogonal projection (Pnew):
+            P = np.eye(self.Interp_mat.shape[0])
+            B = np.eye(self.Interp_mat.shape[0])
+            for i in range(self.Interp_mat.shape[0]):
+                elem = self.JJ.Jxreorder[i]
+                where = np.argwhere(self.JJ.Jxreorder == elem)
+                P[i,where] = 1 / len(where)
+                B[i,where] = 1
+
+            B       = B[self.JJ.unique_in_reorder,:]
+            Bsum    = np.sum(B, axis=1)
+            # Identify the corner points:
+            indexer = np.argwhere(Bsum > 1)
+            B       = B[indexer.T[0]]
+
+            # Try this instead:
+            V_null = null_space(B)
+            Pnew = V_null @ np.transpose(V_null)
             
-            cond_min = 3.25; cond_max = 3.5; err_tol = 2e-8
-            q = p+5; tic = time()
-            while (True):
-                Interp_loc,err,cond = get_loc_interp(x_cheb,x_cheb_nocorners,q)
-                
-                if ((cond < cond_min) or ((err > err_tol) and (cond < cond_max)) ):
-                    break
-                else:
-                    q += 10
+            # Apply this to our interpolation matrix to ensure continuity at corner nodes:
+            self.Interp_mat        = Pnew @ self.Interp_mat    # with redundant corners
+            self.Interp_mat_unique = self.Interp_mat[self.JJ.unique_in_reorder,:] # without redundant corners
+
             toc = time() - tic
-            
-            # Expand the dimensions of Interp_loc once then repeat it four times
-            Interp_mat_chebfleg = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc,0),4,axis=0))
-            
-            # Reorder the columns
-            perm = np.hstack((np.arange(p-2),\
-                            np.arange(p-2)+3*(p-2),\
-                            np.flip(np.arange(p-2)+1*(p-2),0),\
-                            np.flip(np.arange(p-2)+2*(p-2),0)
-                            ))
-            #print(perm)
-            perm = np.argsort(perm)
-            #print(perm)
-            self.Interp_mat = Interp_mat_chebfleg[:,perm]
-            #print(self.Interp_mat.shape)
-            print ("--Interp_mat required lstsqfit of q=%d, condition number %5.5f with error %5.5e and time to calculate %12.5f"\
-                % (q,cond,err,toc))
+            print ("--Interp_mat has GtC condition number %5.5f, CtG condition number %5.5e, and time to calculate %12.5f"\
+                % (cond,err,toc))
+
         else:
             tic = time()
             l = p #min(p,q) + 10
@@ -519,14 +589,6 @@ class HPS_Disc:
                 where = np.argwhere(B[index] > 0)
                 where = where.T[0]
                 B[index, where[1]] = -1
-
-
-            """_, _, Vh = np.linalg.svd(B, full_matrices=True)
-            V = np.transpose(Vh)
-            # The nullspace of B is the last _ columns of V:
-            null_rank = 6*p**2 - 12*p + 8
-            V_tilde = V[:,-null_rank:]
-            Pnew = V_tilde @ np.transpose(V_tilde)"""
 
             # Try this instead:
             V_null = null_space(B)

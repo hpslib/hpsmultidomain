@@ -241,27 +241,30 @@ class Domain_Driver(AbstractHPSSolver):
             
             self.ntot = self.XX_active.shape[0]
             
-            I_Ldir = torch.where(self.XX_active[:,0] < self.box_geom[0,0] + 0.5 * self.hps.hmin)[0]
-            I_Rdir = torch.where(self.XX_active[:,0] > self.box_geom[0,1] - 0.5 * self.hps.hmin)[0]
-            I_Ddir = torch.where(self.XX_active[:,1] < self.box_geom[1,0] + 0.5 * self.hps.hmin)[0]
-            I_Udir = torch.where(self.XX_active[:,1] > self.box_geom[1,1] - 0.5 * self.hps.hmin)[0]
-            
+            tol = 0.01 * self.hps.hmin # Adding a tolerance to avoid potential numerical error
             if periodic_bc:
-                self.I_Xtot  = torch.hstack((I_Ddir,I_Udir))
-            else:
-                self.I_Xtot  = torch.hstack((I_Ldir,I_Rdir,I_Ddir,I_Udir))
-            
-            self.I_Ctot = torch.sort(torch_setdiff1d( torch.arange(self.ntot), self.I_Xtot))[0]
+                I_dir = torch.where((self.XX_active[:,1] < self.box_geom[1,0] + tol)
+                                | (self.XX_active[:,1] > self.box_geom[1,1] - tol))[0]
 
-            if periodic_bc:
-                
-                tot_C = self.I_Ctot.shape[0]
-                n_LR  = I_Rdir.shape[0]
-                tot_unique = tot_C - n_LR
-                
-                self.I_Ctot_unique = torch.arange(tot_unique)
-                self.I_Ctot_copy1  = torch.arange(n_LR)
-                self.I_Ctot_copy2  = torch.arange(tot_unique, tot_C)
+                I_dir2 = torch.where((self.XX_active[:,0] > self.box_geom[0,1] - tol)
+                                | (self.XX_active[:,1] < self.box_geom[1,0] + tol)
+                                | (self.XX_active[:,1] > self.box_geom[1,1] - tol))[0]
+
+                self.I_Xtot = I_dir
+                self.I_Ctot = torch.sort(torch_setdiff1d(torch.arange(self.ntot), I_dir2))[0]
+            else:
+                I_dir = torch.where((self.XX_active[:,0] < self.box_geom[0,0] + tol)
+                                | (self.XX_active[:,0] > self.box_geom[0,1] - tol)
+                                | (self.XX_active[:,1] < self.box_geom[1,0] + tol)
+                                | (self.XX_active[:,1] > self.box_geom[1,1] - tol))[0]
+            
+                self.I_Xtot = I_dir
+                self.I_Ctot = torch.sort(torch_setdiff1d(torch.arange(self.ntot), self.I_Xtot))[0]
+
+            self.I_Xtot_in_unique = self.hps.I_unique[self.I_Xtot]
+
+            # Note that I_Xtot and I_Ctot are both out of all XX, not just the unique
+            # boundaries.
         else: # d==3
             # self.XX_active consists of the unique X values of the subdomain boundaries
             self.XX_active  = self.hps.xx_active
@@ -380,35 +383,16 @@ class Domain_Driver(AbstractHPSSolver):
 
         info_dict = dict()
         #print("Made it to build_blackboxsolver")
-        if self.d==2:
-            if self.periodic_bc:
-                A_copy = self.A[np.ix_(self.I_Ctot,self.I_Ctot)].tolil()
-                A_copy[np.ix_(self.I_Ctot_unique,self.I_Ctot_copy1)] += \
-                A_copy[np.ix_(self.I_Ctot_unique,self.I_Ctot_copy2)]
-            
-                A_copy[np.ix_(self.I_Ctot_copy1,self.I_Ctot_unique)] += \
-                A_copy[np.ix_(self.I_Ctot_copy2,self.I_Ctot_unique)] 
-            
-                A_copy[np.ix_(self.I_Ctot_copy1,self.I_Ctot_copy1)] += \
-                A_copy[np.ix_(self.I_Ctot_copy2,self.I_Ctot_copy2)]
-                
-                A_CC = A_copy[np.ix_(self.I_Ctot_unique,self.I_Ctot_unique)].tocsr()
-            else: # not periodic
-                A_CC = self.A[self.I_Ctot][:,self.I_Ctot].tocsr()
-                A_CX = self.A[self.I_Ctot][:,self.I_Xtot].tocsr()
-                A_XC = self.A[self.I_Xtot][:,self.I_Ctot].tocsr()
-                A_XX = self.A[self.I_Xtot][:,self.I_Xtot].tocsr()
-        else: #self.d==3. Same for periodic and not since the change is in I_copy1, I_copy2:
-            I_copy1 = self.hps.I_copy1.detach().cpu().numpy()
-            I_copy2 = self.hps.I_copy2.detach().cpu().numpy()
-            I_ext   = self.I_Xtot_in_unique.detach().cpu().numpy()
-            A_CC = self.A[I_copy1] + self.A[I_copy2]
-            A_CC = A_CC[:,I_copy1] + A_CC[:,I_copy2]
-            A_CX = self.A[I_copy1] + self.A[I_copy2]
-            A_CX = A_CX[:,I_ext]
-            A_XC = self.A[I_ext]
-            A_XC = A_XC[:,I_copy1] + A_XC[:,I_copy2]
-            A_XX = self.A[I_ext][:,I_ext]
+        I_copy1 = self.hps.I_copy1.detach().cpu().numpy()
+        I_copy2 = self.hps.I_copy2.detach().cpu().numpy()
+        I_ext   = self.I_Xtot_in_unique.detach().cpu().numpy()
+        A_CC = self.A[I_copy1] + self.A[I_copy2]
+        A_CC = A_CC[:,I_copy1] + A_CC[:,I_copy2]
+        A_CX = self.A[I_copy1] + self.A[I_copy2]
+        A_CX = A_CX[:,I_ext]
+        A_XC = self.A[I_ext]
+        A_XC = A_XC[:,I_copy1] + A_XC[:,I_copy2]
+        A_XX = self.A[I_ext][:,I_ext]
 
         self.A_CC = A_CC
         self.A_CX = A_CX
@@ -450,8 +434,6 @@ class Domain_Driver(AbstractHPSSolver):
             print("\t--memory for (A sparse) (%5.2f) GB"\
                   % (csr_stor))
         
-        if self.d==2:
-            assert self.ntot == self.A.shape[0]
             
         ########## sparse slab operations ##########
         info_dict = dict()
@@ -482,14 +464,12 @@ class Domain_Driver(AbstractHPSSolver):
             uu_dir = uu_dir_vec
 
         # body load on I_Ctot
-        if self.d==2:
-            ff_body = -apply_sparse_lowmem(self.A,I_Ctot,I_Xtot,uu_dir)
-        else:
-            I_copy1  = self.hps.I_copy1
-            I_copy2  = self.hps.I_copy2
+        I_copy1  = self.hps.I_copy1
+        I_copy2  = self.hps.I_copy2
 
-            ff_body  = -apply_sparse_lowmem(self.A,I_copy1,self.I_Xtot_in_unique,uu_dir)
-            ff_body  = ff_body - apply_sparse_lowmem(self.A,I_copy2,self.I_Xtot_in_unique,uu_dir)
+        ff_body  = -apply_sparse_lowmem(self.A,I_copy1,self.I_Xtot_in_unique,uu_dir)
+        ff_body  = ff_body - apply_sparse_lowmem(self.A,I_copy2,self.I_Xtot_in_unique,uu_dir)
+
         if (ff_body_func is not None) or (ff_body_vec is not None):    # THIS NEEDS TO CHANGE FOR C-N
 
             if (self.sparse_assembly == 'reduced_gpu'):
@@ -502,38 +482,20 @@ class Domain_Driver(AbstractHPSSolver):
             elif self.d==3:
                 ff_body += self.hps.reduce_body(device,ff_body_func,ff_body_vec)[I_Ctot]
         
-        # adjust to sum body load on left and right boundaries
-        if (self.d==2) and (self.periodic_bc and sum_body_load):
-            ff_body[self.I_Ctot_copy1] += ff_body[self.I_Ctot_copy2]
-            ff_body = ff_body[self.I_Ctot_unique]
-        
         return ff_body
     
     def solve_residual_calc(self,sol,ff_body):
         """
         This takes our computed solution sol and plugs it into A to get the difference, A (sol) - f
         """
-        if (self.d==3) or (not self.periodic_bc):
-            if self.d==2:
-                res = apply_sparse_lowmem(self.A,self.I_Ctot,self.I_Ctot,sol) - ff_body
-            else:
-                I_copy1 = self.hps.I_copy1
-                I_copy2 = self.hps.I_copy2
-                res = apply_sparse_lowmem(self.A,I_copy1,I_copy1,sol)
-                res = res + apply_sparse_lowmem(self.A,I_copy1,I_copy2,sol)
-                res = res + apply_sparse_lowmem(self.A,I_copy2,I_copy1,sol)
-                res = res + apply_sparse_lowmem(self.A,I_copy2,I_copy2,sol)
-                res = res - ff_body
-        else:
-            res  = - ff_body
-            res += apply_sparse_lowmem(self.A,self.I_Ctot[self.I_Ctot_unique],\
-                                       self.I_Ctot[self.I_Ctot_unique], sol)
-            res += apply_sparse_lowmem(self.A,self.I_Ctot[self.I_Ctot_unique],\
-                                       self.I_Ctot[self.I_Ctot_copy2], sol[self.I_Ctot_copy1])
-            res[self.I_Ctot_copy1] += apply_sparse_lowmem(self.A,self.I_Ctot[self.I_Ctot_copy2],\
-                                       self.I_Ctot[self.I_Ctot_unique], sol)
-            res[self.I_Ctot_copy1] += apply_sparse_lowmem(self.A,self.I_Ctot[self.I_Ctot_copy2],\
-                                       self.I_Ctot[self.I_Ctot_copy2], sol[self.I_Ctot_copy1])
+        I_copy1 = self.hps.I_copy1
+        I_copy2 = self.hps.I_copy2
+        res = apply_sparse_lowmem(self.A,I_copy1,I_copy1,sol)
+        res = res + apply_sparse_lowmem(self.A,I_copy1,I_copy2,sol)
+        res = res + apply_sparse_lowmem(self.A,I_copy2,I_copy1,sol)
+        res = res + apply_sparse_lowmem(self.A,I_copy2,I_copy2,sol)
+        res = res - ff_body
+
         return res
     
     def solve_helper_blackbox(self,uu_dir_func,uu_dir_vec=None,ff_body_func=None,ff_body_vec=None):
@@ -567,30 +529,14 @@ class Domain_Driver(AbstractHPSSolver):
         """
         The main function that solves the sparse system and leaf interiors.
         """
-        if self.d==2:
-            if (self.solver_type == 'slabLU'):
-                raise ValueError("not included in this version")
-            else:
-                sol,toc_system_solve, ff_body = self.solve_helper_blackbox(uu_dir_func,uu_dir_vec=uu_dir_vec,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
+        if (self.solver_type == 'slabLU'):
+            raise ValueError("not included in this version")
+        else:
+            sol,toc_system_solve, ff_body = self.solve_helper_blackbox(uu_dir_func,uu_dir_vec=uu_dir_vec,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
 
-            # self.A is black box matrix:
-            sol_tot = torch.zeros(self.A.shape[0],1)
-            # Here we set the solution on box boundaries not exterior to whole to sol
-            if (not self.periodic_bc):
-                sol_tot[self.I_Ctot] = sol
-            else:            
-                sol_tot[self.I_Ctot[self.I_Ctot_unique]] = sol
-                sol_tot[self.I_Ctot[self.I_Ctot_copy2]]  = sol[self.I_Ctot_copy1]
-
-        else: # 3D
-            if (self.solver_type == 'slabLU'):
-                raise ValueError("not included in this version")
-            else:
-                sol,toc_system_solve, ff_body = self.solve_helper_blackbox(uu_dir_func,uu_dir_vec=uu_dir_vec,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
-
-            # We set the solution on the subdomain boundaries to the result of our sparse system.
-            sol_tot = torch.zeros(len(self.hps.I_unique),1)
-            sol_tot[self.I_Ctot] = sol
+        # We set the solution on the subdomain boundaries to the result of our sparse system.
+        sol_tot = torch.zeros(len(self.hps.I_unique),1)
+        sol_tot[self.I_Ctot] = sol
 
         # Here we set the true exterior to the given data:
         if uu_dir_vec is None:
@@ -639,8 +585,13 @@ class Domain_Driver(AbstractHPSSolver):
             XX = self.hps.xx_tot
             uu_true = uu_dir_func(XX.clone())
             if self.d==2:
-                uu_true = torch.reshape(uu_true, (self.hps.nboxes,self.hps.p**2))
-                true_err = torch.linalg.norm(sol_tot-uu_true) / torch.linalg.norm(uu_true)
+                # special protocol for 3D case, needed due to the dropped corners in Chebyshev nodes:
+                uu_true = torch.reshape(uu_true, (self.hps.nboxes,self.hps.p**self.d))
+
+                Jx   = torch.tensor(self.hps.H.JJ.Jx)#.to(device)
+                Jc   = torch.tensor(self.hps.H.JJ.Jc)#.to(device)
+                Jtot = torch.hstack((Jc,Jx))
+                true_err = torch.linalg.norm(sol_tot[:,Jtot]-uu_true[:,Jtot]) / torch.linalg.norm(uu_true[:,Jtot])
             if self.d==3:
                 # special protocol for 3D case, needed due to the dropped corners in Chebyshev nodes:
                 uu_true = torch.reshape(uu_true, (self.hps.nboxes,self.hps.p**3))

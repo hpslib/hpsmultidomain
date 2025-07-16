@@ -92,15 +92,22 @@ class HPS_Multidomain:
         #Jc = torch.tensor(self.H.JJ.Jc)
         
         if d==2:
-            self.grid_ext = self.grid_xx[:,Jx,:].flatten(start_dim=0,end_dim=-2)
-            self.xx_ext = self.grid_ext
+            self.grid_ext = self.grid_xx[:,Jxreorder,:].flatten(start_dim=0,end_dim=-2)
+            self.gauss_xx = self.get_gaussian_nodes()
+            self.gauss_xx = self.gauss_xx.flatten(start_dim=0,end_dim=-2)
             self.I_unique, self.I_copy1, self.I_copy2 = self.get_unique_inds()
+            
+            # We want xx_ext to be based on Gaussian nodes unless there are no mixed terms:
+            self.xx_ext = self.gauss_xx
+            if self.interpolate == False:
+                self.xx_ext = self.grid_xx[:,Jx,:].flatten(start_dim=0,end_dim=-2)
             self.xx_active = self.xx_ext[self.I_unique,:]
         else:
             self.grid_ext = self.grid_xx[:,Jxreorder,:].flatten(start_dim=0,end_dim=-2)
             self.gauss_xx = self.get_gaussian_nodes()
             self.gauss_xx = self.gauss_xx.flatten(start_dim=0,end_dim=-2)
             self.I_unique, self.I_copy1, self.I_copy2 = self.get_unique_inds()
+
             # We want xx_ext to be based on Gaussian nodes unless there are no mixed terms:
             self.xx_ext = self.gauss_xx
             if self.interpolate == False:
@@ -141,7 +148,7 @@ class HPS_Multidomain:
         """
         #print("Built DtNs")
         if self.d==2:
-            size_face = self.p-2; size_ext = 4*size_face
+            size_face = self.q; size_ext = 4*size_face
             n0,n1 = self.n
             nprod = n0*n1
         else:
@@ -150,55 +157,27 @@ class HPS_Multidomain:
             nprod=n0*n1*n2
         
         if self.d==2:
+            # For 2D, we're now indexing box by box. Thus let's follow that approach here:
             tic = time()
-            Iext_box  = torch.arange(size_face).repeat(nprod,2*self.d).reshape(nprod,size_ext)
-            toc_alloc = time() - tic
-            
-            tic = time()
-            # Go through range of n
-            for Npan_ind in range(n0):
-                # This increases in each level
-                npan_offset = (2*n1+1)*Npan_ind
-                
-                for box_j in range(n1):
-                    
-                    box_ind = Npan_ind*n1 + box_j
-                    
-                    l_ind = npan_offset + box_j
-                    r_ind = npan_offset + 2*n1 + 1 + box_j
-                    d_ind = npan_offset + n1 + box_j
-                    u_ind = npan_offset + n1 + box_j + 1
-                    Iext_box[box_ind,:size_face]              += l_ind * size_face
-                    Iext_box[box_ind,size_face:2*size_face]   += r_ind * size_face
-                    Iext_box[box_ind,2*size_face:3*size_face] += d_ind * size_face
-                    Iext_box[box_ind,3*size_face:]            += u_ind * size_face
-            toc_index = time() - tic
-            
-            tic = time()
-            row_data,col_data = batched_meshgrid(n0*n1,size_ext,Iext_box,Iext_box)
-            
-            # LOOK HERE:
+            col_data = torch.arange(size_ext, device="cpu")#, dtype=torch.float64)
+
+
+            row_data = torch.repeat_interleave(col_data, size_ext)
+            col_data = col_data.repeat((size_ext))
+
+            box_range = size_ext * torch.arange(nprod, device="cpu")
+            box_range = box_range.unsqueeze(-1)
+
+            row_data = box_range + row_data
+            col_data = box_range + col_data
             data = DtN_loc.flatten()
             row_data = row_data.flatten()
             col_data = col_data.flatten()
             toc_flatten = time() - tic
-
-            toc_forloop = toc_index + toc_flatten + toc_alloc
         else:
             # For 3D, we're indexing box by box. Thus let's follow that approach here:
             tic = time()
             col_data = torch.arange(size_ext, device="cpu")#, dtype=torch.float64)
-
-            print("Type of col_data:")
-            print(col_data.dtype)
-            
-            # Add one box worth to F, n2 box worth to U, n1*n2 box worth to L
-            # The idea is that this ensures all matrix entries correspond to boundary values in
-            # I_copy1 and not I_copy2
-            #col_data[size_face:2*size_face]   += n1*n2*size_ext - size_face
-            #col_data[3*size_face:4*size_face] += n2*size_ext - size_face
-            #col_data[5*size_face:]            += size_ext - size_face
-
 
             row_data = torch.repeat_interleave(col_data, size_ext)
             col_data = col_data.repeat((size_ext))
@@ -220,18 +199,9 @@ class HPS_Multidomain:
 
         print("Assembled sparse matrix")
 
-        if self.d==2:
-            if (verbose) and (self.d==2):
-                print("\t--time to do for loop (alloc,index, flatten) (%5.2f,%5.2f,%5.2f)"\
-                    %(toc_alloc,toc_index,toc_flatten))
-                print("\t--time to assemble sparse HPS (DtN ops, for loop, csr_scipy) (%5.2f,%5.2f,%5.2f)"\
-                    %(toc_DtN,toc_forloop,toc_csr_scipy))
         t_dict = dict()
         t_dict['toc_DtN'] = toc_DtN
-        if self.d==2:
-            t_dict['toc_forloop'] = toc_forloop
-        if self.d==3:
-            t_dict['toc_indices'] = toc_flatten
+        t_dict['toc_indices'] = toc_flatten
         t_dict['toc_sparse'] = toc_csr_scipy
         return sp_mat,t_dict
     
@@ -275,11 +245,15 @@ class HPS_Multidomain:
         zzG = torch.tensor(self.H.zzG)
         #print(zzG.shape)
         n   = self.n
-        xxG = torch.zeros(self.nboxes, 6*self.q**2, self.d)
+        xxG = torch.zeros(self.nboxes, 2*self.d*self.q**(self.d-1), self.d)
         for i in range(n[0]):
             for j in range(n[1]):
                 if self.d==2:
-                    print("Error! Gaussian only needed for d=3")
+                    box   = i*n[1] + j
+                    zzloc = zzG.clone()
+                    zzloc[:,0] += self.a[0] + 2*self.a[0]*i + self.domain[0,0]
+                    zzloc[:,1] += self.a[1] + 2*self.a[1]*j + self.domain[1,0]
+                    xxG[box,:,:] = zzloc
                 else:
                     for k in range(n[2]):
                         box   = i*n[1]*n[2] + j*n[2] + k
@@ -299,62 +273,63 @@ class HPS_Multidomain:
         - I_unique, I_copy1, I_copy2 (torch.Tensor): Tensors representing unique and duplicated grid indices.
         """
         if self.d==2:
-            size_face = self.p-2
-            n0,n1 = self.n
+            # Assuming gaussian nodes with pxp nodes total
+            # FOR NOW we're assuming Chebyshev
+            size_face = self.q
+            n0,n1  = self.n
 
             box_ind = torch.arange(n0*n1*4*size_face).reshape(n0,n1,4*size_face)
 
-            inds_unique = size_face * (n0 * (2*n1+1) + n1)
-            inds_rep    = size_face * (n0 * (n1-1) + n1 * (n0-1))
+            # Keep order in mind: L R D U B F (n0 is LR, n1 is DU, n2 is BF)
+            # Unique: 1 copy of every boundary in the model. This will be:
+            # ALL down, left, and back faces
+            # Right face for the rightmost boxes (on n0) UNLESS we have periodic BC
+            # Up face for the upmost boxes (on n1)
+            I_unique = box_ind.clone()
+            if self.periodic_bc:
+                I_unique[:,:,size_face:2*size_face] = -1 # Eliminate right edges
+            else:
+                I_unique[:-1,:,size_face:2*size_face] = -1 # Eliminate right edges except rightmost
 
-            I_unique   = torch.zeros(inds_unique).long()
-            I_copy1    = torch.zeros(inds_rep).long()
-            I_copy2    = torch.zeros(inds_rep).long()
+            I_unique[:,:-1,3*size_face:4*size_face] = -1 # Eliminate up edges except upmost
+            I_unique = I_unique.flatten()
+            I_unique = I_unique[I_unique > -1]
 
-            offset_unique = 0; offset_copy = 0
-            L_inds_slab0 = box_ind[0,:,:size_face].flatten()
-            I_unique[offset_unique : offset_unique + n1 * size_face] = L_inds_slab0
-            offset_unique += n1 * size_face
+            # For copy 1, we need to eliminate edges that make up domain boundary. This is just:
+            # Left faces for all but leftmost boxes (UNLESS we have a periodic domain on the L/R boundary)
+            # Down faces for all but downmost boxes
+            indices_ru = np.hstack((np.arange(size_face,2*size_face),np.arange(3*size_face,4*size_face)))
+            I_copy1 = box_ind.clone()
+            I_copy1[:,:,indices_ru]             = -1 # Eliminate all right, up, and front faces
+            if not self.periodic_bc:
+                I_copy1[0,:,:size_face]          = -1 # Eliminate left faces on left edge if they aren't periodic
+            I_copy1[:,0,2*size_face:3*size_face] = -1 # Eliminate down faces on down edge
+            I_copy1 = I_copy1.flatten()
+            I_copy1 = I_copy1[I_copy1 > -1]
+            #print("I_copy1 shape is " + str(I_copy1.shape))
+            #print(I_copy1)
 
-            for i in range(n0):
-                
-                if (i > 0):
-                    # shared L,R face between current panel (L) and previous panel (R) 
-                    l_faces_rep = box_ind[i,:,:size_face].flatten()
-                    r_faces_rep = box_ind[i-1,:,size_face:2*size_face].flatten()
-                    # can use a check here with self.xx to verify these indices line up
+            # For copy 2, we need to match relative indexing of copy 1 to easily copy from one to the other.
+            # We'll do this by copying the correct copy 2 indices to their relative points in copy1,
+            # then mimic the eliminations we did in copy1
+            I_copy2 = box_ind.clone()
 
-                    I_unique[offset_unique : offset_unique + (n1)*size_face] = l_faces_rep
-                    offset_unique += (n1) * size_face
+            # Every down index is equal to the up of the preceding box
+            I_copy2[:,1:,2*size_face:3*size_face] = I_copy2[:,:-1,3*size_face:4*size_face]
+            # Every left index is equal to the right of the preceding box
+            I_copy2[1:,:,:size_face] = I_copy2[:-1,:,size_face:2*size_face]
 
-                    I_copy1[offset_copy : offset_copy + (n1)*size_face] = l_faces_rep
-                    I_copy2[offset_copy : offset_copy + (n1)*size_face] = r_faces_rep
-                    offset_copy += (n1) * size_face
+            # SPECIAL CASE: if periodic, we need the leftmost domain faces to equal the rightmost:
+            if self.periodic_bc:
+                I_copy2[0,:,:size_face] = I_copy2[-1,:,size_face:2*size_face]
 
-                # unique down face
-                d_face_uni = box_ind[i,0,2*size_face:3*size_face]
-                I_unique[offset_unique : offset_unique + size_face] = d_face_uni
-                offset_unique += size_face
 
-                # repeated up and down faces
-                u_faces_rep = box_ind[i,:n1-1,3*size_face:].flatten()
-                d_faces_rep = box_ind[i,1:,2*size_face:3*size_face].flatten()
-
-                I_unique[offset_unique : offset_unique + (n1-1)*size_face] = d_faces_rep
-                offset_unique += (n1-1) * size_face
-
-                I_copy1[offset_copy : offset_copy + (n1-1)*size_face] = d_faces_rep
-                I_copy2[offset_copy : offset_copy + (n1-1)*size_face] = u_faces_rep
-                offset_copy += (n1-1) * size_face
-
-                # unique up face
-                u_face_uni = box_ind[i,n1-1,3*size_face:]
-                I_unique[offset_unique : offset_unique + size_face] = u_face_uni
-                offset_unique += size_face
-
-            R_inds_slablast = box_ind[n0-1,:,size_face:2*size_face].flatten()
-            I_unique[offset_unique : offset_unique + n1 * size_face] = R_inds_slablast
-            offset_unique += n1 * size_face
+            I_copy2[:,:,indices_ru]              = -1 # Eliminate all right, up, and front faces
+            if not self.periodic_bc:
+                I_copy2[0,:,:size_face]          = -1 # Eliminate left faces on left edge if they aren't periodic
+            I_copy2[:,0,2*size_face:3*size_face] = -1 # Eliminate down faces on down edge
+            I_copy2 = I_copy2.flatten()
+            I_copy2 = I_copy2[I_copy2 > -1]
         else:
             # Assuming gaussian nodes with pxp nodes total
             # FOR NOW we're assuming Chebyshev
@@ -448,15 +423,14 @@ class HPS_Multidomain:
         
         xxloc = self.grid_xx.to(device)
         Nxtot = torch.tensor(self.H.Nxc).to(device)
-        if (d==3) and (self.interpolate == False):
+        if (self.interpolate == False):
             Nxtot = torch.tensor(self.H.Nx).to(device)
         Jx    = torch.tensor(self.H.JJ.Jx).to(device)
         Jc    = torch.tensor(self.H.JJ.Jc).to(device)
         Jxreo = torch.tensor(self.H.JJ.Jxreorder).to(device)
-        if d==3:
-            Jxun  = torch.tensor(self.H.JJ.Jxunique).to(device)
-            Intmap_rev = torch.tensor(self.H.Interp_mat_reverse).to(device)
-            Intmap_unq = torch.tensor(self.H.Interp_mat_unique).to(device)
+        Jxun  = torch.tensor(self.H.JJ.Jxunique).to(device)
+        Intmap_rev = torch.tensor(self.H.Interp_mat_reverse).to(device)
+        Intmap_unq = torch.tensor(self.H.Interp_mat_unique).to(device)
             
         Intmap = torch.tensor(self.H.Interp_mat).to(device)
         Ds     = self.H.Ds.to(device)
@@ -464,11 +438,7 @@ class HPS_Multidomain:
         if (mode =='solve'):
             data = data.to(device)
 
-        # Only need Jxun for 3D case:
-        if d==2:    
-            args = p,q,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxreo,Ds,Intmap,Intmap,Intmap,pdo
-        else:
-            args = p,q,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
+        args = p,q,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
         
         # reserve at most 1GB memory for stored DtNs at a time
         f = 0.8e9 # 1 * 0.8 = 0.8 GB in bytes

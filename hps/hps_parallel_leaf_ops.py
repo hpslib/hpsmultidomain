@@ -186,14 +186,8 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
 
         uu_sol = torch.zeros(box_end-box_start,p**d,2*nrhs,device=device)
         
-        # We use different indexing schemes for 2D, 3D dropped corners, and 3D Gaussian:
-        if d==2:
-            uu_sol[:,Jxreo,:nrhs] = Intmap.unsqueeze(0) @ data[box_start:box_end]
-            if (pdo.c12 is None):
-                uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc][...,Jx] @ data[box_start:box_end])
-            else:
-                uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, f_body - Aloc[:,Jc][...,Jxreo] @ uu_sol[:,Jxreo,:nrhs])
-        elif interpolate == False:
+        # We use different indexing schemes for dropped corners and Gaussian:
+        if interpolate == False:
             uu_sol[:,Jx,:nrhs] = data[box_start:box_end]
             uu_sol[:,Jc,:nrhs] = -Aloc[:,Jc[:,None],Jx] @ data[box_start:box_end]
             uu_sol[:,Jc,:nrhs] += f_body
@@ -244,9 +238,7 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_
     are computed at once, and transfers results to CPU as needed.
     """
     nboxes = box_end - box_start
-    size_face = (p-2)**(d-1)
-    if d==3:
-        size_face = q**2
+    size_face = q**(d-1)
     if (mode == 'build'):
         DtNs = torch.zeros(nboxes,2*d*size_face,2*d*size_face,device=device)
     elif (mode == 'solve'):
