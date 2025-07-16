@@ -49,7 +49,6 @@ class HPS_Multidomain:
         self.a      = a
         self.d      = d
 
-
         self.periodic_bc = periodic_bc
 
         # For interpolation:
@@ -84,35 +83,20 @@ class HPS_Multidomain:
                               torch.tensor(Dtmp.D1), torch.tensor(Dtmp.D2), torch.tensor(Dtmp.D3)))
         self.H.Ds = Ds 
         
-        grid_xx       = self.get_grid()
-        self.grid_xx  = grid_xx
-        
         Jx = torch.tensor(self.H.JJ.Jx)
         Jxreorder = torch.tensor(self.H.JJ.Jxreorder)
-        #Jc = torch.tensor(self.H.JJ.Jc)
         
-        if d==2:
-            self.grid_ext = self.grid_xx[:,Jxreorder,:].flatten(start_dim=0,end_dim=-2)
-            self.gauss_xx = self.get_gaussian_nodes()
-            self.gauss_xx = self.gauss_xx.flatten(start_dim=0,end_dim=-2)
-            self.I_unique, self.I_copy1, self.I_copy2 = self.get_unique_inds()
-            
-            # We want xx_ext to be based on Gaussian nodes unless there are no mixed terms:
-            self.xx_ext = self.gauss_xx
-            if self.interpolate == False:
-                self.xx_ext = self.grid_xx[:,Jx,:].flatten(start_dim=0,end_dim=-2)
-            self.xx_active = self.xx_ext[self.I_unique,:]
-        else:
-            self.grid_ext = self.grid_xx[:,Jxreorder,:].flatten(start_dim=0,end_dim=-2)
-            self.gauss_xx = self.get_gaussian_nodes()
-            self.gauss_xx = self.gauss_xx.flatten(start_dim=0,end_dim=-2)
-            self.I_unique, self.I_copy1, self.I_copy2 = self.get_unique_inds()
+        self.grid_xx  = self.get_grid()
+        self.grid_ext = self.grid_xx[:,Jxreorder,:].flatten(start_dim=0,end_dim=-2)
+        self.gauss_xx = self.get_gaussian_nodes()
+        self.gauss_xx = self.gauss_xx.flatten(start_dim=0,end_dim=-2)
+        self.I_unique, self.I_copy1, self.I_copy2 = self.get_unique_inds()
 
-            # We want xx_ext to be based on Gaussian nodes unless there are no mixed terms:
-            self.xx_ext = self.gauss_xx
-            if self.interpolate == False:
-                self.xx_ext = self.grid_xx[:,Jx,:].flatten(start_dim=0,end_dim=-2)
-            self.xx_active = self.xx_ext[self.I_unique,:]
+        # We want xx_ext to be based on Gaussian nodes unless there are no mixed terms:
+        self.xx_ext = self.gauss_xx
+        if self.interpolate == False:
+            self.xx_ext = self.grid_xx[:,Jx,:].flatten(start_dim=0,end_dim=-2)
+        self.xx_active = self.xx_ext[self.I_unique,:]
         
         self.xx_tot = self.grid_xx.flatten(start_dim=0,end_dim=-2)
     
@@ -146,54 +130,9 @@ class HPS_Multidomain:
                 self.get_DtNs(device,'build')
         print(prof.key_averages(group_by_input_shape=False).table(sort_by=sort_by_keyword, row_limit=12))
         """
-        #print("Built DtNs")
-        if self.d==2:
-            size_face = self.q; size_ext = 4*size_face
-            n0,n1 = self.n
-            nprod = n0*n1
-        else:
-            size_face = self.q**2; size_ext = 6*size_face
-            n0,n1,n2 = self.n
-            nprod=n0*n1*n2
-        
-        if self.d==2:
-            # For 2D, we're now indexing box by box. Thus let's follow that approach here:
-            tic = time()
-            col_data = torch.arange(size_ext, device="cpu")#, dtype=torch.float64)
-
-
-            row_data = torch.repeat_interleave(col_data, size_ext)
-            col_data = col_data.repeat((size_ext))
-
-            box_range = size_ext * torch.arange(nprod, device="cpu")
-            box_range = box_range.unsqueeze(-1)
-
-            row_data = box_range + row_data
-            col_data = box_range + col_data
-            data = DtN_loc.flatten()
-            row_data = row_data.flatten()
-            col_data = col_data.flatten()
-            toc_flatten = time() - tic
-        else:
-            # For 3D, we're indexing box by box. Thus let's follow that approach here:
-            tic = time()
-            col_data = torch.arange(size_ext, device="cpu")#, dtype=torch.float64)
-
-            row_data = torch.repeat_interleave(col_data, size_ext)
-            col_data = col_data.repeat((size_ext))
-
-            box_range = size_ext * torch.arange(nprod, device="cpu")
-            box_range = box_range.unsqueeze(-1)
-
-            row_data = box_range + row_data
-            col_data = box_range + col_data
-            data = DtN_loc.flatten()
-            row_data = row_data.flatten()
-            col_data = col_data.flatten()
-            toc_flatten = time() - tic
         
         tic = time()
-        sp_mat = sp.coo_matrix((data.detach().cpu().numpy(),(row_data.detach().cpu().numpy(),col_data.detach().cpu().numpy())))
+        sp_mat = sp.block_diag(DtN_loc)
         sp_mat = sp_mat.tocsr()
         toc_csr_scipy = time() - tic
 
@@ -201,7 +140,6 @@ class HPS_Multidomain:
 
         t_dict = dict()
         t_dict['toc_DtN'] = toc_DtN
-        t_dict['toc_indices'] = toc_flatten
         t_dict['toc_sparse'] = toc_csr_scipy
         return sp_mat,t_dict
     
@@ -300,7 +238,7 @@ class HPS_Multidomain:
             # Down faces for all but downmost boxes
             indices_ru = np.hstack((np.arange(size_face,2*size_face),np.arange(3*size_face,4*size_face)))
             I_copy1 = box_ind.clone()
-            I_copy1[:,:,indices_ru]             = -1 # Eliminate all right, up, and front faces
+            I_copy1[:,:,indices_ru]              = -1 # Eliminate all right and up faces
             if not self.periodic_bc:
                 I_copy1[0,:,:size_face]          = -1 # Eliminate left faces on left edge if they aren't periodic
             I_copy1[:,0,2*size_face:3*size_face] = -1 # Eliminate down faces on down edge

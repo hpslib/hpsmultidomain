@@ -213,7 +213,7 @@ class Domain_Driver(AbstractHPSSolver):
             XX_mapped = self.XX()
 
         # 2) Evaluate known Green's function at boundary points, with a source placed far outside domain
-        uu = uu_dir_func_greens(self.d, XX_mapped, kh, center=self.geom()[1] + 10)
+        uu = uu_dir_func_greens(self.d, XX_mapped, kh, center=self.geom()[1] + 12)
 
         # 3) Extract boundary values (unique exterior) and interior true values
         #uu_sol = self.solve_dir_full(uu[self.Jx()])
@@ -236,12 +236,11 @@ class Domain_Driver(AbstractHPSSolver):
 
         self.hps = HPS_multi
 
+        self.XX_active  = self.hps.xx_active
+        self.ntot       = self.XX_active.shape[0]
+        tol             = 0.01 * self.hps.hmin # Adding a tolerance to avoid potential numerical error
+
         if d==2:
-            self.XX_active  = self.hps.xx_active
-            
-            self.ntot = self.XX_active.shape[0]
-            
-            tol = 0.01 * self.hps.hmin # Adding a tolerance to avoid potential numerical error
             if periodic_bc:
                 I_dir = torch.where((self.XX_active[:,1] < self.box_geom[1,0] + tol)
                                 | (self.XX_active[:,1] > self.box_geom[1,1] - tol))[0]
@@ -261,17 +260,7 @@ class Domain_Driver(AbstractHPSSolver):
                 self.I_Xtot = I_dir
                 self.I_Ctot = torch.sort(torch_setdiff1d(torch.arange(self.ntot), self.I_Xtot))[0]
 
-            self.I_Xtot_in_unique = self.hps.I_unique[self.I_Xtot]
-
-            # Note that I_Xtot and I_Ctot are both out of all XX, not just the unique
-            # boundaries.
         else: # d==3
-            # self.XX_active consists of the unique X values of the subdomain boundaries
-            self.XX_active  = self.hps.xx_active
-            
-            self.ntot = self.XX_active.shape[0]
-            
-            tol = 0.01 * self.hps.hmin # Adding a tolerance to avoid potential numerical error
             if periodic_bc:
                 I_dir = torch.where((self.XX_active[:,1] < self.box_geom[1,0] + tol)
                                 | (self.XX_active[:,1] > self.box_geom[1,1] - tol)
@@ -297,10 +286,9 @@ class Domain_Driver(AbstractHPSSolver):
                 self.I_Xtot = I_dir
                 self.I_Ctot = torch.sort(torch_setdiff1d(torch.arange(self.ntot), self.I_Xtot))[0]
 
-            self.I_Xtot_in_unique = self.hps.I_unique[self.I_Xtot]
-
-            # Note that I_Xtot and I_Ctot are both out of all XX, not just the unique
-            # boundaries.
+        self.I_Xtot_in_unique = self.hps.I_unique[self.I_Xtot]
+        # Note that I_Xtot and I_Ctot are both out of all XX, not just the unique
+        # boundaries.
 
         self.XXfull_reshape = torch.reshape(self.hps.grid_xx, (self.hps.grid_xx.shape[0] * self.hps.grid_xx.shape[1], -1))
             

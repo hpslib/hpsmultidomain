@@ -458,8 +458,13 @@ def get_diff_ops(Ds,JJ,d):
         Nd = Ds.D2[JJ.Jd]
         Nu = Ds.D2[JJ.Ju]
 
+        Nlc = Ds.D1[JJ.Jlc]
+        Nrc = Ds.D1[JJ.Jrc]
+        Ndc = Ds.D2[JJ.Jdc]
+        Nuc = Ds.D2[JJ.Juc]
+
         Nx  = np.concatenate((-Nl,+Nr,-Nd,+Nu))
-        Nxc = Nx
+        Nxc = np.concatenate((-Nlc,+Nrc,-Ndc,+Nuc))
     else: # Need to include corners here...
         Nl = Ds.D1[JJ.Jl]
         Nr = Ds.D1[JJ.Jr]

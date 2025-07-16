@@ -43,7 +43,7 @@ def get_Aloc_2d(p, xxloc, Ds, pdo, box_start, box_end, device):
     Aloc_acc(p, 2, nboxes, xx_flat, Aloc, pdo.c11, Ds[0], c=-1.)
     Aloc_acc(p, 2, nboxes, xx_flat, Aloc, pdo.c22, Ds[1], c=-1.)
     if pdo.c12 is not None:
-        Aloc_acc(p, 2, nboxes, xx_flat, Aloc, pdo.c12, Ds[2], c=-2.)
+        Aloc_acc(p, 2, nboxes, xx_flat, Aloc, pdo.c12, Ds[2], c=-1.)
     if pdo.c1 is not None:
         Aloc_acc(p, 2, nboxes, xx_flat, Aloc, pdo.c1, Ds[3])
     if pdo.c2 is not None:
@@ -190,14 +190,13 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         if interpolate == False:
             uu_sol[:,Jx,:nrhs] = data[box_start:box_end]
             uu_sol[:,Jc,:nrhs] = -Aloc[:,Jc[:,None],Jx] @ data[box_start:box_end]
-            uu_sol[:,Jc,:nrhs] += f_body
-            uu_sol[:,Jc,:nrhs] = torch.linalg.solve(Acc, uu_sol[:,Jc,:nrhs])
         else:
             # Need to make this Jxunique:
             uu_sol[:,Jxun,:nrhs] = Intmap_unq.unsqueeze(0) @ data[box_start:box_end]
             uu_sol[:,Jc,:nrhs]   = -Aloc[:,Jc[:,None],Jxun] @ uu_sol[:,Jxun,:nrhs]
-            uu_sol[:,Jc,:nrhs]  += f_body
-            uu_sol[:,Jc,:nrhs]   = torch.linalg.solve(Acc, uu_sol[:,Jc,:nrhs])
+
+        uu_sol[:,Jc,:nrhs]  += f_body    
+        uu_sol[:,Jc,:nrhs]   = torch.linalg.solve(Acc, uu_sol[:,Jc,:nrhs])
             
         # calculate residual if there is a true solution available
         if uu_true is None:
