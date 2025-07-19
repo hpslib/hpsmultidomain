@@ -13,6 +13,8 @@ from visualize_problem import visualize_problem
 import pickle  # For serializing and saving results
 import os  # For interacting with the operating system, e.g., environment variables
 
+from geom import *
+
 # Initialize argument parser to define and read command-line arguments
 parser = argparse.ArgumentParser("Call direct solver for 2D/3D domain.")
 # Add expected command-line arguments for the script
@@ -74,9 +76,11 @@ else:
     ValueError("Need to set either n or (for 3D only) n0,n1,n2")
 
 d = args.d
-box_geom = torch.tensor([[0,args.box_xlim],[0,args.box_ylim]])  # Domain geometry tensor
+box = torch.tensor([[0,0],[args.box_xlim,args.box_ylim]])  # Domain geometry tensor
 if d==3:
-    box_geom = torch.tensor([[0,args.box_xlim],[0,args.box_ylim],[0,args.box_zlim]])
+    box = torch.tensor([[0,0,0],[args.box_xlim,args.box_ylim,args.box_zlim]])
+
+box_geom = BoxGeometry(box)
 
 # Print configuration based on whether ppw is set
 if (args.ppw is not None):

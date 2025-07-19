@@ -70,6 +70,10 @@ class HPS_Multidomain:
         self.n = n; self.nboxes = nboxes
         self.H = hps_disc.HPS_Disc(a,p,self.q,d)
         self.hmin = self.H.hmin
+
+        
+        print("Boxes", self.n)
+        print("Total boxes", self.nboxes)
         
         Dtmp  = self.H.Ds
         Ds = 0

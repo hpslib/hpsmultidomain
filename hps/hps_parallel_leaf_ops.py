@@ -124,6 +124,13 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
     All tensors should be small enough to fit on the GPU (if using one)
     """
 
+    # We need Aloc:
+    if (d == 2):
+        Aloc = get_Aloc_2d(*args,device)
+    else:
+        Aloc = get_Aloc_3d(*args,device)
+    Acc = Aloc[:,Jc[:,None],Jc]
+
     if ff_body_vec is not None:
         ff_body_vec = ff_body_vec.to(device)
 
@@ -136,19 +143,22 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         if ff_body_func is not None:
             f_body += ff_body_func(xx_flat)
         if ff_body_vec is not None:
-            f_body += ff_body_vec[box_start:box_end].reshape((box_end-box_start)*(p-2)**d,1)
+            print(f_body.shape)
+            print(ff_body_vec.shape)
+            print(ff_body_vec[box_start*(p-2)**d:box_end*(p-2)**d].shape)
+            #f_body += ff_body_vec.reshape((box_end-box_start)*(p-2)**d,1)
+            f_body += ff_body_vec[box_start*(p-2)**d:box_end*(p-2)**d].squeeze(-1)
 
         f_body = f_body.reshape(box_end-box_start,(p-2)**d,1)
+        print("f_body shape", f_body.shape)
+        tmp = torch.linalg.solve(Acc,f_body)
+        print("torch.linalg.solve(Acc,f_body) shape", tmp.shape)
+        tmp = -Nx[:,Jc].unsqueeze(0) @ tmp
+        print("body load shape", tmp.shape)
+        print("Nx[:,Jc].unsqueeze(0) shape", Nx[:,Jc].unsqueeze(0).shape)
         return -Nx[:,Jc].unsqueeze(0) @ torch.linalg.solve(Acc,f_body)
 
-    # Otherwise we need Aloc:
-    if (d == 2):
-        Aloc = get_Aloc_2d(*args,device)
-    else:
-        Aloc = get_Aloc_3d(*args,device)
-    Acc = Aloc[:,Jc[:,None],Jc]
-
-    if (mode == 'build'):
+    elif (mode == 'build'):
         nrhs = data.shape[-1]
         
         # Slightly different operations depending on if we use Gaussian interpolation or not:

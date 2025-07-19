@@ -1,14 +1,24 @@
 import torch
 import numpy as np
 
-from geometry import ParametrizedGeometry2D, ParametrizedGeometry3D
-from hps_multidomain import HPSMultidomain
+import sys
+sys.path.append("/Users/jkump/Desktop/hps-multidomain-disc")
 
-def get_known_greens(points, kh, center):
-    # Dummy: returns exp(-|x|^2)
-    raise ValueError("todo")
+from hps.geom import ParametrizedGeometry2D, ParametrizedGeometry3D
+from hps.domain_driver import Domain_Driver
 
-def test_hps_multidomain_curved_2d():
+from hps.built_in_funcs import uu_dir_func_greens
+
+def test_hps_multidomain_curved_2d(sparse_assembly='reduced_gpu',solver_type='MUMPS'):
+
+    # Check CUDA availability and adjust settings accordingly
+    print("CUDA available %s" % torch.cuda.is_available())
+    if (torch.cuda.is_available()):
+        print("--num cuda devices %d" % torch.cuda.device_count())
+    if ((not torch.cuda.is_available()) and (sparse_assembly == 'reduced_gpu')):
+        sparse_assembly = 'reduced_cpu'
+        print("Changed sparse assembly to reduced_cpu")
+    
     a = 1 / 8
     p = 16
     kh = 0
@@ -42,32 +52,41 @@ def test_hps_multidomain_curved_2d():
 
     pdo_mod = param_geom.transform_helmholtz_pdo(bfield_constant, kh)
 
-    solver = HPSMultidomain(pdo_mod, param_geom, a, p)
+    solver = Domain_Driver(param_geom, pdo_mod, 0, a, p=p, d=2)
+    solver.build(sparse_assembly, solver_type,verbose=False)
     relerr = solver.verify_discretization(kh)
     assert relerr < 1e-6, f"Relative error too high in 2D: {relerr:.2e}"
 
+    
     points_bnd = solver.geom.parameter_map(solver.XX)
-    points_full = solver.geom.parameter_map(solver._XXfull)
-
-    uu_full = get_known_greens(points_full, kh, center=solver.geom.bounds[1]+10)
-    uu_bnd = get_known_greens(points_bnd, kh, center=solver.geom.bounds[1]+10)
+    points_full = solver.geom.parameter_map(solver.XXfull)
+    
+    uu_full = uu_dir_func_greens(2,points_full,kh,center=solver.geom.bounds[1]+10)
+    uu_bnd  = uu_dir_func_greens(2,points_bnd,kh,center=solver.geom.bounds[1]+10)
 
     uu_sol = solver.solve_dir_full(uu_bnd[solver.Jx])
     relerr = np.linalg.norm(uu_sol - uu_full) / np.linalg.norm(uu_full)
     assert relerr < 3e-10, f"Relative error too high in 2D: {relerr:.2e}"
 
     assert kh == 0
-
+    """
     def get_mms(points):
-        return np.sin(np.pi * points[:, 0]) * np.cos(np.pi * points[:, 1])[:, np.newaxis]
+        return (torch.sin(torch.pi * points[:, 0]) * torch.cos(torch.pi * points[:, 1])).unsqueeze(-1)
 
     def get_body_load(points):
-        ff = 2 * (np.pi**2) * get_mms(points)
-        return ff[:, np.newaxis]
+        ff = 2 * (torch.pi**2) * get_mms(points)
+        return ff.unsqueeze(-1)
 
-    uu_full = get_mms(points_full.numpy())
-    uu_bnd = get_mms(points_bnd.numpy())
+    uu_full = get_mms(points_full)
+    uu_bnd = get_mms(points_bnd)
 
-    uu_sol = solver.solve_dir_full(uu_bnd[solver.Jx], get_body_load(points_full.numpy()))
+    thing = get_body_load(points_full)
+    print("Shape of body load", thing.shape)
+    print("Shape of DBC", uu_bnd[solver.Jx].shape)
+
+    uu_sol = solver.solve_dir_full(uu_bnd[solver.Jx], get_body_load(points_full))
     relerr = np.linalg.norm(uu_sol - uu_full) / np.linalg.norm(uu_full)
     assert relerr < 3e-7, f"Relative error too high in 2D: {relerr:.2e}"
+    """
+
+test_hps_multidomain_curved_2d()

@@ -98,10 +98,13 @@ class Domain_Driver(AbstractHPSSolver):
         """
         self.d = d
         self.kh = kh
-        self.periodic_bc = periodic_bc
-        self.box_geom    = box_geom
+        self.periodic_bc  = periodic_bc
+        self.box_geometry = box_geom # The full BoxGeometry object
+        self.box_geom     = self.box_geometry.bounds.T # The array itself
         assert p > 0
-        self.hps_disc(box_geom,a,p,d,pdo_op,periodic_bc)
+        self.hps_disc(self.box_geom,a,p,d,pdo_op,periodic_bc)
+
+        print("n is:", self.hps.n)
 
     ################### Required functions for parent class AbstractHPSSolver #####################
 
@@ -109,73 +112,84 @@ class Domain_Driver(AbstractHPSSolver):
     # Abstract properties defining essential data
     #################################################
 
+    @property
     def geom(self):
         """
         Geometry object containing domain bounds and, optionally, a parameterization map.
         Must have attribute `bounds` of shape (2, ndim).
         """
-        return self.box_geom.T
+        return self.box_geometry
 
     # TODO: one or both of these might have to be I_unique indexed:
 
+    @property
     def XX(self):
         """
         Flattened array of coordinates for all boundary (exterior) nodes:
         """
         return self.XX_active
 
+    @property
     def XXfull(self):
         """
         Flattened array of coordinates for all discretization (including interiors) nodes:
         """
         return self.XXfull_reshape
-        
+       
+    @property 
     def p(self):
         """
         Polynomial degree used in each patch (number of Chebyshev nodes per direction).
         """
         return self.hps.p
 
+    @property
     def Ji(self):
         """
         Index array for interior (duplicated interface) points in the global boundary ordering.
         """
         return self.I_Ctot #self.hps.I_copy1
 
+    @property
     def Jx(self):
         """
         Index array for unique exterior (non-duplicated) boundary points.
         """
         return self.I_Xtot
 
+    @property
     def npoints_dim(self):
         """
         Total number of Chebyshev points per dimension (npan_dim * p for each dimension).
         """
-        return self.hps.n * self.p()
+        return self.hps.n * self.p
 
     #################################################
     # Abstract properties defining Schur complement blocks
     #################################################
 
+    @property
     def Aii(self):
         """
         Sparse matrix block coupling interior‐interior (duplicated interface) degrees of freedom.
         """
         return self.A_CC
 
+    @property
     def Aix(self):
         """
         Sparse matrix block coupling interior (duplicated interface) to unique exterior DOFs.
         """
         return self.A_CX
 
+    @property
     def Axx(self):
         """
         Sparse matrix block coupling unique exterior DOFs to themselves.
         """
         return self.A_XX
 
+    @property
     def Axi(self):
         """
         Sparse matrix block coupling unique exterior DOFs to interior (duplicated interface) DOFs.
@@ -194,31 +208,24 @@ class Domain_Driver(AbstractHPSSolver):
 
         sol_tot, _, _, _, _, _, _, _ = self.solve(uu_dir,uu_dir_vec=uu_dir,ff_body_vec=ff_body)
 
-        #c Slice sol_tot to be right
-        if self.d == 2:
-            sol_tot = torch.reshape(sol_tot, (-1, self.p(), self.p(), nrhs))
-            sol_tot = sol_tot[:, 1:self.p()-1, 1:self.p()-1, :]
-        else: #self.d == 3
-            sol_tot = torch.reshape(sol_tot, (-1, self.p(), self.p(), self.p(), nrhs))
-            sol_tot = sol_tot[:, 1:self.p()-1, 1:self.p()-1, 1:self.p()-1, :]
-        ff_body = torch.reshape(sol_tot, (-1, nrhs))
+        print(sol_tot.shape)
 
         return sol_tot
 
     def verify_discretization(self, kh):
         # 1) Possibly map XX through a parameterization, if geometry defines one
-        if hasattr(self.geom(), 'parameter_map'):
-            XX_mapped = self.geom().parameter_map(self.XX())
+        if hasattr(self.geom, 'parameter_map'):
+            XX_mapped = self.geom.parameter_map(self.XX)
         else:
-            XX_mapped = self.XX()
+            XX_mapped = self.XX
 
         # 2) Evaluate known Green's function at boundary points, with a source placed far outside domain
-        uu = uu_dir_func_greens(self.d, XX_mapped, kh, center=self.geom()[1] + 12)
+        uu = uu_dir_func_greens(self.d, XX_mapped, kh, center=self.geom.bounds[1] + 12)
 
         # 3) Extract boundary values (unique exterior) and interior true values
         #uu_sol = self.solve_dir_full(uu[self.Jx()])
-        uu_sol, _, _ = self.solve_helper_blackbox(uu[self.Jx()],uu_dir_vec=uu[self.Jx()])
-        uu_true = uu[self.Ji()]
+        uu_sol, _, ff_body = self.solve_helper_blackbox(uu[self.Jx],uu_dir_vec=uu[self.Jx])
+        uu_true = uu[self.Ji]
 
         # 4) Compute error and relative error
         err = np.linalg.norm(uu_sol - uu_true, ord=2)
@@ -536,8 +543,7 @@ class Domain_Driver(AbstractHPSSolver):
             sol_tot[self.I_Xtot] = uu_dir_vec
 
         res = np.linalg.norm(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body)
-        forward_bdry_error = torch.linalg.norm(res) / torch.linalg.norm(ff_body)
-
+        forward_bdry_error = res
         reverse_bdry_error = torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)
         reverse_bdry_error = reverse_bdry_error.item()
 
@@ -556,7 +562,7 @@ class Domain_Driver(AbstractHPSSolver):
         # Creating the true solution for comparison's sake.
         uu_true = None
         if known_sol and uu_dir_vec is not None:
-            GridX = self.hps.grid_xx.clone()
+            GridX   = self.hps.grid_xx.clone()
             uu_true = torch.zeros((GridX.shape[0], GridX.shape[1],1), device=device)
             for i in range(GridX.shape[0]):
                 uu_true[i] = uu_dir_func(GridX[i])
@@ -566,28 +572,16 @@ class Domain_Driver(AbstractHPSSolver):
         toc_leaf_solve = time() - tic
         sol_tot = sol_tot.cpu()
 
-        sol_tot = torch.reshape(sol_tot, (self.hps.nboxes,self.hps.p**self.d))
-
         true_err = torch.tensor([float('nan')])
         if (known_sol):
-            XX = self.hps.xx_tot
-            uu_true = uu_dir_func(XX.clone())
-            if self.d==2:
-                # special protocol for 3D case, needed due to the dropped corners in Chebyshev nodes:
-                uu_true = torch.reshape(uu_true, (self.hps.nboxes,self.hps.p**self.d))
-
-                Jx   = torch.tensor(self.hps.H.JJ.Jx)#.to(device)
-                Jc   = torch.tensor(self.hps.H.JJ.Jc)#.to(device)
-                Jtot = torch.hstack((Jc,Jx))
-                true_err = torch.linalg.norm(sol_tot[:,Jtot]-uu_true[:,Jtot]) / torch.linalg.norm(uu_true[:,Jtot])
-            if self.d==3:
-                # special protocol for 3D case, needed due to the dropped corners in Chebyshev nodes:
-                uu_true = torch.reshape(uu_true, (self.hps.nboxes,self.hps.p**3))
-
-                Jx   = torch.tensor(self.hps.H.JJ.Jx)#.to(device)
-                Jc   = torch.tensor(self.hps.H.JJ.Jc)#.to(device)
-                Jtot = torch.hstack((Jc,Jx))
-                true_err = torch.linalg.norm(sol_tot[:,Jtot]-uu_true[:,Jtot]) / torch.linalg.norm(uu_true[:,Jtot])
+            sol_boxes = torch.reshape(sol_tot, (self.hps.nboxes,self.hps.p**self.d))
+            XX       = self.hps.xx_tot
+            uu_true  = uu_dir_func(XX.clone())
+            uu_true  = torch.reshape(uu_true, (self.hps.nboxes,self.hps.p**self.d))
+            Jx       = torch.tensor(self.hps.H.JJ.Jx)#.to(device)
+            Jc       = torch.tensor(self.hps.H.JJ.Jc)#.to(device)
+            Jtot     = torch.hstack((Jc,Jx))
+            true_err = torch.linalg.norm(sol_boxes[:,Jtot]-uu_true[:,Jtot]) / torch.linalg.norm(uu_true[:,Jtot])
 
             del uu_true
             true_err = true_err.item()

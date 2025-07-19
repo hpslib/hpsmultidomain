@@ -1,6 +1,6 @@
 from abc import ABCMeta, abstractmethod, abstractproperty
 import numpy as np
-#import jax.numpy as jnp # can use tis as an alternative
+import torch
 from hps.pdo import PDO_2d, PDO_3d
 
 ############################################################################################
@@ -113,7 +113,7 @@ class ParametrizedGeometry2D(AbstractGeometry):
         def param_map(xx):
             (z1, z2) = self.zz
             # Evaluate forward map at all points xx
-            ZZ = np.stack([z1(xx), z2(xx)], axis=-1)
+            ZZ = torch.stack([z1(xx), z2(xx)], axis=-1)
             return ZZ
 
         return param_map
@@ -129,7 +129,7 @@ class ParametrizedGeometry2D(AbstractGeometry):
         """
         def inv_param_map(xx):
             (y1, y2) = self.yy
-            YY = np.stack([y1(xx), y2(xx)], axis=-1)
+            YY = torch.stack([y1(xx), y2(xx)], axis=-1)
             return YY
 
         return inv_param_map
@@ -210,7 +210,7 @@ class ParametrizedGeometry2D(AbstractGeometry):
                 result = 0
                 for a, b in pairs:
                     if a is not None and b is not None:
-                        result += np.multiply(a(yy), b(yy))
+                        result += 2*np.multiply(a(yy), b(yy))
                 return result
 
         # Zeroth-order coefficient c(x) = bfield(yy, kh)

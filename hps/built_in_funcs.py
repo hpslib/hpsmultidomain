@@ -4,7 +4,7 @@ import numpy as np  # For numerical operations
 torch.set_default_dtype(torch.double)  # Set default tensor data type to double precision for higher numerical accuracy
 import pdo  # Import a custom library for dealing with Partial Differential Operators
 
-from scipy.special import hankel1  # Import the Hankel function of the first kind for wave-related computations
+from scipy.special import hankel1, j0  # Import the Hankel function of the first kind for wave-related computations
 
 # FUNCTIONS FOR DIRICHLET DATA AND BODY LOAD
 
@@ -132,19 +132,17 @@ def uu_dir_func_greens(d,xx,kh,center=torch.tensor([-1.1,+1.,+1.2])):
     if d==3:
         dd2 = xx[:,2] - center[2]
         ddsq += np.multiply(dd2,dd2)
+    dist_x = np.sqrt(ddsq)
     if (kh == 0):
         if d==2:
-            uu_exact = (1/np.pi) * np.log(ddsq)
+            uu_exact = np.log(dist_x)
         else:
-            uu_exact = 1 / (4 * np.pi * np.sqrt(ddsq))
+            uu_exact = 1 / dist_x
     else:
         if d==2:
-            dist_x = np.sqrt(ddsq)
-            uu_exact = (1j/4) * hankel1(0,kh*dist_x)
-            uu_exact = np.real(uu_exact)
+            uu_exact = j0(kh*dist_x)
         else:
-            dist_x = np.sqrt(ddsq)
-            uu_exact = np.cos(kh * dist_x) / (4*np.pi * dist_x)
+            uu_exact = np.sin(kh * dist_x) / dist_x
     return uu_exact.unsqueeze(-1)
 
 def uu_true_variable_helmholtz(d,xx,kh,center=torch.tensor([-1.1,+2.,+2.2])):

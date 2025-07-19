@@ -17,8 +17,8 @@ from scipy.linalg import null_space
 Pdo_2d   = namedtuple('Pdo_2d',['c11','c22','c12', 'c1','c2','c'])
 Ds_2d    = namedtuple('Ds_2d', ['D11','D22','D12','D1','D2'])
 JJ_2d    = namedtuple('JJ_2d', ['Jl','Jr','Jd','Ju','Jx', 'Jlc', 'Jrc', 'Jdc',
-                               'Juc', 'Jxreorder', 'Jxunique', 'Jc', 'Jtot',
-                               'unique_in_reorder'])
+                                'Juc', 'Jxreorder', 'Jxunique', 'Jc', 'Jtot',
+                                'unique_in_reorder'])
 
 Pdo_3d = namedtuple('Pdo_3d', ['c11', 'c22', 'c33', 'c12', 'c13', 'c23', 'c1', 'c2', 'c3', 'c'])
 Ds_3d  = namedtuple('Ds_3d',  ['D11', 'D22', 'D33', 'D12', 'D13', 'D23', 'D1', 'D2', 'D3'])
@@ -482,6 +482,7 @@ def get_diff_ops(Ds,JJ,d):
 
         Nx  = np.concatenate((-Nl,+Nr,-Nd,+Nu,-Nb,+Nf))
         Nxc = np.concatenate((-Nlc,+Nrc,-Ndc,+Nuc,-Nbc,+Nfc))
+        
     return Nx, Nxc
 
 #################################### HPS Object ##########################################
@@ -544,7 +545,7 @@ class HPS_Disc:
             Pnew = V_null @ np.transpose(V_null)
             
             # Apply this to our interpolation matrix to ensure continuity at corner nodes:
-            self.Interp_mat        = Pnew @ self.Interp_mat    # with redundant corners
+            self.Interp_mat        = P @ self.Interp_mat    # with redundant corners
             self.Interp_mat_unique = self.Interp_mat[self.JJ.unique_in_reorder,:] # without redundant corners
 
             toc = time() - tic
