@@ -364,9 +364,8 @@ class HPS_Multidomain:
             DtNs = torch.zeros(nboxes,2*d*size_face,1)
         
         xxloc = self.grid_xx.to(device)
-        Nxtot = torch.tensor(self.H.Nxc).to(device)
-        if (self.interpolate == False):
-            Nxtot = torch.tensor(self.H.Nx).to(device)
+        Nx    = torch.tensor(self.H.Nx).to(device)
+        Nxc   = torch.tensor(self.H.Nxc).to(device)
         Jx    = torch.tensor(self.H.JJ.Jx).to(device)
         Jc    = torch.tensor(self.H.JJ.Jc).to(device)
         Jxreo = torch.tensor(self.H.JJ.Jxreorder).to(device)
@@ -380,7 +379,7 @@ class HPS_Multidomain:
         if (mode =='solve'):
             data = data.to(device)
 
-        args = p,q,d,xxloc,Nxtot,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
+        args = p,q,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
         
         # reserve at most 1GB memory for stored DtNs at a time
         f = 0.8e9 # 1 * 0.8 = 0.8 GB in bytes
@@ -391,9 +390,6 @@ class HPS_Multidomain:
         else: #if mode == 'build'
             chunk_max = int(f / ((2*d*size_face)**2 * 8)) # Size of DtN matrix * number of bytes per double
         chunk_size = chunk_max #leaf_ops.get_nearest_div(nboxes,chunk_max)
-
-        print("nboxes, chunk max, chunk size:")
-        print((nboxes, chunk_max, chunk_size))
         
         Aloc_chunkinit = np.min([50,int(nboxes/4)])
         if d==3:

@@ -115,7 +115,7 @@ def Aloc_acc(p, d, nboxes, xx_flat, Aloc, func, D, c=1.):
     Aloc     += f_vals * D.unsqueeze(0)
 
     
-def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
+def form_DtNs(p,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
           box_start,box_end,device,mode,interpolate,data,ff_body_func,ff_body_vec,uu_true):
     args = p,xxloc,Ds,pdo,box_start,box_end
     """
@@ -136,27 +136,20 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
 
     # This one doesn't require Aloc
     if (mode == 'reduce_body'):
-        # assume that the data is a function that you can apply to
-        # xx locations
-        xx_flat = xxloc[box_start:box_end,Jc].reshape((box_end-box_start)*(p-2)**d,d)
-        f_body  = torch.zeros((box_end-box_start)*(p-2)**d,device=device).unsqueeze(-1)
+        nrhs = 1 # Assuming 1 RHS for now
+        f_body  = torch.zeros((box_end-box_start),(p-2)**d,nrhs,device=device)
         if ff_body_func is not None:
-            f_body += ff_body_func(xx_flat)
+            xx_flat = xxloc[box_start:box_end,Jc].reshape((box_end-box_start)*(p-2)**d,d)
+            tmp = ff_body_func(xx_flat)
+            f_body += tmp.reshape(box_end-box_start,(p-2)**d,nrhs)
         if ff_body_vec is not None:
-            print(f_body.shape)
-            print(ff_body_vec.shape)
-            print(ff_body_vec[box_start*(p-2)**d:box_end*(p-2)**d].shape)
-            #f_body += ff_body_vec.reshape((box_end-box_start)*(p-2)**d,1)
-            f_body += ff_body_vec[box_start*(p-2)**d:box_end*(p-2)**d].squeeze(-1)
+            f_body_vec_part = ff_body_vec[box_start*p**d:box_end*p**d].reshape(box_end-box_start,p**d,nrhs)
+            f_body += f_body_vec_part[:,Jc,:]
 
-        f_body = f_body.reshape(box_end-box_start,(p-2)**d,1)
-        print("f_body shape", f_body.shape)
-        tmp = torch.linalg.solve(Acc,f_body)
-        print("torch.linalg.solve(Acc,f_body) shape", tmp.shape)
-        tmp = -Nx[:,Jc].unsqueeze(0) @ tmp
-        print("body load shape", tmp.shape)
-        print("Nx[:,Jc].unsqueeze(0) shape", Nx[:,Jc].unsqueeze(0).shape)
-        return -Nx[:,Jc].unsqueeze(0) @ torch.linalg.solve(Acc,f_body)
+        if interpolate == False:
+            return -Nx[:,Jc].unsqueeze(0) @ torch.linalg.solve(Acc,f_body)
+        else:
+            return -Intmap_rev.unsqueeze(0) @ Nxc[:,Jc].unsqueeze(0) @ torch.linalg.solve(Acc,f_body)
 
     elif (mode == 'build'):
         nrhs = data.shape[-1]
@@ -176,7 +169,7 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
             S_full        = torch.concat((S_tmp @ Intmap_unq.unsqueeze(0),Intmap_repeat),dim=1) # Applying interpolation to both identity and S
             
             Jtot = torch.hstack((Jc,Jxun))
-            DtN  = Nx[:,Jtot].unsqueeze(0) @ S_full
+            DtN  = Nxc[:,Jtot].unsqueeze(0) @ S_full
             DtN  = Intmap_rev.unsqueeze(0) @ DtN
         return DtN
     
@@ -188,10 +181,10 @@ def form_DtNs(p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
         f_body = torch.zeros(box_end-box_start,Jc.shape[0],nrhs,device=device)
         if (ff_body_func is not None):
             xx_flat = xxloc[box_start:box_end,Jc].reshape((box_end-box_start)*(p-2)**d,d)
-            f_body += Aloc @ ff_body_func(xx_flat).reshape(box_end-box_start,(p-2)**d,nrhs)
+            f_body += ff_body_func(xx_flat).reshape(box_end-box_start,(p-2)**d,nrhs)
         if (ff_body_vec is not None):
-            f_body_vec_part = ff_body_vec[box_start:box_end].unsqueeze(-1)
-            f_body         += Aloc @ f_body_vec_part
+            f_body_vec_part = ff_body_vec[box_start*p**d:box_end*p**d].reshape(box_end-box_start,p**d,nrhs)
+            f_body         += f_body_vec_part[:,Jc]
         
 
         uu_sol = torch.zeros(box_end-box_start,p**d,2*nrhs,device=device)
@@ -240,7 +233,7 @@ def get_DtN_chunksize(p,d,device,mode):
     return np.max([chunk_max, 1])
 
 
-def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,\
+def get_DtNs_helper(p,q,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,\
                     box_start,box_end,chunk_init,device,mode,interpolate,data,ff_body_func,ff_body_vec,uu_true):
     """
     Handles the batch scheduling for computing DtNs and leaf solves - designates how many
@@ -256,7 +249,7 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_
         DtNs = torch.zeros(nboxes,2*d*size_face,1,device=device)
     #print("Built zero arrays in helper")
     chunk_size = chunk_init
-    args = p,d,xxloc,Nx,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
+    args = p,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
     chunk_list = torch.zeros(int(nboxes/chunk_init)+100,device=device).int(); 
     box_curr = 0; nchunks = 0
 

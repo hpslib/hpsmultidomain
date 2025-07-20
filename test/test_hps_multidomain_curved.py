@@ -56,6 +56,7 @@ def test_hps_multidomain_curved_2d(sparse_assembly='reduced_gpu',solver_type='MU
     solver.build(sparse_assembly, solver_type,verbose=False)
     relerr = solver.verify_discretization(kh)
     assert relerr < 1e-6, f"Relative error too high in 2D: {relerr:.2e}"
+    print("Relative error for box interfaces: ", relerr)
 
     
     points_bnd = solver.geom.parameter_map(solver.XX)
@@ -67,26 +68,24 @@ def test_hps_multidomain_curved_2d(sparse_assembly='reduced_gpu',solver_type='MU
     uu_sol = solver.solve_dir_full(uu_bnd[solver.Jx])
     relerr = np.linalg.norm(uu_sol - uu_full) / np.linalg.norm(uu_full)
     assert relerr < 3e-10, f"Relative error too high in 2D: {relerr:.2e}"
+    print("Relative error for box interfaces and interiors: ", relerr)
 
     assert kh == 0
-    """
+    
     def get_mms(points):
         return (torch.sin(torch.pi * points[:, 0]) * torch.cos(torch.pi * points[:, 1])).unsqueeze(-1)
 
     def get_body_load(points):
         ff = 2 * (torch.pi**2) * get_mms(points)
-        return ff.unsqueeze(-1)
+        return ff
 
     uu_full = get_mms(points_full)
     uu_bnd = get_mms(points_bnd)
 
-    thing = get_body_load(points_full)
-    print("Shape of body load", thing.shape)
-    print("Shape of DBC", uu_bnd[solver.Jx].shape)
-
     uu_sol = solver.solve_dir_full(uu_bnd[solver.Jx], get_body_load(points_full))
     relerr = np.linalg.norm(uu_sol - uu_full) / np.linalg.norm(uu_full)
     assert relerr < 3e-7, f"Relative error too high in 2D: {relerr:.2e}"
-    """
+    print("Relative error for box interfaces and interiors with body load: ", relerr)
+    
 
 test_hps_multidomain_curved_2d()

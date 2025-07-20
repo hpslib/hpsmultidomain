@@ -204,11 +204,7 @@ class Domain_Driver(AbstractHPSSolver):
     # Also need sol_tot to be just interiors (no global bdry or no box boundary?)
     def solve_dir_full(self, uu_dir, ff_body=None):
 
-        nrhs = uu_dir.shape[-1]
-
         sol_tot, _, _, _, _, _, _, _ = self.solve(uu_dir,uu_dir_vec=uu_dir,ff_body_vec=ff_body)
-
-        print(sol_tot.shape)
 
         return sol_tot
 

@@ -46,12 +46,12 @@ def test_hps_2d_elongated():
 	a = 1/8; p = 20; kh = 0; ndim = 2
 	relerr = get_discretization_relerr(a,p,kh,ndim,elongated_x=True)
 	print(f"Relative error for 2D elongated Poisson is {relerr}")
-	#assert relerr < 1e-12
+	assert relerr < 1e-12
 
 	kh = 10
 	relerr = get_discretization_relerr(a,p,kh,ndim,elongated_y=True)
 	print(f"Relative error for 2D elongated Helmholtz with kh={kh} is {relerr}")
-	#assert relerr < 1e-12
+	assert relerr < 1e-12
 
 
 def test_hps_2d():
@@ -59,12 +59,12 @@ def test_hps_2d():
 	a = 1/16; p = 10; kh = 0; ndim = 2
 	relerr = get_discretization_relerr(a,p,kh,ndim)
 	print(f"Relative error for 2D Poisson is {relerr}")
-	#assert relerr < 1e-12
+	assert relerr < 1e-12
 
 	kh = 8
 	relerr = get_discretization_relerr(a,p,kh,ndim)
 	print(f"Relative error for 2D Helmholtz with kh={kh} is {relerr}")
-	#assert relerr < 1e-12
+	assert relerr < 1e-11
 
 
 def test_hps_3d():
@@ -72,12 +72,12 @@ def test_hps_3d():
 	a = 1/16; p = 7; kh = 0; ndim = 3
 	relerr = get_discretization_relerr(a,p,kh,ndim)
 	print(f"Relative error for 3D Poisson is {relerr}")
-	#assert relerr < 1e-12
+	assert relerr < 1e-12
 
 	kh = 10
 	relerr = get_discretization_relerr(a,p,kh,ndim)
 	print(f"Relative error for 3D Helmholtz with kh={kh} is {relerr}")
-	#assert relerr < 5e-8
+	assert relerr < 5e-8
 
 
 test_hps_2d()
