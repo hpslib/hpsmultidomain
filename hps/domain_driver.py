@@ -2,9 +2,6 @@ import torch  # Used for tensor operations
 import numpy as np  # For numerical operations, especially those not directly supported by PyTorch
 import sys  # System-specific parameters and functions
 
-import sys
-sys.path.append("/Users/jkump/Desktop/hps-multidomain-disc/hps")
-
 # Importing parent class:
 from abstract_hps_solver import AbstractHPSSolver
 
