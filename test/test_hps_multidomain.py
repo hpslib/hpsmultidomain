@@ -2,9 +2,6 @@ import numpy as np
 import scipy
 import torch
 
-import sys
-sys.path.append("/Users/jkump/Desktop/hps-multidomain-disc")
-
 from hps.pdo               import PDO_2d,PDO_3d,const
 from hps.geom              import BoxGeometry
 from hps.domain_driver     import Domain_Driver

@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod, abstractproperty
 import numpy as np
 import torch
-from hps.pdo import PDO_2d, PDO_3d
+from pdo import PDO_2d, PDO_3d
 
 ############################################################################################
 # Abstract base class for geometries: defines minimal interface (bounds property)

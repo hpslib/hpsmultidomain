@@ -1,9 +1,6 @@
 import torch
 import numpy as np
 
-import sys
-sys.path.append("/Users/jkump/Desktop/hps-multidomain-disc")
-
 from hps.geom import ParametrizedGeometry2D, ParametrizedGeometry3D
 from hps.domain_driver import Domain_Driver
 
