@@ -10,11 +10,6 @@ plotpath    = "plots/convection_diffusion/"
 total_title = "Convection Diffusion with 10 timesteps:\n"
 
 p_list = [10, 12, 14, 16]
-#p_list = [8, 10, 12, 14, 18, 22, 30]
-
-
-#p_list = [10, 12, 14, 16, 18, 20, 22]
-#p_list = [6, 8, 10, 12]#, 14]
 
 def make_p_results(mypath, p_list):
     onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
@@ -103,47 +98,9 @@ def make_plot(p_list, p_results, field, title, xlabel, ylabel, type="plot"):
     plt.savefig(plotpath + field + ".pdf")
     plt.show()
 
-"""
-legend = []
-for i in range(len(p_list)):
-    plt.loglog(p_results[i].index**3, p_results[i]["toc_invert"])
-    legend.append("p = " + str(p_list[i]))
-
-plt.loglog(p_results[i].index**3, 1.5*p_results[i].index**3)
-legend.append("N = N^3/2")
-
-plt.title("Poisson: time to factorize sparse matrix (log plot)")
-plt.legend(legend)
-plt.xlabel("N")
-plt.ylabel("seconds")
-plt.savefig("plots_poisson/log_toc_invert.png")
-plt.show()
-"""
-
 p_results = make_p_results(mypath, p_list)
 
 print(p_results)
 
-
-#make_plot(p_list, p_results, "toc_invert", total_title + "time to factorize sparse matrix", "N", "seconds")
-#make_plot(p_list, p_results, "toc_build_dtn", total_title + "time to assemble batched DtN maps", "N", "seconds")
-#make_plot(p_list, p_results, "toc_leaf_solve", total_title + "time to solve batched leaf operators", "N", "seconds")
-
-
-
-#make_plot(p_list, p_results, "sparse_solve_res", total_title + "residual of sparse system solve for boundaries", "N", "relative error", type="loglog")
 make_plot(p_list, p_results, "true_res", total_title + "Residual of total result", "delta T", "relative error", type="plot")
-#make_plot(p_list, p_results, "leaf_res", total_title + "residual of leaf computations", "N", "relative error", type="loglog")
-"""
-make_plot(p_list, p_results, "forward_bdry_error", total_title + "error when applying box bdries to sparse mat", "N", "relative error", type="loglog")
-make_plot(p_list, p_results, "reverse_bdry_error", total_title + "residual of box boundaries after sparse solve", "N", "relative error", type="loglog")
 
-# Interpolation:
-make_plot(p_list, p_results, "GtC_error", total_title + "error of leaf Gauss to Cheb interpolation", "N", "relative error", type="loglog")
-make_plot(p_list, p_results, "CtG_error", total_title + "error of leaf Cheb to Gauss interpolation", "N", "relative error", type="loglog")
-make_plot(p_list, p_results, "GtC_cond", total_title + "cond of leaf Gauss to Cheb interpolation", "N", "condition #", type="loglog")
-make_plot(p_list, p_results, "CtG_cond", total_title + "cond of leaf Cheb to Gauss interpolation", "N", "condition #", type="loglog")
-make_plot(p_list, p_results, "neumann_tensor_error", total_title + "applying DtNs to Gaussian Dirichlet data", "N", "relative error", type="loglog")
-make_plot(p_list, p_results, "neumann_sparse_error", total_title + "applying sparse mat (from DtN) to Gaussian Dirichlet data", "N", "relative error", type="loglog")
-make_plot(p_list, p_results, "dtn_cond", total_title + "condtion # of a DtN map", "N", "condition #", type="loglog")
-"""

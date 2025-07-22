@@ -13,9 +13,6 @@ mypath      = "gpu_output/gravity_kh_12_0116/"
 plotpath    = "plots/convection_diffusion/"
 total_title = "Convection Diffusion with 10 timesteps:\n"
 
-#p_list = [10]#, 12, 14, 16]
-#p_list = [8, 10, 12, 14, 18, 22, 30]
-
 
 p_list = np.array([9, 11, 13, 15, 17, 19, 21])
 
@@ -67,19 +64,6 @@ def make_p_results(mypath, p_list, box_list):
         sol_errors.append(sol_reshaped_error)
         p_lists.append(p_indices)
 
-        """    
-        p_result = dict(n=n)
-        
-        p_result = pd.DataFrame.from_dict(p_result)
-
-        if pd.api.types.is_object_dtype(p_result['n']):
-            p_result['n'] = p_result['n'].str[0]
-
-        p_result.set_index('n', inplace=True)
-        p_result.sort_index(inplace=True)
-        p_results.append(pd.DataFrame.from_dict(p_result))
-        """
-
     return sol_errors, p_lists, computed_sols, sol_reshaped
 
 convergences, p_lists, computed_sols, sol_reshaped = make_p_results(mypath, p_list, box_list)
@@ -124,12 +108,3 @@ plt.ylabel("Relative Error")
 plt.grid(True)
 plt.savefig("gravity_convergence_p.pdf")
 plt.show()
-
-
-#print([a[int(b**3/2),0] for a, b in zip(computed_sols, p_lists[-1])])
-
-#print(sol_reshaped)
-
-#midpoint = int(9**3 / 2)
-#print(midpoint)
-#print(computed_sols[0][midpoint:-1:9**3,0])
