@@ -1,10 +1,11 @@
 # hpsmultidomain
 ## Hierarchical Poincaré-Steklov Solver for PDEs
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.16379968.svg)](https://doi.org/10.5281/zenodo.16379968)
 [![License](https://img.shields.io/github/license/hpslib/hpsmultidomain)](./LICENSE.md)
 [![Top language](https://img.shields.io/github/languages/top/hpslib/hpsmultidomain)](https://www.python.org)
 ![Code size](https://img.shields.io/github/languages/code-size/hpslib/hpsmultidomain)
-[![Latest commit](https://img.shields.io/github/last-commit/hpslib/hpsmultidomain)](https://github.com/annayesy/slabLU/commits/master)
+[![Latest commit](https://img.shields.io/github/last-commit/hpslib/hpsmultidomain)](https://github.com/hpslib/hpsmultidomain/commits/main)
 
 Written by Joseph Kump and Anna Yesypenko
 
