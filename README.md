@@ -1,4 +1,4 @@
-# hpsmultidomain:
+# hpsmultidomain
 ## Hierarchical Poincaré-Steklov Solver for PDEs
 
 [![License](https://img.shields.io/github/license/hpslib/hpsmultidomain)](./LICENSE.md)
