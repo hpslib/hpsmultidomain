@@ -1,6 +1,11 @@
-# Hierarchical Poincaré-Steklov Solver for PDEs
+# hpsmultidomain: Hierarchical Poincaré-Steklov Solver for PDEs
 
-The Hierarchical Poincaré-Steklov (HPS) Solver is a high-performance computing solution designed to solve Partial Differential Equations (PDEs) on multidomain geometries. Leveraging advanced numerical methods and efficient parallel processing, this solver is capable of handling complex PDE problems with high accuracy and computational efficiency.
+[![License](https://img.shields.io/github/license/hpslib/hpsmultidomain)](./LICENSE.md)
+[![Top language](https://img.shields.io/github/languages/top/hpslib/hpsmultidomain)](https://www.python.org)
+![Code size](https://img.shields.io/github/languages/code-size/hpslib/hpsmultidomain)
+[![Latest commit](https://img.shields.io/github/last-commit/hpslib/hpsmultidomain)](https://github.com/annayesy/slabLU/commits/master)
+
+The Hierarchical Poincaré-Steklov (HPS) Solver is a high-performance computing solution designed to solve Partial Differential Equations (PDEs) on multidomain geometries. Leveraging advanced numerical methods and efficient parallel processing including GPUs, this solver is capable of handling complex PDE problems with high accuracy and computational efficiency.
 
 ## Features
 
