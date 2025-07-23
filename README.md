@@ -2,13 +2,31 @@
 
 The Hierarchical Poincaré-Steklov (HPS) Solver is a high-performance computing solution designed to solve Partial Differential Equations (PDEs) on multidomain geometries. Leveraging advanced numerical methods and efficient parallel processing, this solver is capable of handling complex PDE problems with high accuracy and computational efficiency.
 
-The paper connected to this code can be found here: [https://arxiv.org/abs/2503.04033v1](https://arxiv.org/abs/2503.04033v1).
-
 ## Features
 
 - **Multidomain Discretization**: Supports solving PDEs on complex geometries divided into multiple domains.
 - **Batch Processing**: Utilizes batch operations for efficient computation on both CPU and GPU.
 - **Sparse Matrix Representation**: Employs sparse matrices to optimize memory usage and computation time.
+
+<p align="center">
+    <img src="https://github.com/hpslib/hpsmultidomain/blob/main/figures/gravity_helmholtz_low_res.png" width="49%"/> <img src="https://github.com/hpslib/hpsmultidomain/blob/main/figures/gravity_helmholtz_high_res.png" width="49%" /> 
+</p>
+
+<div style="display: flex; justify-content: center;">
+    <p style="width: 50%; text-align: center; font-size: 90%;">
+        Figures 1 and 2: Plots of solutions to the gravity Helmholtz equation, $\Delta u  + \kappa^2 (1-x_3) u = -1$ on $\Omega = [1.1, 2.1] \times [-1, 0] \times [-1.2, -0.2]$ with a zero DBC. A cross-section has been taken through the $x$-axis. We see consistent results across different $p$ and $h$.
+    </p>
+</div>
+
+<p align="center">
+    <img src="https://github.com/hpslib/hpsmultidomain/blob/main/figures/picture_sinusoidal_curve.png" width="49%"/> <img src="https://github.com/hpslib/hpsmultidomain/blob/main/figures/picture_annulus.png" width="49%" /> 
+</p>
+
+<div style="display: flex; justify-content: center;">
+    <p style="width: 50%; text-align: center; font-size: 90%;">
+        Figures 3 and 4: Plots of solutions to a constant-coefficient Helmholtz equation on different domain geometries.
+    </p>
+</div>
 
 ## Dependencies
 
@@ -17,7 +35,7 @@ The paper connected to this code can be found here: [https://arxiv.org/abs/2503.
 - [SciPy](https://scipy.org/): For sparse matrix operations and linear algebra.
 - [petsc4py](https://petsc.org/release/petsc4py/) (Optional): To use PETSc for sparse matrix operations. The solver can fall back to SciPy if petsc4py is not available. However, PETSc (particularly using the MUMPS direct solver) makes the code much faster.
 
-Example usage.
+## Example usage
 For a 2D problem:
 ```
 python hps/argparse_driver.py --pde poisson --domain square --bc log_dist --n 1000 --p 12 --d 2 --solver superLU
@@ -27,6 +45,7 @@ And for a 3D problem:
 python hps/argparse_driver.py --pde poisson --domain square --bc log_dist --n 50 --p 12 --d 3 --solver MUMPS
 ```
 
+## Notes
 A series of command line arguments can be seen in `argparse_driver.py`. These include:
 - `pde` to specify the partial differential equation to solve, such as `poisson` or `bfield_constant` (i.e. constant-coefficient Helmholtz equation)
 - `domain` to specify domain shapes. `square` is the standard for rectangular domains, `curved` (sinusoidal curve) and `annulus` are alternatives.
@@ -45,3 +64,9 @@ A series of command line arguments can be seen in `argparse_driver.py`. These in
 If you wish to run the solver multiple times for the same 3D problem (same PDE and BC) across a range of `p` and `n` values, you can run `run_models.py` with the problem specified. This calls `test_3d.py` to automatically piece together the commandline arguments and run the solver several times in a row.
 
 Alternatively, you can call `test_hps_multidomain.py` or `test_hps_multidomain_curved.py` to test a few various 2D and 3D configurations.
+
+## Associated Papers
+
+The paper connected to this code can be found here:
+
+[1] Kump, Joseph; Yesypenko, Anna; and Per-Gunnar Martinsson. "A Two-Level Direct Solver for the Hierarchical Poincaré-Steklov Method" arXiv preprint arXiv:2503.04033 (2025).
