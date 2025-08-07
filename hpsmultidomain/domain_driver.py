@@ -73,7 +73,6 @@ def apply_sparse_lowmem(A, I, J, v, transpose=False):
     Returns:
     - The resulting vector after applying A (or A^T if transpose=True) to v, extracting indices I.
     """
-
     vec_full = torch.zeros(A.shape[1], v.shape[-1])
     vec_full[J] = v
     vec_full = A.T @ vec_full if transpose else A @ vec_full
