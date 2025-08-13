@@ -236,11 +236,14 @@ class Domain_Driver(AbstractHPSSolver):
         - solve_op:   Optionally, a pre‐constructed LinearOperator for Aii^{-1}.
         - use_approx: If True and PETSc is available, use an approximate iterative solver.
         """
+        sparse_solver = SparseSolver(self.Aii, use_approx=use_approx)
         if solve_op is None:
             # Build a new SparseSolver on Aii; solver_Aii property will wrap it
-            self.solve_op = SparseSolver(self.Aii, use_approx=use_approx).solve_op
+            self.solve_op = sparse_solver.solve_op
         else:
             self.solve_op = solve_op
+
+        self.petsc_LU = sparse_solver.ksp
 
     @property
     def solver_Aii(self):
@@ -419,11 +422,13 @@ class Domain_Driver(AbstractHPSSolver):
         self.A_CX = A_CX
         self.A_XC = A_XC
         self.A_XX = A_XX
+        """
         print("Trimmed the unnecessary parts to make A_CC, now assembly with PETSc (or maybe SuperLU)")
         if (not petsc_available):
             info_dict = self.build_superLU(verbose)
         else:
             info_dict = self.build_petsc(solvertype,verbose)
+        """
         return info_dict
 
     def build(self,sparse_assembly, solver_type,verbose=True):
