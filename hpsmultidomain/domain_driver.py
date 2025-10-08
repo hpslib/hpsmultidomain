@@ -159,6 +159,10 @@ class Domain_Driver(AbstractHPSSolver):
         """
         return self.hps.n * self.p
 
+    @property
+    def npan_dim(self):
+        return self.hps.n
+
     #################################################
     # Abstract properties defining Schur complement blocks
     #################################################
