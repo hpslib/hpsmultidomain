@@ -3,6 +3,14 @@ from scipy.sparse.linalg import LinearOperator, splu
 from scipy.sparse import csr_matrix, coo_matrix
 from time import time
 
+# Attempting to import the python-mumps library for parallel computation, handling failure gracefully
+try:
+    import mumps
+    mumps_imported = True
+except ImportError:
+    mumps_imported = False
+    print("python-mumps not available")
+
 # Try to import PETSc; if successful, we can use its KSP solvers.
 try:
     from petsc4py import PETSc
@@ -67,6 +75,28 @@ def setup_ksp(A, use_approx=False):
     # Finalize KSP setup
     ksp.setUp()
     return ksp
+
+def setup_mumps(A):
+    """
+    Set up a PETSc KSP (Krylov solver) or direct solver on sparse matrix A.
+
+    Parameters:
+    - A: scipy.sparse matrix (CSR or convertible to CSR)
+    - use_approx: bool
+        If False, use direct LU factorization (MUMPS) via PC “preonly”.
+        If True, use GMRES with a Hypre preconditioner for an approximate solve.
+
+    Returns:
+    - ksp: PETSc KSP object that can solve linear systems with A
+    """
+    # Ensure A is in CSR format for building PETSc AIJ matrix
+    A = A.tocsr()
+
+    inst = mumps.Context()
+    inst.analyze(A, ordering='pord')
+    inst.factor(A)
+
+    return inst
 
 
 def get_vecsolve(ksp):
@@ -185,10 +215,17 @@ class SparseSolver:
         self.is_symmetric = np.linalg.norm(A @ v - A.T @ v) < 1e-12
         self.N = A.shape[0]
 
+        self.use_mumps = mumps_imported
         self.use_petsc = petsc_imported
         self.use_approx = use_approx
 
-        if self.use_petsc:
+        if self.use_mumps:
+            # Build solver on A
+            self.ksp = setup_mumps(A)
+            if not self.is_symmetric:
+                # If A is nonsymmetric, build a separate KSP on A^T for transpose solves
+                self.ksp_adj = setup_mumps(A.T)
+        elif self.use_petsc:
             # Build KSP solver on A
             self.ksp = setup_ksp(A, use_approx)
             if not self.is_symmetric:
@@ -204,7 +241,7 @@ class SparseSolver:
         _ = self.solve_op.matvec(rhs)
         toc = time() - tic
 
-        if self.use_petsc:
+        if not self.use_mumps and self.use_petsc:
             niter = self.ksp.getIterationNumber()
             # Optionally, print or log timing and iteration counts here
             # print(f"use_approx={use_approx}, solve time={toc:.2e}, relerr={np.linalg.norm(res-v):.2e}, iter={niter}")
@@ -220,7 +257,27 @@ class SparseSolver:
         Returns:
         - LinearOperator of shape (N, N)
         """
-        if self.use_petsc and self.is_symmetric:
+        if not self.use_mumps and self.is_symmetric:
+            # Use SciPy LU for both matvec and rmatvec (direct symmetric solve)
+            return LinearOperator(
+                shape=(self.N, self.N),
+                matvec=lambda x: self.ksp.solve(x),
+                rmatvec=lambda x: self.ksp.solve(x),
+                matmat=lambda X: self.ksp.solve(X),
+                rmatmat=lambda X: self.ksp.solve(X)
+            )
+
+        elif  self.use_mumps and not self.is_symmetric:
+            # SciPy LU for nonsymmetric: use transpose solve for rmatvec
+            return LinearOperator(
+                shape=(self.N, self.N),
+                matvec=lambda x: self.ksp.solve(x),
+                rmatvec=lambda x: self.ksp_adj.solve(x),
+                matmat=lambda X: self.ksp.solve(X),
+                rmatmat=lambda X: self.ksp_adj.solve(X)
+            )
+
+        elif self.use_petsc and self.is_symmetric:
             # Symmetric case: matvec and rmatvec are same
             return LinearOperator(
                 shape=(self.N, self.N),

@@ -19,6 +19,14 @@ import scipy.sparse.linalg as sla  # For sparse linear algebra operations, alter
 from hpsmultidomain.built_in_funcs import uu_dir_func_greens
 from hpsmultidomain.sparse_utils import SparseSolver
 
+# Attempting to import the python-mumps library for parallel computation, handling failure gracefully
+try:
+    import mumps
+    mumps_available = True
+except ImportError:
+    mumps_available = False
+    print("python-mumps not available")
+
 # Attempting to import the PETSc library for parallel computation, handling failure gracefully
 try:
     from petsc4py import PETSc
@@ -30,11 +38,11 @@ try:
     # Set relative threshold for numerical pivoting:
     #PETSc.Options()['mat_mumps_cntl_1'] = 0.0
     # Set matrix permutation. 7 is automatically decided, 1-6 are different choices.
-    PETSc.Options()['mat_mumps_icntl_6']  = 7
-    PETSc.Options()['mat_mumps_icntl_8']  = 77 # Scaling strategy, set to be automatically picked
-    PETSc.Options()['mat_mumps_icntl_10'] = 0 # No iterative refinement
-    PETSc.Options()['mat_mumps_icntl_12'] = 1 # Ordering strategy with icntl 6
-    PETSc.Options()['mat_mumps_icntl_13'] = 0 # Parallel factorization of root node
+    #PETSc.Options()['mat_mumps_icntl_6']  = 7
+    #PETSc.Options()['mat_mumps_icntl_8']  = 77 # Scaling strategy, set to be automatically picked
+    #PETSc.Options()['mat_mumps_icntl_10'] = 0 # No iterative refinement
+    #PETSc.Options()['mat_mumps_icntl_12'] = 1 # Ordering strategy with icntl 6
+    #PETSc.Options()['mat_mumps_icntl_13'] = 0 # Parallel factorization of root node
     petsc_available = True
 except ImportError:
     petsc_available = False
@@ -247,7 +255,12 @@ class Domain_Driver(AbstractHPSSolver):
         else:
             self.solve_op = solve_op
 
-        self.petsc_LU = sparse_solver.ksp
+        if mumps_available:
+            self.mumps_LU = sparse_solver.ksp
+        elif petsc_available:
+            self.petsc_LU = sparse_solver.ksp
+        else:
+            self.superLU = sparse_solver.ksp
 
     @property
     def solver_Aii(self):
@@ -405,10 +418,34 @@ class Domain_Driver(AbstractHPSSolver):
         #self.solver_Aii = self.petsc_LU
 
         return info_dict
+
+    def build_mumps(self,verbose):
+        """
+        Constructs the sparse system using mumps from python-mumps. Referred to access MUMPS.
+        """
+        info_dict = dict()
+        try:
+            tic = time()
+            inst = mumps.Context()
+            inst.analyze(self.A_CC, ordering='pord')
+            mumps_LU = inst.factor(self.A_CC)
+            toc_mumps_LU = time() - tic
+            if (verbose):
+                print("\t--time superLU build = %5.2f seconds"\
+                      % (toc_mumps_LU))
+
+            self.mumps_LU    = mumps_LU
+            #self.solver_Aii = self.superLU
+
+            info_dict['toc_build_superLU'] = toc_mumps_LU
+            info_dict['toc_build_blackbox']= toc_mumps_LU
+            info_dict['solver_type']       = 'python-mumps'
+        except:
+            print("python-mumps had an error.")
+        return info_dict
     
     # Builds the sparse matrix that encodes the solutions to boundary points.
     def build_blackboxsolver(self,solvertype,verbose):
-
         info_dict = dict()
         #print("Made it to build_blackboxsolver")
         I_copy1 = self.hps.I_copy1.detach().cpu().numpy()
@@ -538,13 +575,15 @@ class Domain_Driver(AbstractHPSSolver):
         ff_body = self.get_rhs(uu_dir_func,uu_dir_vec=uu_dir_vec,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
         ff_body = np.array(ff_body)
 
-        if (not petsc_available):
-            sol = self.superLU.solve(ff_body)
-        else:
+        if mumps_available:
+            sol = self.mumps_LU.solve(ff_body)
+        elif petsc_available:
             psol = PETSc.Vec().createWithArray(np.ones(ff_body.shape))
             pb   = PETSc.Vec().createWithArray(ff_body.copy())
             self.petsc_LU.solve(pb,psol)
             sol  = psol.getArray().reshape(ff_body.shape)
+        else:
+            sol = self.superLU.solve(ff_body)
 
         res     = self.A_CC @ sol - ff_body
         relerr  = np.linalg.norm(res,ord=2)/np.linalg.norm(ff_body,ord=2)
