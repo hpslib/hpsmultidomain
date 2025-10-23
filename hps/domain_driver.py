@@ -18,6 +18,14 @@ from functools import reduce  # For performing cumulative operations
 import scipy.sparse.linalg as sla  # For sparse linear algebra operations, alternative variable
 from built_in_funcs import uu_dir_func_greens
 
+# Attempting to import the python-mumps library for parallel computation, handling failure gracefully
+try:
+    import mumps
+    mumps_available = False
+except ImportError:
+    mumps_available = False
+    print("python-mumps not available")
+
 # Attempting to import the PETSc library for parallel computation, handling failure gracefully
 try:
     from petsc4py import PETSc
@@ -365,6 +373,32 @@ class Domain_Driver(AbstractHPSSolver):
         self.petsc_LU = ksp
 
         return info_dict
+
+    def build_mumps(self,verbose):
+        """
+        Constructs the sparse system using mumps from python-mumps. Referred to access MUMPS.
+        """
+        info_dict = dict()
+        try:
+            tic = time()
+            inst = mumps.Context()
+            inst.analyze(self.A_CC, ordering='pord')
+            inst.factor(self.A_CC)
+            mumps_LU = inst
+            toc_mumps_LU = time() - tic
+            if (verbose):
+                print("\t--time mumps build = %5.2f seconds"\
+                      % (toc_mumps_LU))
+
+            self.mumps_LU    = mumps_LU
+            #self.solver_Aii = self.superLU
+
+            info_dict['toc_build_mumps'] = toc_mumps_LU
+            info_dict['toc_build_blackbox']= toc_mumps_LU
+            info_dict['solver_type']       = 'python-mumps'
+        except:
+            print("python-mumps had an error.")
+        return info_dict
     
     # Builds the sparse matrix that encodes the solutions to boundary points.
     def build_blackboxsolver(self,solvertype,verbose):
@@ -387,10 +421,13 @@ class Domain_Driver(AbstractHPSSolver):
         self.A_XC = A_XC
         self.A_XX = A_XX
         print("Trimmed the unnecessary parts to make A_CC, now assembly with PETSc (or maybe SuperLU)")
-        if (not petsc_available):
-            info_dict = self.build_superLU(verbose)
-        else:
+        if mumps_available:
+            info_dict = self.build_mumps(verbose)
+        elif petsc_available:
             info_dict = self.build_petsc(solvertype,verbose)
+        else:
+            info_dict = self.build_superLU(verbose)
+
         return info_dict
 
     def build(self,sparse_assembly, solver_type,verbose=True):
@@ -495,13 +532,15 @@ class Domain_Driver(AbstractHPSSolver):
         ff_body = self.get_rhs(uu_dir_func,uu_dir_vec=uu_dir_vec,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
         ff_body = np.array(ff_body)
 
-        if (not petsc_available):
-            sol = self.superLU.solve(ff_body)
-        else:
+        if mumps_available:
+            sol = self.mumps_LU.solve(ff_body)
+        elif petsc_available:
             psol = PETSc.Vec().createWithArray(np.ones(ff_body.shape))
             pb   = PETSc.Vec().createWithArray(ff_body.copy())
             self.petsc_LU.solve(pb,psol)
             sol  = psol.getArray().reshape(ff_body.shape)
+        else:
+            sol = self.superLU.solve(ff_body)
 
         res     = self.A_CC @ sol - ff_body
         relerr  = np.linalg.norm(res,ord=2)/np.linalg.norm(ff_body,ord=2)
