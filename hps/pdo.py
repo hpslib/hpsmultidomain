@@ -394,38 +394,39 @@ def get_param_helper(geom,bfield,kh,d=2):
                          y2_d1=y2_d1, y2_d2=y2_d2, y2_d1d1=y2_d1d1, y2_d2d2=y2_d2d2)
 
     elif (geom == "twisted_torus"):
+        tau = 1.0
         R = 1.5
         bnds = [[-1.,-1.,-1.],[1.,1.,1.]]
         def z1(p):
-            c=torch.cos(2*torch.pi*p[...,0])
-            s=torch.sin(2*torch.pi*p[...,0])
+            c=torch.cos(tau*torch.pi*p[...,0])
+            s=torch.sin(tau*torch.pi*p[...,0])
             c2 = torch.multiply(c,c)
             cs = torch.multiply(c,s)
             q = torch.multiply(c2,p[...,1])-torch.multiply(cs,p[...,2])+c*(R+1)
             return q
 
         def z2(p):
-            c=torch.cos(2*torch.pi*p[...,0])
-            s=torch.sin(2*torch.pi*p[...,0])
+            c=torch.cos(tau*torch.pi*p[...,0])
+            s=torch.sin(tau*torch.pi*p[...,0])
             s2 = torch.multiply(s,s)
             cs = torch.multiply(c,s)
             q = torch.multiply(cs,p[...,1])-torch.multiply(s2,p[...,2])+s*(R+1)
             return q
         def z3(p):
-            c=torch.cos(2*torch.pi*p[...,0])
-            s=torch.sin(2*torch.pi*p[...,0])
+            c=torch.cos(tau*torch.pi*p[...,0])
+            s=torch.sin(tau*torch.pi*p[...,0])
             q = torch.multiply(s,p[...,1])+torch.multiply(c,p[...,2])
             return q
 
 
 
         def y1(p):
-            th = torch.arctan2(p[...,1],p[...,0])
+            th = tau*torch.arctan2(p[...,1],p[...,0])
             return th/torch.pi
 
         def y2(p):
             # p is a vector of points, Nx3
-            th = torch.arctan2(p[...,1],p[...,0])
+            th = tau*torch.arctan2(p[...,1],p[...,0])
             c=torch.cos(th)
             s=torch.sin(th)
             c2 = torch.multiply(c,c)
@@ -435,7 +436,7 @@ def get_param_helper(geom,bfield,kh,d=2):
 
 
         def y3(p):
-            th = torch.arctan2(p[...,1],p[...,0])
+            th = tau*torch.arctan2(p[...,1],p[...,0])
             c=torch.cos(th)
             s=torch.sin(th)
             s2 = torch.multiply(s,s)
@@ -454,7 +455,7 @@ def get_param_helper(geom,bfield,kh,d=2):
 
         #verified
         def y2_d1(p):
-            th = torch.arctan2(p[...,1],p[...,0])
+            th = tau*torch.arctan2(p[...,1],p[...,0])
             c2t = torch.cos(2*th)
             s2t = torch.sin(2*th)
             s   = torch.sin(th)
@@ -465,7 +466,7 @@ def get_param_helper(geom,bfield,kh,d=2):
 
         #verified
         def y2_d2(p):
-            th = torch.arctan2(p[...,1],p[...,0])
+            th = tau*torch.arctan2(p[...,1],p[...,0])
             c2t = torch.cos(2*th)
             s2t = torch.sin(2*th)
             s   = torch.sin(th)
@@ -475,14 +476,14 @@ def get_param_helper(geom,bfield,kh,d=2):
             return s2t/2. + A/r2
 
         def y2_d3(p):
-            th = torch.arctan2(p[...,1],p[...,0])
+            th = tau*torch.arctan2(p[...,1],p[...,0])
             return torch.sin(th)
 
 
 
 
         def y3_d1(p):
-            th = torch.arctan2(p[...,1],p[...,0])
+            th = tau*torch.arctan2(p[...,1],p[...,0])
             c2t = torch.cos(2*th)
             s2t = torch.sin(2*th)
             s   = torch.sin(th)
@@ -492,7 +493,7 @@ def get_param_helper(geom,bfield,kh,d=2):
             return -s2t/2. + A/r2
 
         def y3_d2(p):
-            th = torch.arctan2(p[...,1],p[...,0])
+            th = tau*torch.arctan2(p[...,1],p[...,0])
             c2t = torch.cos(2*th)
             s2t = torch.sin(2*th)
             s   = torch.sin(th)
@@ -502,7 +503,7 @@ def get_param_helper(geom,bfield,kh,d=2):
             return (c2t-1)/2. - A/r2
         #verified
         def y3_d3(p):
-            th = torch.arctan2(p[...,1],p[...,0])
+            th = tau*torch.arctan2(p[...,1],p[...,0])
             return torch.cos(th)
 
 
@@ -517,7 +518,7 @@ def get_param_helper(geom,bfield,kh,d=2):
 
         #verified
         def y2_d1d1(p):
-            th = torch.arctan2(p[...,1],p[...,0])
+            th = tau*torch.arctan2(p[...,1],p[...,0])
             c2t = torch.cos(2*th)
             s2t = torch.sin(2*th)
             s   = torch.sin(th)
@@ -528,7 +529,7 @@ def get_param_helper(geom,bfield,kh,d=2):
             return (p[...,1]*s2t + dA - 2*A*p[...,0]/r2 )/r2
         #verified
         def y2_d2d2(p):
-            th = torch.arctan2(p[...,1],p[...,0])
+            th = tau*torch.arctan2(p[...,1],p[...,0])
             c2t = torch.cos(2*th)
             s2t = torch.sin(2*th)
             s   = torch.sin(th)
@@ -541,7 +542,7 @@ def get_param_helper(geom,bfield,kh,d=2):
 
         #verified
         def y3_d1d1(p):
-            th = torch.arctan2(p[...,1],p[...,0])
+            th = tau*torch.arctan2(p[...,1],p[...,0])
             c2t = torch.cos(2*th)
             s2t = torch.sin(2*th)
             s   = torch.sin(th)
@@ -552,7 +553,7 @@ def get_param_helper(geom,bfield,kh,d=2):
             return (c2t*p[...,1] + dA - 2*p[...,0]*A/r2)/r2
         #verified
         def y3_d2d2(p):
-            th = torch.arctan2(p[...,1],p[...,0])
+            th = tau*torch.arctan2(p[...,1],p[...,0])
             c2t = torch.cos(2*th)
             s2t = torch.sin(2*th)
             s   = torch.sin(th)
