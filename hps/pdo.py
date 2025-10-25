@@ -397,23 +397,23 @@ def get_param_helper(geom,bfield,kh,d=2):
         R = 1.5
         bnds = [[-1.,-1.,-1.],[1.,1.,1.]]
         def z1(p):
-            c=torch.cos(torch.pi*p[...,0])
-            s=torch.sin(torch.pi*p[...,0])
+            c=torch.cos(2*torch.pi*p[...,0])
+            s=torch.sin(2*torch.pi*p[...,0])
             c2 = torch.multiply(c,c)
             cs = torch.multiply(c,s)
             q = torch.multiply(c2,p[...,1])-torch.multiply(cs,p[...,2])+c*(R+1)
             return q
 
         def z2(p):
-            c=torch.cos(torch.pi*p[...,0])
-            s=torch.sin(torch.pi*p[...,0])
+            c=torch.cos(2*torch.pi*p[...,0])
+            s=torch.sin(2*torch.pi*p[...,0])
             s2 = torch.multiply(s,s)
             cs = torch.multiply(c,s)
             q = torch.multiply(cs,p[...,1])-torch.multiply(s2,p[...,2])+s*(R+1)
             return q
         def z3(p):
-            c=torch.cos(torch.pi*p[...,0])
-            s=torch.sin(torch.pi*p[...,0])
+            c=torch.cos(2*torch.pi*p[...,0])
+            s=torch.sin(2*torch.pi*p[...,0])
             q = torch.multiply(s,p[...,1])+torch.multiply(c,p[...,2])
             return q
 
