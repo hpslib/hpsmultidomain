@@ -64,12 +64,12 @@ def visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh=0):
     sc = ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals, c=result, marker='.', cmap="seismic", vmin=-max_result, vmax=max_result)
 
 
-    ax.set_xticks([-1.0, 3.0])
-    ax.set_xticklabels(["-1.0", "3.0"])
-    ax.set_yticks([-3.0, 1.0])
-    ax.set_yticklabels(["-3.0", "1.0"])
-    ax.set_zticks([-.9, -.7])
-    ax.set_zticklabels(["-.9", "-.7"])
+    ax.set_xticks([-3.0, 3.0])
+    ax.set_xticklabels(["-3.0", "3.0"])
+    ax.set_yticks([-3.0, 3.0])
+    ax.set_yticklabels(["-3.0", "3.0"])
+    ax.set_zticks([-3.0, -3.0])
+    ax.set_zticklabels(["-3.0", "3.0"])
 
     #ax.set_xticks([1.4, 1.6])
     #ax.set_xticklabels(["1.4", "1.6"])

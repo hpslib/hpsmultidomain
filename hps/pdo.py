@@ -392,6 +392,181 @@ def get_param_helper(geom,bfield,kh,d=2):
                          y1_d1=y1_d1, y1_d2=y1_d2,\
                          y1_d1d1=y1_d1d1, y1_d2d2=y1_d2d2,\
                          y2_d1=y2_d1, y2_d2=y2_d2, y2_d1d1=y2_d1d1, y2_d2d2=y2_d2d2)
+
+    elif (geom == "twisted_torus"):
+        R = 1.5
+        bnds = [[-1.,-1.,-1.],[1.,1.,1.]]
+        def z1(p):
+            c=torch.cos(torch.pi*p[...,0])
+            s=torch.sin(torch.pi*p[...,0])
+            c2 = torch.multiply(c,c)
+            cs = torch.multiply(c,s)
+            q = torch.multiply(c2,p[...,1])-torch.multiply(cs,p[...,2])+c*(R+1)
+            return q
+
+        def z2(p):
+            c=torch.cos(torch.pi*p[...,0])
+            s=torch.sin(torch.pi*p[...,0])
+            s2 = torch.multiply(s,s)
+            cs = torch.multiply(c,s)
+            q = torch.multiply(cs,p[...,1])-torch.multiply(s2,p[...,2])+s*(R+1)
+            return q
+        def z3(p):
+            c=torch.cos(torch.pi*p[...,0])
+            s=torch.sin(torch.pi*p[...,0])
+            q = torch.multiply(s,p[...,1])+torch.multiply(c,p[...,2])
+            return q
+
+
+
+        def y1(p):
+            th = torch.arctan2(p[...,1],p[...,0])
+            return th/torch.pi
+
+        def y2(p):
+            # p is a vector of points, Nx3
+            th = torch.arctan2(p[...,1],p[...,0])
+            c=torch.cos(th)
+            s=torch.sin(th)
+            c2 = torch.multiply(c,c)
+            cs = torch.multiply(c,s)
+            q = torch.multiply(p[...,0],c2)+torch.multiply(p[...,1],cs)-(R+1)*c + torch.multiply(s,p[...,2])
+            return q
+
+
+        def y3(p):
+            th = torch.arctan2(p[...,1],p[...,0])
+            c=torch.cos(th)
+            s=torch.sin(th)
+            s2 = torch.multiply(s,s)
+            cs = torch.multiply(c,s)
+            q = -torch.multiply(p[...,0],cs)-torch.multiply(p[...,1],s2)+(R+1)*s+torch.multiply(c,p[...,2])
+            return q
+
+        #verified
+        def y1_d1(p):
+            r2 = p[...,0]*p[...,0]+p[...,1]*p[...,1]
+            return -(p[...,1]/r2)/torch.pi
+        #verified
+        def y1_d2(p):
+            r2 = p[...,0]*p[...,0]+p[...,1]*p[...,1]
+            return (p[...,0]/r2)/torch.pi
+
+        #verified
+        def y2_d1(p):
+            th = torch.arctan2(p[...,1],p[...,0])
+            c2t = torch.cos(2*th)
+            s2t = torch.sin(2*th)
+            s   = torch.sin(th)
+            c   = torch.cos(th)
+            r2  = p[...,0]*p[...,0]+p[...,1]*p[...,1]
+            A   = (s2t*p[...,0]*p[...,1] - c2t*p[...,1]**2 - (R+1)*s*p[...,1] - p[...,2]*p[...,1]*c)
+            return (c2t+1)/2. + A/r2
+
+        #verified
+        def y2_d2(p):
+            th = torch.arctan2(p[...,1],p[...,0])
+            c2t = torch.cos(2*th)
+            s2t = torch.sin(2*th)
+            s   = torch.sin(th)
+            c   = torch.cos(th)
+            r2  = p[...,0]*p[...,0]+p[...,1]*p[...,1]
+            A   = ( c2t*p[...,0]*p[...,1] - s2t*p[...,0]*p[...,0] + (R+1)*s*p[...,0] + p[...,2]*p[...,0]*c)
+            return s2t/2. + A/r2
+
+        def y2_d3(p):
+            th = torch.arctan2(p[...,1],p[...,0])
+            return torch.sin(th)
+
+
+
+
+        def y3_d1(p):
+            th = torch.arctan2(p[...,1],p[...,0])
+            c2t = torch.cos(2*th)
+            s2t = torch.sin(2*th)
+            s   = torch.sin(th)
+            c   = torch.cos(th)
+            r2  = p[...,0]*p[...,0]+p[...,1]*p[...,1]
+            A   = (c2t*p[...,0]*p[...,1] + s2t*p[...,1]**2 - (R+1)*c*p[...,1] + p[...,2]*p[...,1]*s)
+            return -s2t/2. + A/r2
+
+        def y3_d2(p):
+            th = torch.arctan2(p[...,1],p[...,0])
+            c2t = torch.cos(2*th)
+            s2t = torch.sin(2*th)
+            s   = torch.sin(th)
+            c   = torch.cos(th)
+            r2  = p[...,0]*p[...,0]+p[...,1]*p[...,1]
+            A   = (s2t*p[...,0]*p[...,1] + c2t*p[...,0]*p[...,0] - (R+1)*c*p[...,0] + p[...,2]*p[...,0]*s)
+            return (c2t-1)/2. - A/r2
+        #verified
+        def y3_d3(p):
+            th = torch.arctan2(p[...,1],p[...,0])
+            return torch.cos(th)
+
+
+        #verified
+        def y1_d1d1(p):
+            r2 = p[...,0]*p[...,0]+p[...,1]*p[...,1]
+            return (2*p[...,1]*p[...,0]/r2)/(r2*torch.pi)
+        #verified
+        def y1_d2d2(p):
+            r2 = p[...,0]*p[...,0]+p[...,1]*p[...,1]
+            return -2*(p[...,0]*p[...,1]/r2)/(r2*torch.pi)
+
+        #verified
+        def y2_d1d1(p):
+            th = torch.arctan2(p[...,1],p[...,0])
+            c2t = torch.cos(2*th)
+            s2t = torch.sin(2*th)
+            s   = torch.sin(th)
+            c   = torch.cos(th)
+            r2  = p[...,0]*p[...,0]+p[...,1]*p[...,1]
+            A   = (s2t*p[...,0]*p[...,1] - c2t*p[...,1]*p[...,1] - (R+1)*s*p[...,1] - p[...,2]*p[...,1]*c)
+            dA = p[...,1]*s2t-(2*c2t*p[...,0]*(p[...,1]**2)+2*s2t*p[...,1]**3-(R+1)*c*p[...,1]**2 + p[...,2]*s*(p[...,1]**2) )/r2
+            return (p[...,1]*s2t + dA - 2*A*p[...,0]/r2 )/r2
+        #verified
+        def y2_d2d2(p):
+            th = torch.arctan2(p[...,1],p[...,0])
+            c2t = torch.cos(2*th)
+            s2t = torch.sin(2*th)
+            s   = torch.sin(th)
+            c   = torch.cos(th)
+            r2  = p[...,0]*p[...,0]+p[...,1]*p[...,1]
+            A   = ( c2t*p[...,0]*p[...,1] - s2t*p[...,0]*p[...,0] + (R+1)*s*p[...,0] + p[...,2]*p[...,0]*c)
+            dA  = p[...,0]*c2t-(2*s2t*p[...,1]*p[...,0]**2+2*c2t*(p[...,0]**3)-(R+1)*c*(p[...,0]**2)+p[...,2]*s*(p[...,0]**2))/r2
+            return (c2t*p[...,0] + dA - 2*A*p[...,1]/r2 )/r2
+
+
+        #verified
+        def y3_d1d1(p):
+            th = torch.arctan2(p[...,1],p[...,0])
+            c2t = torch.cos(2*th)
+            s2t = torch.sin(2*th)
+            s   = torch.sin(th)
+            c   = torch.cos(th)
+            r2  = p[...,0]*p[...,0]+p[...,1]*p[...,1]
+            A   = (c2t*p[...,0]*p[...,1] + s2t*p[...,1]**2 - (R+1)*c*p[...,1] + p[...,2]*p[...,1]*s)
+            dA  = p[...,1]*c2t+(2*p[...,0]*(p[...,1]**2)*s2t-2*(p[...,1]**3)*c2t-(R+1)*(p[...,1]**2)*s-p[...,2]*(p[...,1]**2)*c)/r2
+            return (c2t*p[...,1] + dA - 2*p[...,0]*A/r2)/r2
+        #verified
+        def y3_d2d2(p):
+            th = torch.arctan2(p[...,1],p[...,0])
+            c2t = torch.cos(2*th)
+            s2t = torch.sin(2*th)
+            s   = torch.sin(th)
+            c   = torch.cos(th)
+            r2  = p[...,0]*p[...,0]+p[...,1]*p[...,1]
+            A   = (s2t*p[...,0]*p[...,1] + c2t*p[...,0]*p[...,0] - (R+1)*c*p[...,0] + p[...,2]*p[...,0]*s)
+            dA  = p[...,0]*s2t+(2*(p[...,0]**2)*p[...,1]*c2t-2*(p[...,0]**3)*s2t + (R+1)*(p[...,0]**2)*s + p[...,2]*(p[...,0]**2)*c)/r2
+            return -(s2t*p[...,0] + dA - 2*p[...,1]*A/r2)/r2
+
+        return pdo_param_3d(kh, bfield, z1,z2,z3,y1,y2,y3,
+                                y1_d1=y1_d1, y1_d2=y1_d2, y2_d1=y2_d1, y2_d2=y2_d2, y3_d3=y3_d3,
+                                y1_d1d1=y1_d1d1, y1_d2d2=y1_d2d2,
+                                y2_d1d1=y2_d1d1, y2_d2d2=y2_d2d2,
+                                y2_d3=y2_d3, y3_d1=y3_d1, y3_d2=y3_d2, y3_d1d1=y3_d1d1, y3_d2d2=y3_d2d2) # The new ones
     
     elif (geom == 'corner'):
         

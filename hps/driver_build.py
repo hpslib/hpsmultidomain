@@ -130,6 +130,10 @@ def configure_pde_domain(args):
             op, param_map, \
             inv_param_map = pdo.get_param_map_and_pdo('curvy_annulus', bfield, kh)
             curved_domain=True
+        elif (args.domain == 'twisted_torus'):
+            op, param_map, \
+            inv_param_map = pdo.get_param_map_and_pdo('twisted_torus', bfield, kh)
+            curved_domain=True
         else:
             raise ValueError
         
