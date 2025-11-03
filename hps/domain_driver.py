@@ -109,7 +109,7 @@ class Domain_Driver(AbstractHPSSolver):
         assert p > 0
         self.hps_disc(self.box_geom,a,p,d,pdo_op,periodic_bc)
 
-        print("n is:", self.hps.n)
+        print("pdo_op:", vars(pdo_op))
 
     ################### Required functions for parent class AbstractHPSSolver #####################
 
@@ -593,7 +593,7 @@ class Domain_Driver(AbstractHPSSolver):
 
         # Creating the true solution for comparison's sake.
         uu_true = None
-        if known_sol and uu_dir_vec is not None:
+        if known_sol:
             GridX   = self.hps.grid_xx.clone()
             uu_true = torch.zeros((GridX.shape[0], GridX.shape[1],1), device=device)
             for i in range(GridX.shape[0]):
