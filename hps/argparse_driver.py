@@ -126,7 +126,7 @@ build_info = build_operator_with_info(dom, args, box_geom, kh)
 
 ################################# SOLVE PDE ###################################
 # Solve the PDE with specified configurations and print results
-"""
+
 uu_dir,uu_sol,res,true_res,resloc_hps,toc_solve,forward_bdry_error,reverse_bdry_error,solve_info = run_solver(dom, args, curved_domain, kh, param_map, delta_t, num_timesteps)
 print(uu_sol.shape)
 
@@ -150,4 +150,3 @@ if (args.pickle is not None):
 # Optional: visualization of computed solution
 if args.visualize:
     visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh)
-"""

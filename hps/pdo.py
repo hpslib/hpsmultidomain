@@ -123,6 +123,142 @@ def cij_func(parameter_map,yi_d1, yj_d1, yi_d2, yj_d2, yi_d3=None, yj_d3=None):
             return result
     return cij
 
+def cross_func(parameter_map,yi_d1, yi_d2, yi_d3, yj_d1, yj_d2, yj_d3):
+
+    bool_exprP1 = (yi_d2 is not None) and (yj_d3 is not None)
+    bool_exprP2 = (yi_d3 is not None) and (yj_d1 is not None)
+    bool_exprP3 = (yi_d1 is not None) and (yj_d2 is not None)
+
+    bool_exprM1 = (yi_d3 is not None) and (yj_d2 is not None)
+    bool_exprM2 = (yi_d1 is not None) and (yj_d3 is not None)
+    bool_exprM3 = (yi_d2 is not None) and (yj_d1 is not None)
+
+    if ((not bool_exprP1) and (not bool_exprM1)):
+        cross1 = None
+    else:
+        def cross1(xx):
+            yy     = parameter_map(xx)
+            result = 0
+            if bool_exprP1:
+                result += torch.mul(yi_d2(yy),yj_d3(yy))
+            if bool_exprM1:
+                result -= torch.mul(yi_d3(yy),yj_d2(yy))
+            return result
+
+    if ((not bool_exprP2) and (not bool_exprM2)):
+        cross2 = None
+    else:
+        def cross2(xx):
+            yy     = parameter_map(xx)
+            result = 0
+            if bool_exprP2:
+                result += torch.mul(yi_d3(yy),yj_d1(yy))
+            if bool_exprM2:
+                result -= torch.mul(yi_d1(yy),yj_d3(yy))
+            return result
+
+    if ((not bool_exprP3) and (not bool_exprM3)):
+        cross3 = None
+    else:
+        def cross3(xx):
+            yy     = parameter_map(xx)
+            result = 0
+            if bool_exprP3:
+                result += torch.mul(yi_d1(yy),yj_d2(yy))
+            if bool_exprM3:
+                result -= torch.mul(yi_d2(yy),yj_d1(yy))
+            return result
+    
+    return cross1, cross2, cross3
+
+# Produces the cofactors of the Jacobian, as well as its determinant
+def cofactor_columns_and_det(parameter_map, y_1, y_2, y_3):
+
+    C1 = cross_func(parameter_map, y_2[0], y_2[1], y_2[2], y_3[0], y_3[1], y_3[2])
+    C2 = cross_func(parameter_map, y_3[0], y_3[1], y_3[2], y_1[0], y_1[1], y_1[2])
+    C3 = cross_func(parameter_map, y_1[0], y_1[1], y_1[2], y_2[0], y_2[1], y_2[2])
+
+    bool_exp = [(y_1[_] is not None) and (C1[_] is not None) for _ in range(3)]
+
+    if ((not bool_exp[0]) and (not bool_exp[1]) and (not bool_exp[2])):
+        raise ValueError("Error: the parameter map is probably singular")
+        #return C1, C2, C3, None
+    else:
+        def det_J(xx):
+            yy = parameter_map(xx)
+            result = 0
+            for i in range(3):
+                if bool_exp[i]:
+                    result += torch.mul(y_1[i](yy), C1[i](xx))
+            return result
+
+        def inv_det_J_sq(xx):
+            return 1.0 / torch.mul(det_J(xx), det_J(xx))
+
+        return C1, C2, C3, det_J, inv_det_J_sq
+
+# Computes the dot product between two triples of functions.
+# This assumes both triples already have parameter maps baked in.
+def dot_func(a, b):
+    bool_exp = [((a[_] is not None) and (b[_] is not None)) for _ in range(3)]
+
+    if ((not bool_exp[0]) and (not bool_exp[1]) and (not bool_exp[2])):
+        return None
+    else:
+        def dot_ab(xx):
+            result = 0
+            for i in range(3):
+                if bool_exp[i]:
+                    result += torch.mul(a[i](xx), b[i](xx))
+            return result
+        return dot_ab
+
+# Produces the contravariant matrix G = J^-1 J^-T via cofactors:
+def G_components(parameter_map, y_1, y_2, y_3):
+    C1, C2, C3, det_J, inv_det_J_sq = cofactor_columns_and_det(parameter_map, y_1, y_2, y_3)
+
+    C1C1 = dot_func(C1, C1) 
+    C2C2 = dot_func(C2, C2) 
+    C3C3 = dot_func(C3, C3) 
+    C1C2 = dot_func(C1, C2) 
+    C1C3 = dot_func(C1, C3) 
+    C2C3 = dot_func(C2, C3) 
+
+    if C1C1 is None:
+        G11 = None
+    else:
+        def G11(xx):
+            return torch.mul(C1C1(xx), inv_det_J_sq(xx))
+    if C2C2 is None:
+        G22 = None
+    else:
+        def G22(xx):
+            return torch.mul(C2C2(xx), inv_det_J_sq(xx))
+    if C3C3 is None:
+        G33 = None
+    else: 
+        def G33(xx):
+            return torch.mul(C3C3(xx), inv_det_J_sq(xx))
+    if C1C2 is None:
+        G12 = None
+    else:
+        def G12(xx):
+            return torch.mul(C1C2(xx), inv_det_J_sq(xx))
+    if C1C3 is None:
+        G13 = None
+    else:
+        def G13(xx):
+            return torch.mul(C1C3(xx), inv_det_J_sq(xx))
+    if C2C3 is None:
+        G23 = None
+    else:
+        def G23(xx):
+            return torch.mul(C2C3(xx), inv_det_J_sq(xx))
+
+    return (G11, G22, G33, G12, G13, G23), (C1, C2, C3, det_J)
+
+
+
 #####################################################################################
 
 def pdo_param_2d(kh, bfield, z1, z2, y1, y2, y1_d1=None, y1_d2=None, y2_d1=None, y2_d2=None,\
@@ -219,7 +355,7 @@ def pdo_param_3d(kh, bfield, z1, z2, z3, y1, y2, y3, y1_d1=None, y1_d2=None, y1_
         YY[:,2] = y3(xx)
         return YY
 
-    
+    # What we need to change for into divergence-form
     c11 = cii_func(parameter_map,y1_d1,y1_d2,y1_d3)
     c22 = cii_func(parameter_map,y2_d1,y2_d2,y2_d3)
     c33 = cii_func(parameter_map,y3_d1,y3_d2,y3_d3)
