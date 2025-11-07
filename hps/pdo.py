@@ -255,45 +255,35 @@ def G_components(parameter_map, y_1, y_2, y_3):
         def G23(xx):
             return torch.mul(C2C3(xx), inv_det_J_sq(xx))
 
-    return (G11, G22, G33, G12, G13, G23), (C1, C2, C3, det_J)
+    def logabsJ(xx):
+        logJ = torch.log(torch.abs(det_J(xx)))
+        return logJ * torch.where(logJ < 0, -1, 1)
 
-# Derivatives of C at all entries, 3x3x3 tensor
-def dC_columns(yd1, yd2, yd3):
-    dC = [[None for _ in range(3)] for _ in range(3)]
-    for i in range(3):
-        y1g = y_col_di()
-        y2g = y_col_di()
-        y3g = y_col_di()
-        # Will need to change this to work for lists / tuples
-        dC[1][i] = cross_func(y2g, yd3) + cross_func(yd2, y3g)
-        dC[2][i] = cross_func(y3g, yd1) + cross_func(yd3, y1g)
-        dC[3][i] = cross_func(y1g, yd2) + cross_func(yd1, y2g)
-    return dC
+    return (G11, G22, G33, G12, G13, G23), (C1, C2, C3), det_J, logabsJ
 
+# Computes the first order derivative in x_j of a function using central difference
+def central_diff(f, xx, j, eps=1e-6):
+    if f is None:
+        return None
+    else:
+        perturb = torch.zeros(3)
+        perturb[j] = eps # we can make this more sophisticated if it doesn't work well
+        return 0.5 * (f(xx + perturb) - f(xx - perturb))
 
-# Produces the derivatives for G, the matrix J^-1 J^-T
-def dG_di(parameter_map, G, C, detJ):
-    dC = dC_columns()
-    grad_detJ = d_detJ
-    # G is a matrix, so dG is a tensor:
-    dG = [[[None for _ in range(3)] for _ in range(3)] for _ in range(3)]
+# Generates the 1st order terms using divergence and numrical derivatives
+def ci_func_divergence(G, logabsJ, i):
+    bool_expG = [G[_][i] is not None for _ in range(3)]
 
-## Constructing the first-order coefficients
-def first_order_coeffs(parameter_map, G, C, detJ):
-    dG = dG_di()
-    d_detJ = d_detJ()
-    def grad_logJ(xx):
-        return torch.div(d_detJ(xx), detJ(xx))
-
-    (G11, G22, G33, G12, G13, G23) = G
-    Gmat = [[G11, G12, G13],
-            [G12, G22, G23],
-            [G13, G23, G33]]
-
-    # Constructing the actual first-order derivatives:
-    b = []
-    for i in range(3):
-        b.append(None)
+    if ((not bool_expG[0]) and (not bool_expG[1]) and (not bool_expG[2])):
+        return None
+    else:
+        def ci_func(xx):
+            result = 0
+            for j in range(3):
+                if bool_expG[j]:
+                    result += central_diff(G[j][i], xx, j) + G[j][i](xx) * central_diff(logabsJ, xx, j)
+            return result
+        return ci_func
 
 
 #####################################################################################
@@ -392,29 +382,47 @@ def pdo_param_3d(kh, bfield, z1, z2, z3, y1, y2, y3, y1_d1=None, y1_d2=None, y1_
         YY[:,2] = y3(xx)
         return YY
 
-    yi_djdk = [[[y1_d1d1, y1_d1d2, ]]]
+    (G11, G22, G33, G12, G13, G23), (C1, C2, C3), det_J, logabsJ = G_components(parameter_map, (y1_d1, y1_d2, y1_d3), (y2_d1, y2_d2, y2_d3), (y3_d1, y3_d2, y3_d3))
 
-    (G11, G22, G33, G12, G13, G23), (C1, C2, C3, det_J) = G_components(parameter_map, (y1_d1, y1_d2, y1_d3), (y2_d1, y2_d2, y2_d3), (y3_d1, y3_d2, y3_d3))
-
-    dC = dC_columns()
+    G = [[G11, G12, G13],
+         [G12, G22, G23],
+         [G13, G23, G33]]
 
     # What we need to change for into divergence-form
     #c11 = cii_func(parameter_map,y1_d1,y1_d2,y1_d3)
     #c22 = cii_func(parameter_map,y2_d1,y2_d2,y2_d3)
     #c33 = cii_func(parameter_map,y3_d1,y3_d2,y3_d3)
-    c1  = ci_func (parameter_map,y1_d1d1,y1_d2d2,y1_d3d3)
-    c2  = ci_func (parameter_map,y2_d1d1,y2_d2d2,y2_d3d3)
-    c3  = ci_func (parameter_map,y3_d1d1,y3_d2d2,y3_d3d3)
+    #c1  = ci_func (parameter_map,y1_d1d1,y1_d2d2,y1_d3d3)
+    #c2  = ci_func (parameter_map,y2_d1d1,y2_d2d2,y2_d3d3)
+    #c3  = ci_func (parameter_map,y3_d1d1,y3_d2d2,y3_d3d3)
     #c12 = cij_func(parameter_map,y1_d1,y2_d1,y1_d2,y2_d2,y1_d3,y2_d3)
     #c13 = cij_func(parameter_map,y1_d1,y3_d1,y1_d2,y3_d2,y1_d3,y3_d3)
     #c23 = cij_func(parameter_map,y2_d1,y3_d1,y2_d2,y3_d2,y2_d3,y3_d3)
+
+    c1 = ci_func_divergence(G, logabsJ, 0)
+    c2 = ci_func_divergence(G, logabsJ, 1)
+    c3 = ci_func_divergence(G, logabsJ, 2)
     
     def c(xx):
         return bfield(parameter_map(xx),kh)
+
+    c12 = None
+    c13 = None
+    c23 = None
+
+    if G12 is not None:
+        def c12(xx):
+            return 2*G12(xx)
+    if G13 is not None:
+        def c13(xx):
+            return 2*G13(xx)
+    if G23 is not None:
+        def c23(xx):
+            return 2*G23(xx)
     
     #pdo = PDO_3d(c11=c11,c22=c22,c33=c33,c1=c1,c2=c2,c3=c3,c12=c12,c13=c13,c23=c23,c=c)
     pdo = PDO_3d(c11=G11, c22=G22, c33=G33, c1=c1, c2=c2, c3=c3,
-                 c12 = lambda xx: 2*G12(xx), c13 = lambda xx: 2*G13(xx), c23 = lambda xx: 2*G23(xx),
+                 c12=c12, c13=c13, c23=c23,
                  c=c)
     return pdo, parameter_map, inv_parameter_map
 
