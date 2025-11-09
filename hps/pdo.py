@@ -841,7 +841,10 @@ def get_param_helper(geom,bfield,kh,d=2):
                                 y1_d1=y1_d1, y1_d2=y1_d2, y2_d1=y2_d1, y2_d2=y2_d2, y3_d3=y3_d3,
                                 y1_d1d1=y1_d1d1, y1_d2d2=y1_d2d2,
                                 y2_d1d1=y2_d1d1, y2_d2d2=y2_d2d2,
-                                y2_d3=y2_d3, y3_d1=y3_d1, y3_d2=y3_d2, y3_d1d1=y3_d1d1, y3_d2d2=y3_d2d2) # The new ones
+                                y2_d3=y2_d3, y3_d1=y3_d1, y3_d2=y3_d2, y3_d1d1=y3_d1d1, y3_d2d2=y3_d2d2,
+                                y1_d1d2=y1_d1d2, y1_d2d1=y1_d2d1,
+                                y2_d1d2=y2_d1d2, y2_d1d3=y2_d1d3, y2_d2d1=y2_d2d1, y2_d2d3=y2_d2d3, y2_d3d1=y2_d3d1, y2_d3d2=y2_d3d2,
+                                y3_d1d2=y3_d1d2, y3_d1d3=y3_d1d3, y3_d2d1=y3_d2d1, y3_d2d3=y3_d2d3, y3_d3d1=y3_d3d1, y3_d3d2=y3_d3d2) # The new ones
     
     elif (geom == 'corner'):
         
