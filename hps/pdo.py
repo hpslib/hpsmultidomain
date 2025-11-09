@@ -123,177 +123,93 @@ def cij_func(parameter_map,yi_d1, yj_d1, yi_d2, yj_d2, yi_d3=None, yj_d3=None):
             return result
     return cij
 
-def cross_func(parameter_map,yi_d1, yi_d2, yi_d3, yj_d1, yj_d2, yj_d3):
+def cj_func(parameter_map, trace_JB, J, A, B, j):
 
-    bool_exprP1 = (yi_d2 is not None) and (yj_d3 is not None)
-    bool_exprP2 = (yi_d3 is not None) and (yj_d1 is not None)
-    bool_exprP3 = (yi_d1 is not None) and (yj_d2 is not None)
-
-    bool_exprM1 = (yi_d3 is not None) and (yj_d2 is not None)
-    bool_exprM2 = (yi_d1 is not None) and (yj_d3 is not None)
-    bool_exprM3 = (yi_d2 is not None) and (yj_d1 is not None)
-
-    if ((not bool_exprP1) and (not bool_exprM1)):
-        cross1 = None
+    # HERE: check if final result is None. Unlikely.
+    bool_expr = True
+    if not bool_expr:
+        cj = None
     else:
-        def cross1(xx):
-            yy     = parameter_map(xx)
-            result = 0
-            if bool_exprP1:
-                result += torch.mul(yi_d2(yy),yj_d3(yy))
-            if bool_exprM1:
-                result -= torch.mul(yi_d3(yy),yj_d2(yy))
-            return result
-
-    if ((not bool_exprP2) and (not bool_exprM2)):
-        cross2 = None
-    else:
-        def cross2(xx):
-            yy     = parameter_map(xx)
-            result = 0
-            if bool_exprP2:
-                result += torch.mul(yi_d3(yy),yj_d1(yy))
-            if bool_exprM2:
-                result -= torch.mul(yi_d1(yy),yj_d3(yy))
-            return result
-
-    if ((not bool_exprP3) and (not bool_exprM3)):
-        cross3 = None
-    else:
-        def cross3(xx):
-            yy     = parameter_map(xx)
-            result = 0
-            if bool_exprP3:
-                result += torch.mul(yi_d1(yy),yj_d2(yy))
-            if bool_exprM3:
-                result -= torch.mul(yi_d2(yy),yj_d1(yy))
-            return result
-    
-    return cross1, cross2, cross3
-
-# Produces the cofactors of the Jacobian, as well as its determinant
-def cofactor_columns_and_det(parameter_map, y_1, y_2, y_3):
-
-    C1 = cross_func(parameter_map, y_2[0], y_2[1], y_2[2], y_3[0], y_3[1], y_3[2])
-    C2 = cross_func(parameter_map, y_3[0], y_3[1], y_3[2], y_1[0], y_1[1], y_1[2])
-    C3 = cross_func(parameter_map, y_1[0], y_1[1], y_1[2], y_2[0], y_2[1], y_2[2])
-
-    bool_exp = [(y_1[_] is not None) and (C1[_] is not None) for _ in range(3)]
-
-    if ((not bool_exp[0]) and (not bool_exp[1]) and (not bool_exp[2])):
-        raise ValueError("Error: the parameter map is probably singular")
-        #return C1, C2, C3, None
-    else:
-        def det_J(xx):
+        def cj(xx):
             yy = parameter_map(xx)
             result = 0
-            for i in range(3):
-                if bool_exp[i]:
-                    result += torch.mul(y_1[i](yy), C1[i](xx))
+            for k in range(3):
+                #JBk = J @ B[k] # make function valued
+                tr_JBk = trace_JB[k](yy) # make function valued
+                for i in range(3):
+                    # partial wrt Yk of g^ij
+                    dYk_gij  = B[k][i][0](yy) * A[j][0](yy) + A[i][0](yy) * B[k][j][0](yy)
+                    dYk_gij += B[k][i][1](yy) * A[j][1](yy) + A[i][1](yy) * B[k][j][1](yy)
+                    dYk_gij += B[k][i][2](yy) * A[j][2](yy) + A[i][2](yy) * B[k][j][2](yy)
+                    # g^ij itself:
+                    gij      = A[i][0](yy)*A[j][0](yy) + A[i][1](yy)*A[j][1](yy) + A[i][2](yy)*A[j][2](yy)
+                    result  += J[k][i](yy) * (dYk_gij - gij * tr_JBk)
             return result
+    return cj
 
-        def inv_det_J_sq(xx):
-            return 1.0 / torch.mul(det_J(xx), det_J(xx))
+# Helper to get the trace of JB:
+def get_traceJB(J, B):
+    traceJB = []
+    for k in range(3):
+        def make(k):
+            def tr_JBK(yy):
+                result = 0
+                for i in range(3):
+                    for j in range(3):
+                        result += J[i][j](yy) * B[k][j][i](yy)
+                return result
+            return tr_JBK
+        traceJB.append(make(k))
+    return traceJB
 
-        return C1, C2, C3, det_J, inv_det_J_sq
+def build_J_from_A(A):
+    """
+    yi_dj[i][m](Y) = ∂x_i/∂Y_m   (i,m in {0,1,2})
+    Returns:
+      detA(Y), cofA[i][j](Y), J[k][i](Y) = (A^{-1})_{k i} = cofA[i][k](Y) / detA(Y)
+    All are function-valued, no grids stored.
+    """
+    # pull out A_ij as callables for readability
+    a11, a12, a13 = A[0][0], A[0][1], A[0][2]
+    a21, a22, a23 = A[1][0], A[1][1], A[1][2]
+    a31, a32, a33 = A[2][0], A[2][1], A[2][2]
 
-# Computes the dot product between two triples of functions.
-# This assumes both triples already have parameter maps baked in.
-def dot_func(a, b):
-    bool_exp = [((a[_] is not None) and (b[_] is not None)) for _ in range(3)]
+    # determinant
+    def detA(Y):
+        A11,A12,A13 = a11(Y), a12(Y), a13(Y)
+        A21,A22,A23 = a21(Y), a22(Y), a23(Y)
+        A31,A32,A33 = a31(Y), a32(Y), a33(Y)
+        return A11*(A22*A33 - A23*A32) - A12*(A21*A33 - A23*A31) + A13*(A21*A32 - A22*A31)
 
-    if ((not bool_exp[0]) and (not bool_exp[1]) and (not bool_exp[2])):
-        return None
-    else:
-        def dot_ab(xx):
-            result = 0
-            for i in range(3):
-                if bool_exp[i]:
-                    result += torch.mul(a[i](xx), b[i](xx))
-            return result
-        return dot_ab
+    # cofactors (NOT transposed)
+    def C11(Y): return  +(a22(Y)*a33(Y) - a23(Y)*a32(Y))
+    def C12(Y): return  -(a21(Y)*a33(Y) - a23(Y)*a31(Y))
+    def C13(Y): return  +(a21(Y)*a32(Y) - a22(Y)*a31(Y))
+    def C21(Y): return  -(a12(Y)*a33(Y) - a13(Y)*a32(Y))
+    def C22(Y): return  +(a11(Y)*a33(Y) - a13(Y)*a31(Y))
+    def C23(Y): return  -(a11(Y)*a32(Y) - a12(Y)*a31(Y))
+    def C31(Y): return  +(a12(Y)*a23(Y) - a13(Y)*a22(Y))
+    def C32(Y): return  -(a11(Y)*a23(Y) - a13(Y)*a21(Y))
+    def C33(Y): return  +(a11(Y)*a22(Y) - a12(Y)*a21(Y))
 
-# Produces the contravariant matrix G = J^-1 J^-T via cofactors:
-def G_components(parameter_map, y_1, y_2, y_3):
-    C1, C2, C3, det_J, inv_det_J_sq = cofactor_columns_and_det(parameter_map, y_1, y_2, y_3)
+    cofA = [[C11, C12, C13],
+            [C21, C22, C23],
+            [C31, C32, C33]]
 
-    C1C1 = dot_func(C1, C1) 
-    C2C2 = dot_func(C2, C2) 
-    C3C3 = dot_func(C3, C3) 
-    C1C2 = dot_func(C1, C2) 
-    C1C3 = dot_func(C1, C3) 
-    C2C3 = dot_func(C2, C3) 
+    # J = A^{-1} = (cof(A))^T / det(A) ⇒ J[k][i] = cofA[i][k] / detA
+    J = [[None]*3 for _ in range(3)]
+    for k in range(3):
+        for i in range(3):
+            # bind i,k now to avoid closure bugs
+            def make_J(i=i, k=k):
+                def Jki(Y):
+                    d = detA(Y)
+                    return cofA[i][k](Y) / d
+                return Jki
+            J[k][i] = make_J(i, k)
 
-    if C1C1 is None:
-        G11 = None
-    else:
-        def G11(xx):
-            return torch.mul(C1C1(xx), inv_det_J_sq(xx))
-    if C2C2 is None:
-        G22 = None
-    else:
-        def G22(xx):
-            return torch.mul(C2C2(xx), inv_det_J_sq(xx))
-    if C3C3 is None:
-        G33 = None
-    else: 
-        def G33(xx):
-            return torch.mul(C3C3(xx), inv_det_J_sq(xx))
-    if C1C2 is None:
-        G12 = None
-    else:
-        def G12(xx):
-            return torch.mul(C1C2(xx), inv_det_J_sq(xx))
-    if C1C3 is None:
-        G13 = None
-    else:
-        def G13(xx):
-            return torch.mul(C1C3(xx), inv_det_J_sq(xx))
-    if C2C3 is None:
-        G23 = None
-    else:
-        def G23(xx):
-            return torch.mul(C2C3(xx), inv_det_J_sq(xx))
+    return detA, cofA, J
 
-    return (G11, G22, G33, G12, G13, G23), (C1, C2, C3, det_J)
-
-# Derivatives of C at all entries, 3x3x3 tensor
-def dC_columns(yd1, yd2, yd3):
-    dC = [[None for _ in range(3)] for _ in range(3)]
-    for i in range(3):
-        y1g = y_col_di()
-        y2g = y_col_di()
-        y3g = y_col_di()
-        # Will need to change this to work for lists / tuples
-        dC[1][i] = cross_func(y2g, yd3) + cross_func(yd2, y3g)
-        dC[2][i] = cross_func(y3g, yd1) + cross_func(yd3, y1g)
-        dC[3][i] = cross_func(y1g, yd2) + cross_func(yd1, y2g)
-    return dC
-
-
-# Produces the derivatives for G, the matrix J^-1 J^-T
-def dG_di(parameter_map, G, C, detJ):
-    dC = dC_columns()
-    grad_detJ = d_detJ
-    # G is a matrix, so dG is a tensor:
-    dG = [[[None for _ in range(3)] for _ in range(3)] for _ in range(3)]
-
-## Constructing the first-order coefficients
-def first_order_coeffs(parameter_map, G, C, detJ):
-    dG = dG_di()
-    d_detJ = d_detJ()
-    def grad_logJ(xx):
-        return torch.div(d_detJ(xx), detJ(xx))
-
-    (G11, G22, G33, G12, G13, G23) = G
-    Gmat = [[G11, G12, G13],
-            [G12, G22, G23],
-            [G13, G23, G33]]
-
-    # Constructing the actual first-order derivatives:
-    b = []
-    for i in range(3):
-        b.append(None)
 
 
 #####################################################################################
@@ -350,9 +266,22 @@ def pdo_param_2d(kh, bfield, z1, z2, y1, y2, y1_d1=None, y1_d2=None, y2_d1=None,
     pdo = PDO_2d(c11=c11,c22=c22,c1=c1,c2=c2,c12=c12,c=c)
     return pdo, parameter_map, inv_parameter_map
 
-def pdo_param_3d(kh, bfield, z1, z2, z3, y1, y2, y3, y1_d1=None, y1_d2=None, y1_d3=None, y2_d1=None, y2_d2=None,
-       y2_d3=None, y3_d1=None, y3_d2=None, y3_d3=None, y1_d1d1=None, y1_d2d2=None, y1_d3d3=None, y2_d1d1=None,
-       y2_d2d2=None, y2_d3d3=None, y3_d1d1=None, y3_d2d2=None, y3_d3d3=None,):
+def pdo_param_3d(kh, bfield, z1, z2, z3, y1, y2, y3,
+                 y1_d1=lambda xx: 0*xx[:,0], y1_d2=lambda xx: 0*xx[:,0], y1_d3=lambda xx: 0*xx[:,0],
+                 y2_d1=lambda xx: 0*xx[:,0], y2_d2=lambda xx: 0*xx[:,0], y2_d3=lambda xx: 0*xx[:,0],
+                 y3_d1=lambda xx: 0*xx[:,0], y3_d2=lambda xx: 0*xx[:,0], y3_d3=lambda xx: 0*xx[:,0],
+                 y1_d1d1=lambda xx: 0*xx[:,0], y1_d1d2=lambda xx: 0*xx[:,0], y1_d1d3=lambda xx: 0*xx[:,0],
+                 y1_d2d1=lambda xx: 0*xx[:,0], y1_d2d2=lambda xx: 0*xx[:,0], y1_d2d3=lambda xx: 0*xx[:,0],
+                 y1_d3d1=lambda xx: 0*xx[:,0], y1_d3d2=lambda xx: 0*xx[:,0], y1_d3d3=lambda xx: 0*xx[:,0],
+                 y2_d1d1=lambda xx: 0*xx[:,0], y2_d1d2=lambda xx: 0*xx[:,0], y2_d1d3=lambda xx: 0*xx[:,0],
+                 y2_d2d1=lambda xx: 0*xx[:,0], y2_d2d2=lambda xx: 0*xx[:,0], y2_d2d3=lambda xx: 0*xx[:,0],
+                 y2_d3d1=lambda xx: 0*xx[:,0], y2_d3d2=lambda xx: 0*xx[:,0], y2_d3d3=lambda xx: 0*xx[:,0],
+                 y3_d1d1=lambda xx: 0*xx[:,0], y3_d1d2=lambda xx: 0*xx[:,0], y3_d1d3=lambda xx: 0*xx[:,0],
+                 y3_d2d1=lambda xx: 0*xx[:,0], y3_d2d2=lambda xx: 0*xx[:,0], y3_d2d3=lambda xx: 0*xx[:,0],
+                 y3_d3d1=lambda xx: 0*xx[:,0], y3_d3d2=lambda xx: 0*xx[:,0], y3_d3d3=lambda xx: 0*xx[:,0],
+                 z1_d1=lambda xx: 0*xx[:,0], z1_d2=lambda xx: 0*xx[:,0], z1_d3=lambda xx: 0*xx[:,0],
+                 z2_d1=lambda xx: 0*xx[:,0], z2_d2=lambda xx: 0*xx[:,0], z2_d3=lambda xx: 0*xx[:,0],
+                 z3_d1=lambda xx: 0*xx[:,0], z3_d2=lambda xx: 0*xx[:,0], z3_d3=lambda xx: 0*xx[:,0]):
 
     """
     Configures a 3D PDO for variable-coefficient PDEs on custom domains by specifying parameter maps
@@ -392,30 +321,38 @@ def pdo_param_3d(kh, bfield, z1, z2, z3, y1, y2, y3, y1_d1=None, y1_d2=None, y1_
         YY[:,2] = y3(xx)
         return YY
 
-    yi_djdk = [[[y1_d1d1, y1_d1d2, ]]]
-
-    (G11, G22, G33, G12, G13, G23), (C1, C2, C3, det_J) = G_components(parameter_map, (y1_d1, y1_d2, y1_d3), (y2_d1, y2_d2, y2_d3), (y3_d1, y3_d2, y3_d3))
-
-    dC = dC_columns()
-
     # What we need to change for into divergence-form
-    #c11 = cii_func(parameter_map,y1_d1,y1_d2,y1_d3)
-    #c22 = cii_func(parameter_map,y2_d1,y2_d2,y2_d3)
-    #c33 = cii_func(parameter_map,y3_d1,y3_d2,y3_d3)
-    c1  = ci_func (parameter_map,y1_d1d1,y1_d2d2,y1_d3d3)
-    c2  = ci_func (parameter_map,y2_d1d1,y2_d2d2,y2_d3d3)
-    c3  = ci_func (parameter_map,y3_d1d1,y3_d2d2,y3_d3d3)
-    #c12 = cij_func(parameter_map,y1_d1,y2_d1,y1_d2,y2_d2,y1_d3,y2_d3)
-    #c13 = cij_func(parameter_map,y1_d1,y3_d1,y1_d2,y3_d2,y1_d3,y3_d3)
-    #c23 = cij_func(parameter_map,y2_d1,y3_d1,y2_d2,y3_d2,y2_d3,y3_d3)
+    c11 = cii_func(parameter_map,y1_d1,y1_d2,y1_d3)
+    c22 = cii_func(parameter_map,y2_d1,y2_d2,y2_d3)
+    c33 = cii_func(parameter_map,y3_d1,y3_d2,y3_d3)
+    c12 = cij_func(parameter_map,y1_d1,y2_d1,y1_d2,y2_d2,y1_d3,y2_d3)
+    c13 = cij_func(parameter_map,y1_d1,y3_d1,y1_d2,y3_d2,y1_d3,y3_d3)
+    c23 = cij_func(parameter_map,y2_d1,y3_d1,y2_d2,y3_d2,y2_d3,y3_d3)
+
+    if False: # Keep the old approach as a fallback
+        c1  = ci_func (parameter_map,y1_d1d1,y1_d2d2,y1_d3d3)
+        c2  = ci_func (parameter_map,y2_d1d1,y2_d2d2,y2_d3d3)
+        c3  = ci_func (parameter_map,y3_d1d1,y3_d2d2,y3_d3d3)
+    else:
+        A = [[y1_d1, y1_d2, y1_d3], [y2_d1, y2_d2, y2_d3], [y3_d1, y3_d2, y3_d3]]
+        #J = [[z1_d1, z1_d2, z1_d3], [z2_d1, z2_d2, z2_d3], [z3_d1, z3_d2, z3_d3]]
+
+        _, _, J = build_J_from_A(A)
+
+        B = [[[y1_d1d1, y1_d1d2, y1_d1d3], [y2_d1d1, y2_d1d2, y2_d1d3], [y3_d1d1, y3_d1d2, y3_d1d3]],
+             [[y1_d2d1, y1_d2d2, y1_d2d3], [y2_d2d1, y2_d2d2, y2_d2d3], [y3_d2d1, y3_d2d2, y3_d2d3]],
+             [[y1_d3d1, y1_d3d2, y1_d3d3], [y2_d3d1, y2_d3d2, y2_d3d3], [y3_d3d1, y3_d3d2, y3_d3d3]]]
+
+        trace_JB = get_traceJB(J, B)
+
+        c1 = cj_func(parameter_map, trace_JB, J, A, B, 0)
+        c2 = cj_func(parameter_map, trace_JB, J, A, B, 1)
+        c3 = cj_func(parameter_map, trace_JB, J, A, B, 2)
     
     def c(xx):
         return bfield(parameter_map(xx),kh)
     
-    #pdo = PDO_3d(c11=c11,c22=c22,c33=c33,c1=c1,c2=c2,c3=c3,c12=c12,c13=c13,c23=c23,c=c)
-    pdo = PDO_3d(c11=G11, c22=G22, c33=G33, c1=c1, c2=c2, c3=c3,
-                 c12 = lambda xx: 2*G12(xx), c13 = lambda xx: 2*G13(xx), c23 = lambda xx: 2*G23(xx),
-                 c=c)
+    pdo = PDO_3d(c11=c11,c22=c22,c33=c33,c1=c1,c2=c2,c3=c3,c12=c12,c13=c13,c23=c23,c=c)
     return pdo, parameter_map, inv_parameter_map
 
 
@@ -576,174 +513,329 @@ def get_param_helper(geom,bfield,kh,d=2):
                          y2_d1=y2_d1, y2_d2=y2_d2, y2_d1d1=y2_d1d1, y2_d2d2=y2_d2d2)
 
     elif (geom == "twisted_torus"):
+        if d==2:
+            ValueError("twsited torus is 3D only")
+
         tau = 1.0
         R = 1.5
         bnds = [[-1.,-1.,-1.],[1.,1.,1.]]
-        def z1(p):
-            c=torch.cos(tau*torch.pi*p[...,0])
-            s=torch.sin(tau*torch.pi*p[...,0])
+        def z1(zz):
+            c=torch.cos(tau*torch.pi*zz[:,0])
+            s=torch.sin(tau*torch.pi*zz[:,0])
             c2 = torch.multiply(c,c)
             cs = torch.multiply(c,s)
-            q = torch.multiply(c2,p[...,1])-torch.multiply(cs,p[...,2])+c*(R+1)
+            q = torch.multiply(c2,zz[:,1])-torch.multiply(cs,zz[:,2])+c*(R+1)
             return q
 
-        def z2(p):
-            c=torch.cos(tau*torch.pi*p[...,0])
-            s=torch.sin(tau*torch.pi*p[...,0])
+        def z1_d1(zz):
+            c = torch.cos(tau*torch.pi*zz[:,0])
+            s = torch.sin(tau*torch.pi*zz[:,0])
+
+            return -2*tau*torch.pi*c*s * zz[:,1] - tau*torch.pi*(c*c - s*s) * zz[:,2] - tau*torch.pi*s*(R+1)
+
+        def z1_d2(zz):
+            c = torch.cos(tau*torch.pi*zz[:,0])
+            return c*c
+
+        def z1_d3(zz):
+            c = torch.cos(tau*torch.pi*zz[:,0])
+            s = torch.sin(tau*torch.pi*zz[:,0])
+            return -c*s
+
+        def z2(zz):
+            c=torch.cos(tau*torch.pi*zz[:,0])
+            s=torch.sin(tau*torch.pi*zz[:,0])
             s2 = torch.multiply(s,s)
             cs = torch.multiply(c,s)
-            q = torch.multiply(cs,p[...,1])-torch.multiply(s2,p[...,2])+s*(R+1)
-            return q
-        def z3(p):
-            c=torch.cos(tau*torch.pi*p[...,0])
-            s=torch.sin(tau*torch.pi*p[...,0])
-            q = torch.multiply(s,p[...,1])+torch.multiply(c,p[...,2])
+            q = torch.multiply(cs,zz[:,1])-torch.multiply(s2,zz[:,2])+s*(R+1)
             return q
 
+        def z2_d1(zz):
+            c = torch.cos(tau*torch.pi*zz[:,0])
+            s = torch.sin(tau*torch.pi*zz[:,0])
+            return tau*torch.pi*(c*c - s*s) * zz[:,1] - 2*tau*torch.pi*s*c * zz[:,2] + tau*torch.pi*c*(R+1)
 
+        def z2_d2(zz):
+            c = torch.cos(tau*torch.pi*zz[:,0])
+            s = torch.sin(tau*torch.pi*zz[:,0])
+            return c*s
 
-        def y1(p):
-            th = tau*torch.arctan2(p[...,1],p[...,0])
+        def z2_d3(zz):
+            s = torch.sin(tau*torch.pi*zz[:,0])
+            return -(s*s)
+
+        def z3(zz):
+            c=torch.cos(tau*torch.pi*zz[:,0])
+            s=torch.sin(tau*torch.pi*zz[:,0])
+            q = torch.multiply(s,zz[:,1])+torch.multiply(c,zz[:,2])
+            return q
+
+        def z3_d1(zz):
+            c = torch.cos(tau*torch.pi*zz[:,0])
+            s = torch.sin(tau*torch.pi*zz[:,0])
+            return tau*torch.pi * (c*zz[:,1] - s*zz[:,2])
+
+        def z3_d2(zz):
+            s = torch.sin(tau*torch.pi*zz[:,0])
+            return s
+
+        def z3_d3(zz):
+            c = torch.cos(tau*torch.pi*zz[:,0])
+            return c
+
+        def y1(zz):
+            th = tau*torch.arctan2(zz[:,1],zz[:,0])
             return th/torch.pi
 
-        def y2(p):
+        def y2(zz):
             # p is a vector of points, Nx3
-            th = tau*torch.arctan2(p[...,1],p[...,0])
+            th = tau*torch.arctan2(zz[:,1],zz[:,0])
             c=torch.cos(th)
             s=torch.sin(th)
             c2 = torch.multiply(c,c)
             cs = torch.multiply(c,s)
-            q = torch.multiply(p[...,0],c2)+torch.multiply(p[...,1],cs)-(R+1)*c + torch.multiply(s,p[...,2])
+            q = torch.multiply(zz[:,0],c2)+torch.multiply(zz[:,1],cs)-(R+1)*c + torch.multiply(s,zz[:,2])
             return q
 
 
-        def y3(p):
-            th = tau*torch.arctan2(p[...,1],p[...,0])
+        def y3(zz):
+            th = tau*torch.arctan2(zz[:,1],zz[:,0])
             c=torch.cos(th)
             s=torch.sin(th)
             s2 = torch.multiply(s,s)
             cs = torch.multiply(c,s)
-            q = -torch.multiply(p[...,0],cs)-torch.multiply(p[...,1],s2)+(R+1)*s+torch.multiply(c,p[...,2])
+            q = -torch.multiply(zz[:,0],cs)-torch.multiply(zz[:,1],s2)+(R+1)*s+torch.multiply(c,zz[:,2])
             return q
 
         #verified
-        def y1_d1(p):
-            r2 = p[...,0]*p[...,0]+p[...,1]*p[...,1]
-            return -(p[...,1]/r2)/torch.pi
+        def y1_d1(zz):
+            r2 = zz[:,0] * zz[:,0] + zz[:,1] * zz[:,1]
+            return -(zz[:,1] / r2) / torch.pi
         #verified
-        def y1_d2(p):
-            r2 = p[...,0]*p[...,0]+p[...,1]*p[...,1]
-            return (p[...,0]/r2)/torch.pi
+        def y1_d2(zz):
+            r2 = zz[:,0] * zz[:,0] + zz[:,1] * zz[:,1]
+            return (zz[:,0] / r2) / torch.pi
 
         #verified
-        def y2_d1(p):
-            th = tau*torch.arctan2(p[...,1],p[...,0])
+        def y2_d1(zz):
+            th  = tau * torch.arctan2(zz[:,1],zz[:,0])
             c2t = torch.cos(2*th)
             s2t = torch.sin(2*th)
             s   = torch.sin(th)
             c   = torch.cos(th)
-            r2  = p[...,0]*p[...,0]+p[...,1]*p[...,1]
-            A   = (s2t*p[...,0]*p[...,1] - c2t*p[...,1]**2 - (R+1)*s*p[...,1] - p[...,2]*p[...,1]*c)
-            return (c2t+1)/2. + A/r2
-
+            r2  = zz[:,0] * zz[:,0] + zz[:,1] * zz[:,1]
+            A   = (s2t*zz[:,0]*zz[:,1] - c2t*zz[:,1]**2 - (R+1)*s*zz[:,1] - zz[:,2]*zz[:,1]*c)
+            return (c2t+1) / 2. + A/r2
         #verified
-        def y2_d2(p):
-            th = tau*torch.arctan2(p[...,1],p[...,0])
+        def y2_d2(zz):
+            th = tau*torch.arctan2(zz[:,1],zz[:,0])
             c2t = torch.cos(2*th)
             s2t = torch.sin(2*th)
             s   = torch.sin(th)
             c   = torch.cos(th)
-            r2  = p[...,0]*p[...,0]+p[...,1]*p[...,1]
-            A   = ( c2t*p[...,0]*p[...,1] - s2t*p[...,0]*p[...,0] + (R+1)*s*p[...,0] + p[...,2]*p[...,0]*c)
+            r2  = zz[:,0]*zz[:,0]+zz[:,1]*zz[:,1]
+            A   = ( c2t*zz[:,0]*zz[:,1] - s2t*zz[:,0]*zz[:,0] + (R+1)*s*zz[:,0] + zz[:,2]*zz[:,0]*c)
             return s2t/2. + A/r2
 
-        def y2_d3(p):
-            th = tau*torch.arctan2(p[...,1],p[...,0])
+        def y2_d3(zz):
+            th = tau*torch.arctan2(zz[:,1],zz[:,0])
             return torch.sin(th)
 
-
-
-
-        def y3_d1(p):
-            th = tau*torch.arctan2(p[...,1],p[...,0])
+        def y3_d1(zz):
+            th = tau*torch.arctan2(zz[:,1],zz[:,0])
             c2t = torch.cos(2*th)
             s2t = torch.sin(2*th)
             s   = torch.sin(th)
             c   = torch.cos(th)
-            r2  = p[...,0]*p[...,0]+p[...,1]*p[...,1]
-            A   = (c2t*p[...,0]*p[...,1] + s2t*p[...,1]**2 - (R+1)*c*p[...,1] + p[...,2]*p[...,1]*s)
+            r2  = zz[:,0]*zz[:,0]+zz[:,1]*zz[:,1]
+            A   = (c2t*zz[:,0]*zz[:,1] + s2t*zz[:,1]**2 - (R+1)*c*zz[:,1] + zz[:,2]*zz[:,1]*s)
             return -s2t/2. + A/r2
 
-        def y3_d2(p):
-            th = tau*torch.arctan2(p[...,1],p[...,0])
+        def y3_d2(zz):
+            th = tau*torch.arctan2(zz[:,1],zz[:,0])
             c2t = torch.cos(2*th)
             s2t = torch.sin(2*th)
             s   = torch.sin(th)
             c   = torch.cos(th)
-            r2  = p[...,0]*p[...,0]+p[...,1]*p[...,1]
-            A   = (s2t*p[...,0]*p[...,1] + c2t*p[...,0]*p[...,0] - (R+1)*c*p[...,0] + p[...,2]*p[...,0]*s)
+            r2  = zz[:,0]*zz[:,0]+zz[:,1]*zz[:,1]
+            A   = (s2t*zz[:,0]*zz[:,1] + c2t*zz[:,0]*zz[:,0] - (R+1)*c*zz[:,0] + zz[:,2]*zz[:,0]*s)
             return (c2t-1)/2. - A/r2
         #verified
-        def y3_d3(p):
-            th = tau*torch.arctan2(p[...,1],p[...,0])
+        def y3_d3(zz):
+            th = tau*torch.arctan2(zz[:,1],zz[:,0])
             return torch.cos(th)
 
 
         #verified
-        def y1_d1d1(p):
-            r2 = p[...,0]*p[...,0]+p[...,1]*p[...,1]
-            return (2*p[...,1]*p[...,0]/r2)/(r2*torch.pi)
+        def y1_d1d1(zz):
+            r2 = zz[:,0]*zz[:,0]+zz[:,1]*zz[:,1]
+            return (2*zz[:,1]*zz[:,0]/r2)/(r2*torch.pi)
+        def y1_d1d2(zz):
+            Y1 = zz[:,0]
+            Y2 = zz[:,1]
+            r2 = Y1*Y1 + Y2*Y2
+            return -(Y1*Y1 - Y2*Y2) / (torch.pi * r2*r2)
         #verified
-        def y1_d2d2(p):
-            r2 = p[...,0]*p[...,0]+p[...,1]*p[...,1]
-            return -2*(p[...,0]*p[...,1]/r2)/(r2*torch.pi)
+        def y1_d2d1(zz):
+            return y1_d1d2(zz)
+        def y1_d2d2(zz):
+            r2 = zz[:,0]*zz[:,0]+zz[:,1]*zz[:,1]
+            return -2*(zz[:,0]*zz[:,1]/r2)/(r2*torch.pi)
 
         #verified
-        def y2_d1d1(p):
-            th = tau*torch.arctan2(p[...,1],p[...,0])
+        def y2_d1d1(zz):
+            th = tau*torch.arctan2(zz[:,1],zz[:,0])
             c2t = torch.cos(2*th)
             s2t = torch.sin(2*th)
             s   = torch.sin(th)
             c   = torch.cos(th)
-            r2  = p[...,0]*p[...,0]+p[...,1]*p[...,1]
-            A   = (s2t*p[...,0]*p[...,1] - c2t*p[...,1]*p[...,1] - (R+1)*s*p[...,1] - p[...,2]*p[...,1]*c)
-            dA = p[...,1]*s2t-(2*c2t*p[...,0]*(p[...,1]**2)+2*s2t*p[...,1]**3-(R+1)*c*p[...,1]**2 + p[...,2]*s*(p[...,1]**2) )/r2
-            return (p[...,1]*s2t + dA - 2*A*p[...,0]/r2 )/r2
+            r2  = zz[:,0]*zz[:,0]+zz[:,1]*zz[:,1]
+            A   = (s2t*zz[:,0]*zz[:,1] - c2t*zz[:,1]*zz[:,1] - (R+1)*s*zz[:,1] - zz[:,2]*zz[:,1]*c)
+            dA = zz[:,1]*s2t-(2*c2t*zz[:,0]*(zz[:,1]**2)+2*s2t*zz[:,1]**3-(R+1)*c*zz[:,1]**2 + zz[:,2]*s*(zz[:,1]**2) )/r2
+            return (zz[:,1]*s2t + dA - 2*A*zz[:,0]/r2 )/r2
+
+        def y2_d1d2(zz):
+            Y1 = zz[:,0]
+            Y2 = zz[:,1]
+            Y3 = zz[:,2]
+
+            r2  = Y1*Y1 + Y2*Y2
+            th  = tau * torch.atan2(Y2, Y1)
+            s2t = torch.sin(2*th)
+            c2t = torch.cos(2*th)
+            s   = torch.sin(th)
+            c   = torch.cos(th)
+
+            # dθ/dY2
+            t = tau * Y1 / r2
+
+            # A as in y2_d1
+            A = s2t*Y1*Y2 - c2t*Y2*Y2 - (R+1)*s*Y2 - Y3*Y2*c
+
+            # partial
+            dA_dY2 = 2*c2t*t*Y1*Y2 + s2t*Y1 + 2*s2t*t*Y2*Y2 - 2*c2t*Y2 - (R+1)*(c*t*Y2 + s) - Y3*c + Y3*Y2*s*t
+
+            # partial [(c2t+1)/2] = - s2t * t
+            return - s2t*t + (dA_dY2 * r2 - A * (2*Y2)) / (r2*r2)
+        
+        def y2_d1d3(zz):
+            Y1 = zz[:,0]
+            Y2 = zz[:,1]
+
+            r2  = Y1*Y1 + Y2*Y2
+            th  = tau * torch.atan2(Y2, Y1)
+            c   = torch.cos(th)
+
+            # Only the -Y3*Y2*c / r2 piece depends on Y3
+            return -(Y2 * c) / r2
+
         #verified
-        def y2_d2d2(p):
-            th = tau*torch.arctan2(p[...,1],p[...,0])
+        def y2_d2d1(zz):
+            return y2_d1d2(zz)
+
+        def y2_d2d2(zz):
+            th = tau*torch.arctan2(zz[:,1],zz[:,0])
             c2t = torch.cos(2*th)
             s2t = torch.sin(2*th)
             s   = torch.sin(th)
             c   = torch.cos(th)
-            r2  = p[...,0]*p[...,0]+p[...,1]*p[...,1]
-            A   = ( c2t*p[...,0]*p[...,1] - s2t*p[...,0]*p[...,0] + (R+1)*s*p[...,0] + p[...,2]*p[...,0]*c)
-            dA  = p[...,0]*c2t-(2*s2t*p[...,1]*p[...,0]**2+2*c2t*(p[...,0]**3)-(R+1)*c*(p[...,0]**2)+p[...,2]*s*(p[...,0]**2))/r2
-            return (c2t*p[...,0] + dA - 2*A*p[...,1]/r2 )/r2
+            r2  = zz[:,0]*zz[:,0]+zz[:,1]*zz[:,1]
+            A   = ( c2t*zz[:,0]*zz[:,1] - s2t*zz[:,0]*zz[:,0] + (R+1)*s*zz[:,0] + zz[:,2]*zz[:,0]*c)
+            dA  = zz[:,0]*c2t-(2*s2t*zz[:,1]*zz[:,0]**2+2*c2t*(zz[:,0]**3)-(R+1)*c*(zz[:,0]**2)+zz[:,2]*s*(zz[:,0]**2))/r2
+            return (c2t*zz[:,0] + dA - 2*A*zz[:,1]/r2 )/r2
+        
+        def y2_d2d3(zz):
+            Y1 = zz[:,0]
+            Y2 = zz[:,1]
+
+            r2 = Y1*Y1 + Y2*Y2
+            th = tau * torch.atan2(Y2, Y1)
+
+            return torch.cos(th) * tau * (Y1 / r2)
+
+        def y2_d3d1(zz):
+            return y2_d1d3(zz)
+
+        def y2_d3d2(zz):
+            return y2_d2d3(zz)
 
 
         #verified
-        def y3_d1d1(p):
-            th = tau*torch.arctan2(p[...,1],p[...,0])
+        def y3_d1d1(zz):
+            th = tau*torch.arctan2(zz[:,1],zz[:,0])
             c2t = torch.cos(2*th)
             s2t = torch.sin(2*th)
             s   = torch.sin(th)
             c   = torch.cos(th)
-            r2  = p[...,0]*p[...,0]+p[...,1]*p[...,1]
-            A   = (c2t*p[...,0]*p[...,1] + s2t*p[...,1]**2 - (R+1)*c*p[...,1] + p[...,2]*p[...,1]*s)
-            dA  = p[...,1]*c2t+(2*p[...,0]*(p[...,1]**2)*s2t-2*(p[...,1]**3)*c2t-(R+1)*(p[...,1]**2)*s-p[...,2]*(p[...,1]**2)*c)/r2
-            return (c2t*p[...,1] + dA - 2*p[...,0]*A/r2)/r2
+            r2  = zz[:,0]*zz[:,0]+zz[:,1]*zz[:,1]
+            A   = (c2t*zz[:,0]*zz[:,1] + s2t*zz[:,1]**2 - (R+1)*c*zz[:,1] + zz[:,2]*zz[:,1]*s)
+            dA  = zz[:,1]*c2t+(2*zz[:,0]*(zz[:,1]**2)*s2t-2*(zz[:,1]**3)*c2t-(R+1)*(zz[:,1]**2)*s-zz[:,2]*(zz[:,1]**2)*c)/r2
+            return (c2t*zz[:,1] + dA - 2*zz[:,0]*A/r2)/r2
+
+        def y3_d1d2(zz):
+            Y1 = zz[:,0]
+            Y2 = zz[:,1]
+            Y3 = zz[:,2]
+
+            r2  = Y1*Y1 + Y2*Y2
+            th  = tau * torch.atan2(Y2, Y1)
+            s2t = torch.sin(2*th)
+            c2t = torch.cos(2*th)
+            s   = torch.sin(th)
+            c   = torch.cos(th)
+
+            # dθ/dY2
+            t = tau * Y1 / r2
+
+            # A as in y3_d1
+            A = c2t*Y1*Y2 + s2t*Y2*Y2 - (R+1)*c*Y2 + Y3*Y2*s
+
+            # dA/dY2
+            dA_dY2 = (-2*s2t*t)*Y1*Y2 + c2t*Y1 + (2*c2t*t)*Y2*Y2 + 2*s2t*Y2 + (R+1)*s*t*Y2 - (R+1)*c + Y3*s + Y3*Y2*c*t
+
+            return -c2t*t + (dA_dY2 * r2 - A * (2*Y2)) / (r2 * r2)
+
+        def y3_d1d3(zz):
+            Y1 = zz[:,0]
+            Y2 = zz[:,1]
+            Y3 = zz[:,2]
+
+            r2  = Y1*Y1 + Y2*Y2
+            th  = tau * torch.atan2(Y2, Y1)
+            s   = torch.sin(th)
+
+            # Only the (Y3*Y2*s)/r2 part of y3_d1 depends on Y3
+            return (Y2 * s) / r2
+
+        def y3_d2d1(zz):
+            return y3_d1d2(zz)
+
         #verified
-        def y3_d2d2(p):
-            th = tau*torch.arctan2(p[...,1],p[...,0])
+        def y3_d2d2(zz):
+            th = tau*torch.arctan2(zz[:,1],zz[:,0])
             c2t = torch.cos(2*th)
             s2t = torch.sin(2*th)
             s   = torch.sin(th)
             c   = torch.cos(th)
-            r2  = p[...,0]*p[...,0]+p[...,1]*p[...,1]
-            A   = (s2t*p[...,0]*p[...,1] + c2t*p[...,0]*p[...,0] - (R+1)*c*p[...,0] + p[...,2]*p[...,0]*s)
-            dA  = p[...,0]*s2t+(2*(p[...,0]**2)*p[...,1]*c2t-2*(p[...,0]**3)*s2t + (R+1)*(p[...,0]**2)*s + p[...,2]*(p[...,0]**2)*c)/r2
-            return -(s2t*p[...,0] + dA - 2*p[...,1]*A/r2)/r2
+            r2  = zz[:,0]*zz[:,0]+zz[:,1]*zz[:,1]
+            A   = (s2t*zz[:,0]*zz[:,1] + c2t*zz[:,0]*zz[:,0] - (R+1)*c*zz[:,0] + zz[:,2]*zz[:,0]*s)
+            dA  = zz[:,0]*s2t+(2*(zz[:,0]**2)*zz[:,1]*c2t-2*(zz[:,0]**3)*s2t + (R+1)*(zz[:,0]**2)*s + zz[:,2]*(zz[:,0]**2)*c)/r2
+            return -(s2t*zz[:,0] + dA - 2*zz[:,1]*A/r2)/r2
+
+        def y3_d2d3(zz):
+            Y1 = zz[:,0]
+            Y2 = zz[:,1]
+
+            r2 = Y1*Y1 + Y2*Y2
+            th = tau * torch.atan2(Y2, Y1)
+
+            return -torch.sin(th) * tau * (Y1 / r2)
+
+        def y3_d3d1(zz):
+            return y3_d1d3(zz)
+
+        def y3_d3d2(zz):
+            return y3_d2d3(zz)
 
         return pdo_param_3d(kh, bfield, z1,z2,z3,y1,y2,y3,
                                 y1_d1=y1_d1, y1_d2=y1_d2, y2_d1=y2_d1, y2_d2=y2_d2, y3_d3=y3_d3,
