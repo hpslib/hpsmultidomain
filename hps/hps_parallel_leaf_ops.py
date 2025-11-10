@@ -207,20 +207,6 @@ def form_DtNs(p,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,
         else:
             uu_sol[:,Jc,nrhs:] = (Aloc[:,Jc] @ uu_true[box_start:box_end] - f_body) / (torch.abs(f_body) + 1)
             minimal_indices = torch.unravel_index(torch.argmax(torch.abs(uu_sol[:,Jc,nrhs:])), uu_sol[:,Jc,nrhs:].shape)
-            if box_start > -1:
-                #print("shape of Aloc", Aloc[:,Jc].shape)
-                for i in range(uu_sol.shape[0]):
-                    minimal_patch = uu_sol[minimal_indices[0].item(),Jc,nrhs:]
-                    minimal_patch_big = torch.nonzero(minimal_patch > 1)
-                    #print(minimal_patch_big)
-                    a = minimal_patch_big[:, 0]
-                    b = minimal_patch_big[:, 1]
-                    minimal_patch_big = torch.stack([a//(p-2)**2, (a%(p-2)**2)//(p-2), a%(p-2), b], dim=1)
-                    #print(minimal_patch_big)
-                    #print(torch.reshape(minimal_patch, (1, p-2, p-2, p-2)))
-                    #print(uu_sol[:,Jc,nrhs:].shape)
-            #print(box_start, box_end)
-            #print(minimal_indices)
         return uu_sol
     
 def get_DtN_chunksize(p,d,device,mode):
