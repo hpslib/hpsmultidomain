@@ -456,18 +456,6 @@ def leaf_discretization_3d(a,p,q):
     D12 = Ds.D12[Jc,:]
     D13 = Ds.D13[Jc,:]
     D23 = Ds.D23[Jc,:]
-
-    problem_rows = [46, 47, 53, 54, 55, 60, 61, 62, 63, 118, 119, 125, 126, 127, 191]
-
-    print(np.max(np.abs(D1[problem_rows])))
-    print(np.max(np.abs(D2[problem_rows])))
-    print(np.max(np.abs(D3[problem_rows])))
-    print(np.max(np.abs(D11[problem_rows])))
-    print(np.max(np.abs(D22[problem_rows])))
-    print(np.max(np.abs(D33[problem_rows])))
-    print(np.max(np.abs(D12[problem_rows])))
-    print(np.max(np.abs(D13[problem_rows])))
-    print(np.max(np.abs(D23[problem_rows])))
     
     return zz,Ds,JJ,hmin,zzG
 

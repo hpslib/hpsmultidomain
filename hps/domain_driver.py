@@ -109,8 +109,6 @@ class Domain_Driver(AbstractHPSSolver):
         assert p > 0
         self.hps_disc(self.box_geom,a,p,d,pdo_op,periodic_bc)
 
-        print("pdo_op:", vars(pdo_op))
-
     ################### Required functions for parent class AbstractHPSSolver #####################
 
     #################################################
