@@ -329,7 +329,7 @@ def pdo_param_3d(kh, bfield, z1, z2, z3, y1, y2, y3,
     c13 = cij_func(parameter_map,y1_d1,y3_d1,y1_d2,y3_d2,y1_d3,y3_d3)
     c23 = cij_func(parameter_map,y2_d1,y3_d1,y2_d2,y3_d2,y2_d3,y3_d3)
 
-    if False: # Keep the old approach as a fallback
+    if True: # Keep the old approach as a fallback
         c1  = ci_func (parameter_map,y1_d1d1,y1_d2d2,y1_d3d3)
         c2  = ci_func (parameter_map,y2_d1d1,y2_d2d2,y2_d3d3)
         c3  = ci_func (parameter_map,y3_d1d1,y3_d2d2,y3_d3d3)
@@ -519,11 +519,12 @@ def get_param_helper(geom,bfield,kh,d=2):
         R = 1.5
         bnds = [[-1.,-1.,-1.],[1.,1.,1.]]
         def z1(zz):
-            c=torch.cos(tau*torch.pi*zz[:,0])
-            s=torch.sin(tau*torch.pi*zz[:,0])
+            ZZ = 2*zz - 1
+            c=torch.cos(tau*torch.pi*ZZ[:,0])
+            s=torch.sin(tau*torch.pi*ZZ[:,0])
             c2 = torch.multiply(c,c)
             cs = torch.multiply(c,s)
-            q = torch.multiply(c2,zz[:,1])-torch.multiply(cs,zz[:,2])+c*(R+1)
+            q = torch.multiply(c2,ZZ[:,1])-torch.multiply(cs,ZZ[:,2])+c*(R+1)
             return q
 
         def z1_d1(zz):
@@ -542,11 +543,12 @@ def get_param_helper(geom,bfield,kh,d=2):
             return -c*s
 
         def z2(zz):
-            c=torch.cos(tau*torch.pi*zz[:,0])
-            s=torch.sin(tau*torch.pi*zz[:,0])
+            ZZ = 2*zz - 1
+            c=torch.cos(tau*torch.pi*ZZ[:,0])
+            s=torch.sin(tau*torch.pi*ZZ[:,0])
             s2 = torch.multiply(s,s)
             cs = torch.multiply(c,s)
-            q = torch.multiply(cs,zz[:,1])-torch.multiply(s2,zz[:,2])+s*(R+1)
+            q = torch.multiply(cs,ZZ[:,1])-torch.multiply(s2,ZZ[:,2])+s*(R+1)
             return q
 
         def z2_d1(zz):
@@ -564,9 +566,10 @@ def get_param_helper(geom,bfield,kh,d=2):
             return -(s*s)
 
         def z3(zz):
-            c=torch.cos(tau*torch.pi*zz[:,0])
-            s=torch.sin(tau*torch.pi*zz[:,0])
-            q = torch.multiply(s,zz[:,1])+torch.multiply(c,zz[:,2])
+            ZZ = 2*zz - 1
+            c=torch.cos(tau*torch.pi*ZZ[:,0])
+            s=torch.sin(tau*torch.pi*ZZ[:,0])
+            q = torch.multiply(s,ZZ[:,1])+torch.multiply(c,ZZ[:,2])
             return q
 
         def z3_d1(zz):

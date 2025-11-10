@@ -12,9 +12,10 @@ plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
 
 def visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh=0):
 
-    center=np.array([-1.1,+1.,+1.2])
+    #center=np.array([-1.1,+1.,+1.2])
+    center = np.array([0,0,0])
 
-    xx = dom.hps.grid_xx.flatten(start_dim=0,end_dim=-2)
+    xx = dom.hps.xx_active.flatten(start_dim=0,end_dim=-2)
     #xx = dom.hps.grid_ext
 
     #print(xx)
@@ -44,10 +45,10 @@ def visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh=0):
 
 
     # Eliminates the domain exterior points
-    sequence_containing_x_vals = sequence_containing_x_vals[interior]
-    sequence_containing_y_vals = sequence_containing_y_vals[interior]
-    sequence_containing_z_vals = sequence_containing_z_vals[interior]
-    result = result[interior]
+    #sequence_containing_x_vals = sequence_containing_x_vals[interior]
+    #sequence_containing_y_vals = sequence_containing_y_vals[interior]
+    #sequence_containing_z_vals = sequence_containing_z_vals[interior]
+    #result = result[interior]
 
     #h = round(a[0] * 2, 2)
 

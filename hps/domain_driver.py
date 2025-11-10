@@ -598,6 +598,8 @@ class Domain_Driver(AbstractHPSSolver):
             uu_true = torch.zeros((GridX.shape[0], GridX.shape[1],1), device=device)
             for i in range(GridX.shape[0]):
                 uu_true[i] = uu_dir_func(GridX[i])
+
+        sol_bdry = sol_tot
         
         tic = time()
         sol_tot,resloc_hps = self.hps.solve(device,sol_tot,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
@@ -618,4 +620,4 @@ class Domain_Driver(AbstractHPSSolver):
             del uu_true
             true_err = true_err.item()
 
-        return sol_tot,rel_err,true_err,resloc_hps,toc_system_solve,toc_leaf_solve,forward_bdry_error, reverse_bdry_error
+        return sol_tot,rel_err,true_err,resloc_hps,toc_system_solve,toc_leaf_solve,forward_bdry_error, reverse_bdry_error, sol_bdry

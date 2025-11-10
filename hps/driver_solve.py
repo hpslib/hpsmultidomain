@@ -21,7 +21,7 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
             if (not curved_domain):
                 uu_dir = lambda xx: uu_dir_func_greens(d, xx,kh)
             else:
-                uu_dir = lambda xx: uu_dir_func_greens(d, param_map(xx),kh) #, center=torch.tensor([-3.1,+3.,+3.2]))
+                uu_dir = lambda xx: uu_dir_func_greens(d, param_map(xx),kh, center=torch.tensor([0,0,0]))
         elif (args.pde == 'bfield_variable'):
             ff_body = None; known_sol = True
 
@@ -130,7 +130,7 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
                 uu_dir = lambda xx: uu_dir_func_parabolic_heat(xx, delta_t*(i+1))
 
         # Solving the system and gathering both the system solve and leaf solve times:
-        uu_sol,res, true_res,resloc_hps,toc_system_solve,toc_leaf_solve,forward_bdry_error,reverse_bdry_error = dom.solve(uu_dir,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,known_sol=known_sol)
+        uu_sol,res, true_res,resloc_hps,toc_system_solve,toc_leaf_solve,forward_bdry_error,reverse_bdry_error, sol_bdry = dom.solve(uu_dir,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,known_sol=known_sol)
         total_toc_system_solve += toc_system_solve
         total_toc_leaf_solve += toc_leaf_solve
         
@@ -169,4 +169,4 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
 
     print("The solution residual is only relevant for problems that do not have a known true solution.")
 
-    return uu_dir, uu_sol,res, sol_norm,resloc_hps,toc_system_solve+toc_leaf_solve,forward_bdry_error,reverse_bdry_error, solve_info
+    return uu_dir, uu_sol,res, sol_norm,resloc_hps,toc_system_solve+toc_leaf_solve,forward_bdry_error,reverse_bdry_error, solve_info, sol_bdry
