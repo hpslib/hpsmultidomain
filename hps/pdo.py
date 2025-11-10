@@ -267,21 +267,21 @@ def pdo_param_2d(kh, bfield, z1, z2, y1, y2, y1_d1=None, y1_d2=None, y2_d1=None,
     return pdo, parameter_map, inv_parameter_map
 
 def pdo_param_3d(kh, bfield, z1, z2, z3, y1, y2, y3,
-                 y1_d1=lambda xx: 0*xx[:,0], y1_d2=lambda xx: 0*xx[:,0], y1_d3=lambda xx: 0*xx[:,0],
-                 y2_d1=lambda xx: 0*xx[:,0], y2_d2=lambda xx: 0*xx[:,0], y2_d3=lambda xx: 0*xx[:,0],
-                 y3_d1=lambda xx: 0*xx[:,0], y3_d2=lambda xx: 0*xx[:,0], y3_d3=lambda xx: 0*xx[:,0],
-                 y1_d1d1=lambda xx: 0*xx[:,0], y1_d1d2=lambda xx: 0*xx[:,0], y1_d1d3=lambda xx: 0*xx[:,0],
-                 y1_d2d1=lambda xx: 0*xx[:,0], y1_d2d2=lambda xx: 0*xx[:,0], y1_d2d3=lambda xx: 0*xx[:,0],
-                 y1_d3d1=lambda xx: 0*xx[:,0], y1_d3d2=lambda xx: 0*xx[:,0], y1_d3d3=lambda xx: 0*xx[:,0],
-                 y2_d1d1=lambda xx: 0*xx[:,0], y2_d1d2=lambda xx: 0*xx[:,0], y2_d1d3=lambda xx: 0*xx[:,0],
-                 y2_d2d1=lambda xx: 0*xx[:,0], y2_d2d2=lambda xx: 0*xx[:,0], y2_d2d3=lambda xx: 0*xx[:,0],
-                 y2_d3d1=lambda xx: 0*xx[:,0], y2_d3d2=lambda xx: 0*xx[:,0], y2_d3d3=lambda xx: 0*xx[:,0],
-                 y3_d1d1=lambda xx: 0*xx[:,0], y3_d1d2=lambda xx: 0*xx[:,0], y3_d1d3=lambda xx: 0*xx[:,0],
-                 y3_d2d1=lambda xx: 0*xx[:,0], y3_d2d2=lambda xx: 0*xx[:,0], y3_d2d3=lambda xx: 0*xx[:,0],
-                 y3_d3d1=lambda xx: 0*xx[:,0], y3_d3d2=lambda xx: 0*xx[:,0], y3_d3d3=lambda xx: 0*xx[:,0],
-                 z1_d1=lambda xx: 0*xx[:,0], z1_d2=lambda xx: 0*xx[:,0], z1_d3=lambda xx: 0*xx[:,0],
-                 z2_d1=lambda xx: 0*xx[:,0], z2_d2=lambda xx: 0*xx[:,0], z2_d3=lambda xx: 0*xx[:,0],
-                 z3_d1=lambda xx: 0*xx[:,0], z3_d2=lambda xx: 0*xx[:,0], z3_d3=lambda xx: 0*xx[:,0]):
+                 y1_d1=lambda xx: 0.*xx[:,0], y1_d2=lambda xx: 0.*xx[:,0], y1_d3=lambda xx: 0.*xx[:,0],
+                 y2_d1=lambda xx: 0.*xx[:,0], y2_d2=lambda xx: 0.*xx[:,0], y2_d3=lambda xx: 0.*xx[:,0],
+                 y3_d1=lambda xx: 0.*xx[:,0], y3_d2=lambda xx: 0.*xx[:,0], y3_d3=lambda xx: 0.*xx[:,0],
+                 y1_d1d1=lambda xx: 0.*xx[:,0], y1_d1d2=lambda xx: 0.*xx[:,0], y1_d1d3=lambda xx: 0.*xx[:,0],
+                 y1_d2d1=lambda xx: 0.*xx[:,0], y1_d2d2=lambda xx: 0.*xx[:,0], y1_d2d3=lambda xx: 0.*xx[:,0],
+                 y1_d3d1=lambda xx: 0.*xx[:,0], y1_d3d2=lambda xx: 0.*xx[:,0], y1_d3d3=lambda xx: 0.*xx[:,0],
+                 y2_d1d1=lambda xx: 0.*xx[:,0], y2_d1d2=lambda xx: 0.*xx[:,0], y2_d1d3=lambda xx: 0.*xx[:,0],
+                 y2_d2d1=lambda xx: 0.*xx[:,0], y2_d2d2=lambda xx: 0.*xx[:,0], y2_d2d3=lambda xx: 0.*xx[:,0],
+                 y2_d3d1=lambda xx: 0.*xx[:,0], y2_d3d2=lambda xx: 0.*xx[:,0], y2_d3d3=lambda xx: 0.*xx[:,0],
+                 y3_d1d1=lambda xx: 0.*xx[:,0], y3_d1d2=lambda xx: 0.*xx[:,0], y3_d1d3=lambda xx: 0.*xx[:,0],
+                 y3_d2d1=lambda xx: 0.*xx[:,0], y3_d2d2=lambda xx: 0.*xx[:,0], y3_d2d3=lambda xx: 0.*xx[:,0],
+                 y3_d3d1=lambda xx: 0.*xx[:,0], y3_d3d2=lambda xx: 0.*xx[:,0], y3_d3d3=lambda xx: 0.*xx[:,0],
+                 z1_d1=lambda xx: 0.*xx[:,0], z1_d2=lambda xx: 0.*xx[:,0], z1_d3=lambda xx: 0.*xx[:,0],
+                 z2_d1=lambda xx: 0.*xx[:,0], z2_d2=lambda xx: 0.*xx[:,0], z2_d3=lambda xx: 0.*xx[:,0],
+                 z3_d1=lambda xx: 0.*xx[:,0], z3_d2=lambda xx: 0.*xx[:,0], z3_d3=lambda xx: 0.*xx[:,0]):
 
     """
     Configures a 3D PDO for variable-coefficient PDEs on custom domains by specifying parameter maps
@@ -335,7 +335,6 @@ def pdo_param_3d(kh, bfield, z1, z2, z3, y1, y2, y3,
         c3  = ci_func (parameter_map,y3_d1d1,y3_d2d2,y3_d3d3)
     else:
         A = [[y1_d1, y1_d2, y1_d3], [y2_d1, y2_d2, y2_d3], [y3_d1, y3_d2, y3_d3]]
-        #J = [[z1_d1, z1_d2, z1_d3], [z2_d1, z2_d2, z2_d3], [z3_d1, z3_d2, z3_d3]]
 
         _, _, J = build_J_from_A(A)
 
