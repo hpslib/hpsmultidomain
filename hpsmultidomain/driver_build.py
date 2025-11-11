@@ -1,10 +1,10 @@
 import torch                           # PyTorch library for tensor computations and GPU support
 import numpy as np                     # For numerical operations
 
-from domain_driver import *  # Importing domain driver utilities for PDE solving
-from built_in_funcs import *  # Importing built-in functions for specific PDEs or conditions
+from hpsmultidomain.domain_driver import *  # Importing domain driver utilities for PDE solving
+from hpsmultidomain.built_in_funcs import *  # Importing built-in functions for specific PDEs or conditions
 
-torch.set_printoptions(precision=16)
+#torch.set_printoptions(precision=16)
 
 def configure_pde_domain(args):
     """
@@ -130,6 +130,10 @@ def configure_pde_domain(args):
             op, param_map, \
             inv_param_map = pdo.get_param_map_and_pdo('curvy_annulus', bfield, kh)
             curved_domain=True
+        elif (args.domain == 'twisted_torus'):
+            op, param_map, \
+            inv_param_map = pdo.get_param_map_and_pdo('twisted_torus', bfield, kh)
+            curved_domain=True
         else:
             raise ValueError
         
@@ -198,6 +202,9 @@ def build_operator_with_info(dom, args, box_geom, kh=0):
 
     build_info = dom.build(sparse_assembly=args.sparse_assembly,\
                             solver_type = args.solver, verbose=True)
+
+    info_dict = dom.build_factorize(args.solver,True)
+
     build_info['N']    = N
     build_info['n']    = args.n
     build_info['pde']  = args.pde

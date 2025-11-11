@@ -1,8 +1,8 @@
 import torch                           # PyTorch library for tensor computations and GPU support
 import numpy as np                     # For numerical operations
 
-from domain_driver import *  # Importing domain driver utilities for PDE solving
-from built_in_funcs import *  # Importing built-in functions for specific PDEs or conditions
+from hpsmultidomain.domain_driver import *  # Importing domain driver utilities for PDE solving
+from hpsmultidomain.built_in_funcs import *  # Importing built-in functions for specific PDEs or conditions
 
 def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_timesteps=1):
     """
@@ -21,7 +21,7 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
             if (not curved_domain):
                 uu_dir = lambda xx: uu_dir_func_greens(d, xx,kh)
             else:
-                uu_dir = lambda xx: uu_dir_func_greens(d, param_map(xx),kh) #, center=torch.tensor([-3.1,+3.,+3.2]))
+                uu_dir = lambda xx: uu_dir_func_greens(d, param_map(xx),kh, center=torch.tensor([11.0,11.0,11.0]))
         elif (args.pde == 'bfield_variable'):
             ff_body = None; known_sol = True
 

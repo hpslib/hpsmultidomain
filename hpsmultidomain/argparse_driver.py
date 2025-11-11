@@ -1,19 +1,20 @@
 import argparse                        # For parsing command-line arguments
+import jax # for reasons
 import torch                           # PyTorch library for tensor computations and GPU support
 import numpy as np                     # For numerical operations
 from time import time                  # For timing operations
 torch.set_default_dtype(torch.double)  # Set default tensor type to double precision
 
-from driver_build import *
-from driver_solve import run_solver
+from hpsmultidomain.driver_build import *
+from hpsmultidomain.driver_solve import run_solver
 
-from domain_driver import *  # Importing domain driver utilities for PDE solving
-from built_in_funcs import *  # Importing built-in functions for specific PDEs or conditions
-from visualize_problem import visualize_problem
+from hpsmultidomain.domain_driver import *  # Importing domain driver utilities for PDE solving
+from hpsmultidomain.built_in_funcs import *  # Importing built-in functions for specific PDEs or conditions
+from hpsmultidomain.visualize_problem import visualize_problem
 import pickle  # For serializing and saving results
 import os  # For interacting with the operating system, e.g., environment variables
 
-from geom import *
+from hpsmultidomain.geom import *
 
 # Initialize argument parser to define and read command-line arguments
 parser = argparse.ArgumentParser("Call direct solver for 2D/3D domain.")

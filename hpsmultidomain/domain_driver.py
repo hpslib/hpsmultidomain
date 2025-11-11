@@ -472,6 +472,16 @@ class Domain_Driver(AbstractHPSSolver):
         """
         return info_dict
 
+    def build_factorize(self,solvertype,verbose):
+        info_dict = dict()
+        print("Trimmed the unnecessary parts to make A_CC, now assembly with PETSc (or maybe SuperLU)")
+        if (not petsc_available):
+            info_dict = self.build_superLU(verbose)
+        else:
+            info_dict = self.build_petsc(solvertype,verbose)
+        return info_dict
+
+
     def build(self,sparse_assembly, solver_type,verbose=True):
         """
         Assembles the sparse system, then factorizes it using build_blackboxsolver
