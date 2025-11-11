@@ -67,14 +67,22 @@ param_map = None
 redundant_n = (args.n is not None) and ((args.n0 is not None) or (args.n1 is not None) or (args.n2 is not None))
 if redundant_n:
     ValueError("Cannot have n and n0,n1,n2 set")
-elif (args.n is not None) and (args.d==2):
-    args.n = np.array([args.n, args.n])
-elif args.n is not None:
-    args.n = np.array([args.n, args.n, args.n])
-elif ((args.n0 is not None) and (args.n1 is not None) and (args.n2 is not None)):
-    args.n = np.array([args.n0, args.n1, args.n2])
+if args.d == 2:
+    if args.n is not None:
+        args.n = np.array([args.n, args.n])
+    elif ((args.n0 is not None) and (args.n1 is not None)):
+        args.n = np.array([args.n0, args.n1])
+    else:
+        ValueError("Need to set either n or (for 2D only) n0,n1")
+elif args.d == 3:
+    if args.n is not None:
+        args.n = np.array([args.n, args.n, args.n])
+    elif ((args.n0 is not None) and (args.n1 is not None) and (args.n2 is not None)):
+        args.n = np.array([args.n0, args.n1, args.n2])
+    else:
+        ValueError("Need to set either n or (for 3D only) n0,n1,n2")
 else:
-    ValueError("Need to set either n or (for 3D only) n0,n1,n2")
+    ValueError("dimension d must be 2 or 3")
 
 d = args.d
 box = torch.tensor([[0,0],[args.box_xlim,args.box_ylim]])  # Domain geometry tensor
@@ -149,4 +157,7 @@ if (args.pickle is not None):
 
 # Optional: visualization of computed solution
 if args.visualize:
-    visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh)
+    if args.d == 2:
+        print("Warning: visualization for d=2 not yet implemented")
+    else:
+        visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh)
