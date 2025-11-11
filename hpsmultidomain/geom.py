@@ -410,7 +410,7 @@ class ParametrizedGeometry3D(AbstractGeometry):
                     result = 0
                     for f, g in pairs:
                         if f is not None and g is not None:
-                            result += np.multiply(f(yy), g(yy))
+                            result += 2*np.multiply(f(yy), g(yy))
                     return result
                 return func
 
