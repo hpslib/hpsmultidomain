@@ -385,8 +385,8 @@ class Domain_Driver(AbstractHPSSolver):
         #
 
         # Set the blocksize using icntl(15) to the size of a face (q**2)
-        if self.d==3:
-            PETSc.Options()['mat_mumps_icntl_15'] = -self.hps.q**2
+        #if self.d==3:
+        #    PETSc.Options()['mat_mumps_icntl_15'] = -self.hps.q**2
 
         info_dict = dict()
         tmp = self.A_CC

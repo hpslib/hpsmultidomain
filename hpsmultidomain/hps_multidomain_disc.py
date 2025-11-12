@@ -226,10 +226,11 @@ class HPS_Multidomain:
         if self.d==2:
             # Assuming gaussian nodes with pxp nodes total
             # FOR NOW we're assuming Chebyshev
-            size_face = self.q[0]
+            size_face1 = self.q[1]
+            size_face2 = self.q[0]
             n0,n1  = self.n
 
-            box_ind = torch.arange(n0*n1*4*size_face).reshape(n0,n1,4*size_face)
+            box_ind = torch.arange(n0*n1*2*(size_face1+size_face2)).reshape(n0,n1,2*(size_face1+size_face2))
 
             # Keep order in mind: L R D U B F (n0 is LR, n1 is DU, n2 is BF)
             # Unique: 1 copy of every boundary in the model. This will be:
@@ -238,23 +239,23 @@ class HPS_Multidomain:
             # Up face for the upmost boxes (on n1)
             I_unique = box_ind.clone()
             if self.periodic_bc:
-                I_unique[:,:,size_face:2*size_face] = -1 # Eliminate right edges
+                I_unique[:,:,size_face1:2*size_face1] = -1 # Eliminate right edges
             else:
-                I_unique[:-1,:,size_face:2*size_face] = -1 # Eliminate right edges except rightmost
+                I_unique[:-1,:,size_face1:2*size_face1] = -1 # Eliminate right edges except rightmost
 
-            I_unique[:,:-1,3*size_face:4*size_face] = -1 # Eliminate up edges except upmost
+            I_unique[:,:-1,2*size_face1 + size_face2:2*size_face1 + 2*size_face2] = -1 # Eliminate up edges except upmost
             I_unique = I_unique.flatten()
             I_unique = I_unique[I_unique > -1]
 
             # For copy 1, we need to eliminate edges that make up domain boundary. This is just:
             # Left faces for all but leftmost boxes (UNLESS we have a periodic domain on the L/R boundary)
             # Down faces for all but downmost boxes
-            indices_ru = np.hstack((np.arange(size_face,2*size_face),np.arange(3*size_face,4*size_face)))
+            indices_ru = np.hstack((np.arange(size_face1,2*size_face1),np.arange(2*size_face1 + size_face2, 2*size_face1 + 2*size_face2)))
             I_copy1 = box_ind.clone()
             I_copy1[:,:,indices_ru]              = -1 # Eliminate all right and up faces
             if not self.periodic_bc:
-                I_copy1[0,:,:size_face]          = -1 # Eliminate left faces on left edge if they aren't periodic
-            I_copy1[:,0,2*size_face:3*size_face] = -1 # Eliminate down faces on down edge
+                I_copy1[0,:,:size_face1]          = -1 # Eliminate left faces on left edge if they aren't periodic
+            I_copy1[:,0,2*size_face1:2*size_face1 + size_face2] = -1 # Eliminate down faces on down edge
             I_copy1 = I_copy1.flatten()
             I_copy1 = I_copy1[I_copy1 > -1]
             #print("I_copy1 shape is " + str(I_copy1.shape))
@@ -266,28 +267,30 @@ class HPS_Multidomain:
             I_copy2 = box_ind.clone()
 
             # Every down index is equal to the up of the preceding box
-            I_copy2[:,1:,2*size_face:3*size_face] = I_copy2[:,:-1,3*size_face:4*size_face]
+            I_copy2[:,1:,2*size_face1:2*size_face1 + size_face2] = I_copy2[:,:-1, 2*size_face1 + size_face2:2*size_face1 + 2*size_face2]
             # Every left index is equal to the right of the preceding box
-            I_copy2[1:,:,:size_face] = I_copy2[:-1,:,size_face:2*size_face]
+            I_copy2[1:,:,:size_face1] = I_copy2[:-1,:,size_face1:2*size_face1]
 
             # SPECIAL CASE: if periodic, we need the leftmost domain faces to equal the rightmost:
             if self.periodic_bc:
-                I_copy2[0,:,:size_face] = I_copy2[-1,:,size_face:2*size_face]
+                I_copy2[0,:,:size_face1] = I_copy2[-1,:,size_face1:2*size_face1]
 
 
             I_copy2[:,:,indices_ru]              = -1 # Eliminate all right, up, and front faces
             if not self.periodic_bc:
-                I_copy2[0,:,:size_face]          = -1 # Eliminate left faces on left edge if they aren't periodic
-            I_copy2[:,0,2*size_face:3*size_face] = -1 # Eliminate down faces on down edge
+                I_copy2[0,:,:size_face1]          = -1 # Eliminate left faces on left edge if they aren't periodic
+            I_copy2[:,0,2*size_face1:2*size_face1 + size_face2] = -1 # Eliminate down faces on down edge
             I_copy2 = I_copy2.flatten()
             I_copy2 = I_copy2[I_copy2 > -1]
         else:
             # Assuming gaussian nodes with pxp nodes total
             # FOR NOW we're assuming Chebyshev
-            size_face = self.q[0]**2
+            size_face1 = self.q[1] * self.q[2]
+            size_face2 = self.q[0] * self.q[2]
+            size_face3 = self.q[0] * self.q[1]
             n0,n1,n2  = self.n
 
-            box_ind = torch.arange(n0*n1*n2*6*size_face).reshape(n0,n1,n2,6*size_face)
+            box_ind = torch.arange(n0*n1*n2*2*(size_face1+size_face2+size_face3)).reshape(n0,n1,n2,2*(size_face1+size_face2+size_face3))
 
             # Keep order in mind: L R D U B F (n0 is LR, n1 is DU, n2 is BF)
             # Unique: 1 copy of every boundary in the model. This will be:
@@ -297,12 +300,12 @@ class HPS_Multidomain:
             # Front face for the frontmost boxes (on n2)
             I_unique = box_ind.clone()
             if self.periodic_bc:
-                I_unique[:,:,:,size_face:2*size_face] = -1 # Eliminate right edges
+                I_unique[:,:,:,size_face1:2*size_face1] = -1 # Eliminate right edges
             else:
-                I_unique[:-1,:,:,size_face:2*size_face] = -1 # Eliminate right edges except rightmost
+                I_unique[:-1,:,:,size_face1:2*size_face1] = -1 # Eliminate right edges except rightmost
 
-            I_unique[:,:-1,:,3*size_face:4*size_face] = -1 # Eliminate up edges except upmost
-            I_unique[:,:,:-1,5*size_face:] = -1 # Eliminate front edges except frontmost
+            I_unique[:,:-1,:,2*size_face1+size_face2:2*size_face1+2*size_face2] = -1 # Eliminate up edges except upmost
+            I_unique[:,:,:-1,-size_face3:] = -1 # Eliminate front edges except frontmost
             I_unique = I_unique.flatten()
             I_unique = I_unique[I_unique > -1]
 
@@ -310,13 +313,13 @@ class HPS_Multidomain:
             # Left faces for all but leftmost boxes (UNLESS we have a periodic domain on the L/R boundary)
             # Down faces for all but downmost boxes
             # Back faces for all but backmost boxes
-            indices_ruf = np.hstack((np.arange(size_face,2*size_face),np.arange(3*size_face,4*size_face),np.arange(5*size_face,6*size_face)))
+            indices_ruf = np.hstack((np.arange(size_face1,2*size_face1),np.arange(2*size_face1+size_face2,2*size_face1+2*size_face2),np.arange(2*size_face1+2*size_face2+size_face3,2*size_face1+2*size_face2+2*size_face3)))
             I_copy1 = box_ind.clone()
             I_copy1[:,:,:,indices_ruf]             = -1 # Eliminate all right, up, and front faces
             if not self.periodic_bc:
-                I_copy1[0,:,:,:size_face]          = -1 # Eliminate left faces on left edge if they aren't periodic
-            I_copy1[:,0,:,2*size_face:3*size_face] = -1 # Eliminate down faces on down edge
-            I_copy1[:,:,0,4*size_face:5*size_face] = -1 # Eliminate back faces on back edge
+                I_copy1[0,:,:,:size_face1]          = -1 # Eliminate left faces on left edge if they aren't periodic
+            I_copy1[:,0,:,2*size_face1:2*size_face1+size_face2] = -1 # Eliminate down faces on down edge
+            I_copy1[:,:,0,2*size_face1+2*size_face2:2*size_face1+2*size_face2+size_face3] = -1 # Eliminate back faces on back edge
             I_copy1 = I_copy1.flatten()
             I_copy1 = I_copy1[I_copy1 > -1]
             #print("I_copy1 shape is " + str(I_copy1.shape))
@@ -328,22 +331,22 @@ class HPS_Multidomain:
             I_copy2 = box_ind.clone()
 
             # Every back index is equal to the front of the preceding box
-            I_copy2[:,:,1:,4*size_face:5*size_face] = I_copy2[:,:,:-1,5*size_face:]
+            I_copy2[:,:,1:,2*size_face1+2*size_face2:2*size_face1+2*size_face2+size_face3] = I_copy2[:,:,:-1,-size_face3:]
             # Every down index is equal to the up of the preceding box
-            I_copy2[:,1:,:,2*size_face:3*size_face] = I_copy2[:,:-1,:,3*size_face:4*size_face]
+            I_copy2[:,1:,:,2*size_face1:2*size_face1+size_face2] = I_copy2[:,:-1,:,2*size_face1+size_face2:2*size_face1+2*size_face2]
             # Every left index is equal to the right of the preceding box
-            I_copy2[1:,:,:,:size_face] = I_copy2[:-1,:,:,size_face:2*size_face]
+            I_copy2[1:,:,:,:size_face1] = I_copy2[:-1,:,:,size_face1:2*size_face1]
 
             # SPECIAL CASE: if periodic, we need the leftmost domain faces to equal the rightmost:
             if self.periodic_bc:
-                I_copy2[0,:,:,:size_face] = I_copy2[-1,:,:,size_face:2*size_face]
+                I_copy2[0,:,:,:size_face1] = I_copy2[-1,:,:,size_face1:2*size_face1]
 
 
             I_copy2[:,:,:,indices_ruf]             = -1 # Eliminate all right, up, and front faces
             if not self.periodic_bc:
-                I_copy2[0,:,:,:size_face]          = -1 # Eliminate left faces on left edge if they aren't periodic
-            I_copy2[:,0,:,2*size_face:3*size_face] = -1 # Eliminate down faces on down edge
-            I_copy2[:,:,0,4*size_face:5*size_face] = -1 # Eliminate back faces on back edge
+                I_copy2[0,:,:,:size_face1]          = -1 # Eliminate left faces on left edge if they aren't periodic
+            I_copy2[:,0,:,2*size_face1:2*size_face1+size_face2] = -1 # Eliminate down faces on down edge
+            I_copy2[:,:,0,2*size_face1+2*size_face2:2*size_face1+2*size_face2+size_face3] = -1 # Eliminate back faces on back edge
             I_copy2 = I_copy2.flatten()
             I_copy2 = I_copy2[I_copy2 > -1]
 
