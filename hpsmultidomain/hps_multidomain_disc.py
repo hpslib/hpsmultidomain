@@ -45,7 +45,7 @@ class HPS_Multidomain:
         """
         self.pdo    = pdo
         self.domain = domain
-        self.p      = p
+        self.p      = np.array([p] * d)
         self.a      = a
         self.d      = d
 
@@ -73,7 +73,7 @@ class HPS_Multidomain:
         n = torch.round(n).int()
         nboxes = torch.prod(n)
         self.n = n; self.nboxes = nboxes
-        self.H = hps_disc.HPS_Disc(a,p,self.q,d)
+        self.H = hps_disc.HPS_Disc(a,self.p,self.q,d)
         self.hmin = self.H.hmin
 
         
@@ -162,7 +162,7 @@ class HPS_Multidomain:
         zz = torch.tensor(self.H.zz.T)
 
         n = self.n
-        xx = torch.zeros(self.nboxes, self.p**self.d, self.d)
+        xx = torch.zeros(self.nboxes, np.prod(self.p), self.d)
         for i in range(n[0]):
             for j in range(n[1]):
                 if self.d==2:
@@ -190,9 +190,13 @@ class HPS_Multidomain:
         - xxG (torch.Tensor): Tensor representing the Gaussian grid points of the box surfaces in the computational domain.
         """
         zzG = torch.tensor(self.H.zzG)
-        #print(zzG.shape)
         n   = self.n
-        xxG = torch.zeros(self.nboxes, 2*self.d*self.q**(self.d-1), self.d)
+        if self.d==2:
+            size_surface = 2*self.q[1] + 2*self.q[0]
+        else: #d == 3
+            size_surface = 2*self.q[1]*self.q[2] + 2*self.q[0]*self.q[2] + 2*self.q[0]*self.q[1]
+
+        xxG = torch.zeros(self.nboxes, size_surface, self.d)
         for i in range(n[0]):
             for j in range(n[1]):
                 if self.d==2:
@@ -222,7 +226,7 @@ class HPS_Multidomain:
         if self.d==2:
             # Assuming gaussian nodes with pxp nodes total
             # FOR NOW we're assuming Chebyshev
-            size_face = self.q
+            size_face = self.q[0]
             n0,n1  = self.n
 
             box_ind = torch.arange(n0*n1*4*size_face).reshape(n0,n1,4*size_face)
@@ -280,7 +284,7 @@ class HPS_Multidomain:
         else:
             # Assuming gaussian nodes with pxp nodes total
             # FOR NOW we're assuming Chebyshev
-            size_face = self.q**2
+            size_face = self.q[0]**2
             n0,n1,n2  = self.n
 
             box_ind = torch.arange(n0*n1*n2*6*size_face).reshape(n0,n1,n2,6*size_face)
@@ -356,17 +360,20 @@ class HPS_Multidomain:
         """
         p = self.p; q = self.q; nboxes = self.nboxes; d = self.d
         pdo = self.pdo
+
+        if self.d==2:
+            size_ext = 2*q[1] + 2*q[0]
+        else: #d == 3
+            size_ext = 2*q[1]*q[2] + 2*q[0]*q[2] + 2*q[0]*q[1]
         
         # For Gaussian we might need p^2, not (p-2)^2:
-        size_face = q**(d-1)
         if (mode == 'build'):
-            DtNs = torch.zeros(nboxes,2*d*size_face,2*d*size_face)
-            data = torch.zeros(nboxes,2*d*size_face,1)
-            #print("Initialized arrays of zeros")
+            DtNs = torch.zeros(nboxes, size_ext, size_ext)
+            data = torch.zeros(nboxes, size_ext, 1)
         elif (mode == 'solve'):
-            DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1])
+            DtNs = torch.zeros(nboxes,np.prod(p),2*data.shape[-1])
         elif (mode == 'reduce_body'):
-            DtNs = torch.zeros(nboxes,2*d*size_face,1)
+            DtNs = torch.zeros(nboxes, size_ext, 1)
         
         xxloc = self.grid_xx.to(device)
         Nx    = torch.tensor(self.H.Nx).to(device)
@@ -389,16 +396,17 @@ class HPS_Multidomain:
         # reserve at most 1GB memory for stored DtNs at a time
         f = 0.8e9 # 1 * 0.8 = 0.8 GB in bytes
         if mode == 'solve':
-            chunk_max = int(f / ((p**d)*2*data.shape[-1] * 8)) # Size of leaf solution * # RHS * number of bytes per double
+            chunk_max = int(f / ((np.prod(p))*2*data.shape[-1] * 8)) # Size of leaf solution * # RHS * number of bytes per double
         elif mode == 'reduce_body':
-            chunk_max = int(f / ((2*d*size_face) * 8)) # Size of reduction * number of bytes per double
+            chunk_max = int(f / (size_ext * 8)) # Size of reduction * number of bytes per double
         else: #if mode == 'build'
-            chunk_max = int(f / ((2*d*size_face)**2 * 8)) # Size of DtN matrix * number of bytes per double
+            chunk_max = int(f / (size_ext**2 * 8)) # Size of DtN matrix * number of bytes per double
         chunk_size = chunk_max #leaf_ops.get_nearest_div(nboxes,chunk_max)
         
         Aloc_chunkinit = np.min([50,int(nboxes/4)])
         if d==3:
-            Aloc_chunkinit = np.max([int(0.2e9 / ((q**6 + 12*q**5 + 72*q**4) * 8)), 1])
+            q_max = max(q)
+            Aloc_chunkinit = np.max([int(0.2e9 / ((q_max**6 + 12*q_max**5 + 72*q_max**4) * 8)), 1])
 
         # TODO: replace this with a while loop, end when index reaches nboxes
         j = 0
@@ -421,9 +429,10 @@ class HPS_Multidomain:
         the solution on the subdomain interiors. It also does error analysis if a true solution is known.
         """
         nrhs     = uu_sol.shape[-1]
-        size_ext = 4*(self.q)
-        if self.d==3:
-            size_ext = 6*(self.q**2)
+        if self.d==2:
+            size_ext = 2*self.q[1] + 2*self.q[0]
+        else: #d == 3
+            size_ext = 2*self.q[1]*self.q[2] + 2*self.q[0]*self.q[2] + 2*self.q[0]*self.q[1]
 
         nboxes   = torch.prod(self.n)
         uu_sol   = uu_sol.to(device)

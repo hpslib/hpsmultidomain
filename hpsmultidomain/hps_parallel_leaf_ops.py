@@ -36,8 +36,8 @@ def get_Aloc_2d(p, xxloc, Ds, pdo, box_start, box_end, device):
     - Aloc (tensor): A tensor containing the assembled local blocks of the global matrix.
     """
     nboxes = box_end - box_start  # Number of boxes to process
-    Aloc = torch.zeros(nboxes, p**2, p**2, device=device)  # Initialize the tensor for local blocks
-    xx_flat = xxloc[box_start:box_end].reshape(nboxes*p**2, 2)  # Flatten the grid points for the given range
+    Aloc = torch.zeros(nboxes, p[0]*p[1], p[0]*p[1], device=device)  # Initialize the tensor for local blocks
+    xx_flat = xxloc[box_start:box_end].reshape(nboxes*p[0]*p[1], 2)  # Flatten the grid points for the given range
 
     # Accumulate the contributions of each coefficient to the local blocks
     Aloc_acc(p, 2, nboxes, xx_flat, Aloc, pdo.c11, Ds[0], c=-1.)
@@ -49,7 +49,7 @@ def get_Aloc_2d(p, xxloc, Ds, pdo, box_start, box_end, device):
     if pdo.c2 is not None:
         Aloc_acc(p, 2, nboxes, xx_flat, Aloc, pdo.c2, Ds[4])
     if pdo.c is not None:
-        I = torch.eye(p**2, device=device)
+        I = torch.eye(np.prod(p), device=device)
         Aloc_acc(p, 2, nboxes, xx_flat, Aloc, pdo.c, I)
     return Aloc
 
@@ -70,8 +70,8 @@ def get_Aloc_3d(p, xxloc, Ds, pdo, box_start, box_end, device):
     - Aloc (tensor): A tensor containing the assembled local blocks of the global matrix.
     """
     nboxes = box_end - box_start  # Number of boxes to process
-    Aloc = torch.zeros(nboxes, p**3, p**3, device=device)  # Initialize the tensor for local blocks
-    xx_flat = xxloc[box_start:box_end].reshape(nboxes*p**3, 3)  # Flatten the grid points for the given range
+    Aloc = torch.zeros(nboxes, p[0]*p[1]*p[2], p[0]*p[1]*p[2], device=device)  # Initialize the tensor for local blocks
+    xx_flat = xxloc[box_start:box_end].reshape(nboxes*p[0]*p[1]*p[2], 3)  # Flatten the grid points for the given range
 
     # Accumulate the contributions of each coefficient to the local blocks
     Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c11, Ds[0], c=-1.)
@@ -90,7 +90,7 @@ def get_Aloc_3d(p, xxloc, Ds, pdo, box_start, box_end, device):
     if pdo.c3 is not None:
         Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c3, Ds[8])
     if pdo.c is not None:
-        I = torch.eye(p**3, device=device)
+        I = torch.eye(np.prod(p), device=device)
         Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c, I)
     return Aloc
 
@@ -109,7 +109,7 @@ def Aloc_acc(p, d, nboxes, xx_flat, Aloc, func, D, c=1.):
     - c (float): A scaling factor for the coefficient function (default is 1).
     """
 
-    size_f    = p**d
+    size_f    = np.prod(p)
     f_vals    = func(xx_flat).reshape(nboxes,size_f)
     f_vals    = f_vals[:,:,None]
     f_vals   *= c
@@ -138,13 +138,13 @@ def form_DtNs(p,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,
     # This one doesn't require Aloc
     if (mode == 'reduce_body'):
         nrhs = 1 # Assuming 1 RHS for now
-        f_body  = torch.zeros((box_end-box_start),(p-2)**d,nrhs,device=device)
+        f_body  = torch.zeros((box_end-box_start),np.prod(p-2),nrhs,device=device)
         if ff_body_func is not None:
-            xx_flat = xxloc[box_start:box_end,Jc].reshape((box_end-box_start)*(p-2)**d,d)
+            xx_flat = xxloc[box_start:box_end,Jc].reshape((box_end-box_start)*np.prod(p-2),d)
             tmp = ff_body_func(xx_flat)
-            f_body += tmp.reshape(box_end-box_start,(p-2)**d,nrhs)
+            f_body += tmp.reshape(box_end-box_start,np.prod(p-2),nrhs)
         if ff_body_vec is not None:
-            f_body_vec_part = ff_body_vec[box_start*p**d:box_end*p**d].reshape(box_end-box_start,p**d,nrhs)
+            f_body_vec_part = ff_body_vec[box_start*np.prod(p):box_end*np.prod(p)].reshape(box_end-box_start,np.prod(p),nrhs)
             f_body += f_body_vec_part[:,Jc,:]
 
         if interpolate == False:
@@ -181,14 +181,14 @@ def form_DtNs(p,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,
         nrhs   = data.shape[-1]
         f_body = torch.zeros(box_end-box_start,Jc.shape[0],nrhs,device=device)
         if (ff_body_func is not None):
-            xx_flat = xxloc[box_start:box_end,Jc].reshape((box_end-box_start)*(p-2)**d,d)
-            f_body += ff_body_func(xx_flat).reshape(box_end-box_start,(p-2)**d,nrhs)
+            xx_flat = xxloc[box_start:box_end,Jc].reshape((box_end-box_start)*np.prod(p-2),d)
+            f_body += ff_body_func(xx_flat).reshape(box_end-box_start,np.prod(p-2),nrhs)
         if (ff_body_vec is not None):
-            f_body_vec_part = ff_body_vec[box_start*p**d:box_end*p**d].reshape(box_end-box_start,p**d,nrhs)
+            f_body_vec_part = ff_body_vec[box_start*np.prod(p):box_end*np.prod(p)].reshape(box_end-box_start,np.prod(p),nrhs)
             f_body         += f_body_vec_part[:,Jc]
         
 
-        uu_sol = torch.zeros(box_end-box_start,p**d,2*nrhs,device=device)
+        uu_sol = torch.zeros(box_end-box_start,np.prod(p),2*nrhs,device=device)
         
         # We use different indexing schemes for dropped corners and Gaussian:
         if interpolate == False:
@@ -215,7 +215,7 @@ def get_DtN_chunksize(p,d,device,mode):
     the DtNs / solutions themselves. Here the free space on the GPU is computed to determine how many 
     can be done at once without erroring.
     """
-    q = p-2
+    q = np.max(p-2)
     if (device == torch.device('cuda')):
         r = torch.cuda.memory_reserved(0)
         a = torch.cuda.memory_allocated(0)
@@ -223,13 +223,13 @@ def get_DtN_chunksize(p,d,device,mode):
         #print(f"Available memory for next chunk: {r} - {a} = {f}")
     else:
         f = 10e9 # 10 GB in bytes
-    chunk_max = int(f / (4*p**(2*d) * 8)) # 8 bytes in 64 bits memory
+    chunk_max = int(f / (4*(q+2)**(2*d) * 8)) # 8 bytes in 64 bits memory
     if d == 3:
-        chunk_max = int(f / ((p**6 + q**6 + 12*q**5 + 72*q**4) * 8)) # 8 bytes in 64 bits memory
+        chunk_max = int(f / (((q+2)**6 + q**6 + 12*q**5 + 72*q**4) * 8)) # 8 bytes in 64 bits memory
         if mode=="solve":
             # Need a little extra overhead for Aloc in this case
-            chunk_max = int(f / ((2*p**6 + q**6 + 12*q**5 + 72*q**4) * 8))
-        if p >= 16:
+            chunk_max = int(f / ((2*(q+2)**6 + q**6 + 12*q**5 + 72*q**4) * 8))
+        if q >= 14:
             chunk_max = 1
     return np.max([chunk_max, 1])
 
@@ -241,13 +241,17 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Int
     are computed at once, and transfers results to CPU as needed.
     """
     nboxes = box_end - box_start
-    size_face = q**(d-1)
+    if d==2:
+        size_surface = 2*q[1] + 2*q[0]
+    else: #d == 3
+        size_surface = 2*q[1]*q[2] + 2*q[0]*q[2] + 2*q[0]*q[1]
+    
     if (mode == 'build'):
-        DtNs = torch.zeros(nboxes,2*d*size_face,2*d*size_face,device=device)
+        DtNs = torch.zeros(nboxes,size_surface,size_surface,device=device)
     elif (mode == 'solve'):
-        DtNs = torch.zeros(nboxes,p**d,2*data.shape[-1],device=device)
+        DtNs = torch.zeros(nboxes,np.prod(p),2*data.shape[-1],device=device)
     elif (mode == 'reduce_body'):
-        DtNs = torch.zeros(nboxes,2*d*size_face,1,device=device)
+        DtNs = torch.zeros(nboxes,size_surface,1,device=device)
     #print("Built zero arrays in helper")
     chunk_size = chunk_init
     args = p,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
