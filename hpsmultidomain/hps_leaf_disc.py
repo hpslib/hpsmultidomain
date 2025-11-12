@@ -372,16 +372,16 @@ def leaf_discretization_3d(a,p,q):
     Jr    = Jr.copy().reshape((p[1]-2)*(p[2]-2),)
     Jd    = np.argwhere(np.logical_and(zz[1,:] < - a[1] + 0.5 * hmin1,
                                             np.logical_and(Jc0,Jc2)))
-    Jd    = Jd.copy().reshape((p[0]-2)*(p[1]-2),)
+    Jd    = Jd.copy().reshape((p[0]-2)*(p[2]-2),)
     Ju    = np.argwhere(np.logical_and(zz[1,:] > + a[1] - 0.5 * hmin1,
                                             np.logical_and(Jc0,Jc2)))
-    Ju    = Ju.copy().reshape((p[0]-2)*(p[1]-2),)
+    Ju    = Ju.copy().reshape((p[0]-2)*(p[2]-2),)
     Jb    = np.argwhere(np.logical_and(zz[2,:] < - a[2] + 0.5 * hmin2,
                                             np.logical_and(Jc0,Jc1)))
-    Jb    = Jb.copy().reshape((p[0]-2)*(p[2]-2),)
+    Jb    = Jb.copy().reshape((p[0]-2)*(p[1]-2),)
     Jf    = np.argwhere(np.logical_and(zz[2,:] > + a[2] - 0.5 * hmin2,
                                             np.logical_and(Jc0,Jc1)))
-    Jf    = Jf.copy().reshape((p[0]-2)*(p[2]-2),)
+    Jf    = Jf.copy().reshape((p[0]-2)*(p[1]-2),)
     Jc    = np.argwhere(np.logical_and(Jc0, np.logical_and(Jc1,Jc2)))
     Jc    = Jc.copy().reshape((p[0]-2)*(p[1]-2)*(p[2]-2),)
     Jx    = np.concatenate((Jl,Jr,Jd,Ju,Jb,Jf))
