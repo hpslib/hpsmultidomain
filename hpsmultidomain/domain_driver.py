@@ -279,6 +279,9 @@ class Domain_Driver(AbstractHPSSolver):
         if isinstance(a, (int, float)):
             a = np.array([a] * d)
 
+        if isinstance(p, (int)):
+            p = np.array([p] * d)
+
         HPS_multi = hpsmultidomain.hps_multidomain_disc.HPS_Multidomain(pdo_op,box_geom,a,p,d, periodic_bc=periodic_bc)
 
         self.hps = HPS_multi
@@ -659,10 +662,10 @@ class Domain_Driver(AbstractHPSSolver):
 
         true_err = torch.tensor([float('nan')])
         if (known_sol):
-            sol_boxes = torch.reshape(sol_tot, (self.hps.nboxes,self.hps.p[0]**self.d))
+            sol_boxes = torch.reshape(sol_tot, (self.hps.nboxes,np.prod(self.hps.p)))
             XX       = self.hps.xx_tot
             uu_true  = uu_dir_func(XX.clone())
-            uu_true  = torch.reshape(uu_true, (self.hps.nboxes,self.hps.p[0]**self.d))
+            uu_true  = torch.reshape(uu_true, (self.hps.nboxes,np.prod(self.hps.p)))
             Jx       = torch.tensor(self.hps.H.JJ.Jx)#.to(device)
             Jc       = torch.tensor(self.hps.H.JJ.Jc)#.to(device)
             Jtot     = torch.hstack((Jc,Jx))

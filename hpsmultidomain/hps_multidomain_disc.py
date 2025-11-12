@@ -45,7 +45,7 @@ class HPS_Multidomain:
         """
         self.pdo    = pdo
         self.domain = domain
-        self.p      = np.array([p] * d)
+        self.p      = p
         self.a      = a
         self.d      = d
 
