@@ -23,10 +23,13 @@ parser.add_argument('--p',type=int,required=False)  # Polynomial order for certa
 parser.add_argument('--n', type=int, required=False)  # Number of discretization points
 parser.add_argument('--d', type=int, required=False, default=2)  # Spatial dimension of problem
 
-
 parser.add_argument('--n0', type=int, required=False)  # Number of discretization points in x0
 parser.add_argument('--n1', type=int, required=False)  # Number of discretization points in x1
 parser.add_argument('--n2', type=int, required=False)  # Number of discretization points in x2
+
+parser.add_argument('--p0', type=int, required=False)  # Polynomail order in x0
+parser.add_argument('--p1', type=int, required=False)  # Polynomail order in x1
+parser.add_argument('--p2', type=int, required=False)  # Polynomail order in x2
 
 # Arguments defining the PDE problem
 parser.add_argument('--pde', type=str, required=True)  # Type of PDE
@@ -63,10 +66,7 @@ args = parser.parse_args()  # Parse arguments from command line
 test_components = args.test_components
 param_map = None
 
-# Extract and setup basic parameters from parsed arguments
-redundant_n = (args.n is not None) and ((args.n0 is not None) or (args.n1 is not None) or (args.n2 is not None))
-if redundant_n:
-    ValueError("Cannot have n and n0,n1,n2 set")
+# Extract and setup basic parameters from parsed arguments:
 if args.d == 2:
     if args.n is not None:
         args.n = np.array([args.n, args.n])
@@ -74,6 +74,13 @@ if args.d == 2:
         args.n = np.array([args.n0, args.n1])
     else:
         ValueError("Need to set either n or (for 2D only) n0,n1")
+
+    if args.p is not None:
+        args.p = np.array([args.p, args.p])
+    elif ((args.p0 is not None) and (args.p1 is not None)):
+        args.p = np.array([args.p0, args.p1])
+    else:
+        ValueError("Need to set either p or (for 2D only) p0,p1")
 elif args.d == 3:
     if args.n is not None:
         args.n = np.array([args.n, args.n, args.n])
@@ -81,6 +88,13 @@ elif args.d == 3:
         args.n = np.array([args.n0, args.n1, args.n2])
     else:
         ValueError("Need to set either n or (for 3D only) n0,n1,n2")
+
+    if args.p is not None:
+        args.p = np.array([args.p, args.p, args.p])
+    elif ((args.p0 is not None) and (args.p1 is not None) and (args.p2 is not None)):
+        args.p = np.array([args.p0, args.p1, args.p2])
+    else:
+        ValueError("Need to set either p or (for 3D only) p0,p1,p2")
 else:
     ValueError("dimension d must be 2 or 3")
 

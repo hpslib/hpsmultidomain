@@ -106,7 +106,7 @@ class Domain_Driver(AbstractHPSSolver):
         self.periodic_bc  = periodic_bc
         self.box_geometry = box_geom # The full BoxGeometry object
         self.box_geom     = self.box_geometry.bounds.T # The array itself
-        assert p > 0
+        assert p.all() > 0
         self.hps_disc(self.box_geom,a,p,d,pdo_op,periodic_bc)
 
     ################### Required functions for parent class AbstractHPSSolver #####################

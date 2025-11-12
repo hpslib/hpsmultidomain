@@ -198,7 +198,7 @@ def build_operator_with_info(dom, args, box_geom, kh=0):
     Given a domain decomposition, constructs the operator needed for the HPS computation.
     This also stores outut in 'build_info'
     """
-    N = (args.p-2) * (args.p*dom.hps.n[0]*dom.hps.n[1] + dom.hps.n[0] + dom.hps.n[1])
+    N = (args.p[0]-2) * (args.p[0]*dom.hps.n[0]*dom.hps.n[1] + dom.hps.n[0] + dom.hps.n[1])
 
     build_info = dom.build(sparse_assembly=args.sparse_assembly,\
                             solver_type = args.solver, verbose=True)
