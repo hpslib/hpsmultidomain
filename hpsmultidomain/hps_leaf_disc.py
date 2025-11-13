@@ -357,8 +357,6 @@ def leaf_discretization_3d(a,p,q):
     hmin1 = zz[1,p[2]]      - zz[1,0]
     hmin2 = zz[2,1]         - zz[2,0]
 
-    print("hmins", hmin0, hmin1, hmin2)
-
     # Jl, Jr, Jd, Ju are RLDU as expected, with no corners
     # Jc is interior, Jx is all boundaries without corners
     # Jb, Jf are back and front
