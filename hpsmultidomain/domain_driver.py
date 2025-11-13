@@ -106,7 +106,6 @@ class Domain_Driver(AbstractHPSSolver):
         self.periodic_bc  = periodic_bc
         self.box_geometry = box_geom # The full BoxGeometry object
         self.box_geom     = self.box_geometry.bounds.T # The array itself
-        assert p.all() > 0
         self.hps_disc(self.box_geom,a,p,d,pdo_op,periodic_bc)
 
     ################### Required functions for parent class AbstractHPSSolver #####################
@@ -281,6 +280,8 @@ class Domain_Driver(AbstractHPSSolver):
 
         if isinstance(p, (int)):
             p = np.array([p] * d)
+
+        assert p.all() > 0
 
         HPS_multi = hpsmultidomain.hps_multidomain_disc.HPS_Multidomain(pdo_op,box_geom,a,p,d, periodic_bc=periodic_bc)
 
