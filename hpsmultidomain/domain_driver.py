@@ -619,7 +619,7 @@ class Domain_Driver(AbstractHPSSolver):
 
         # We set the solution on the subdomain boundaries to the result of our sparse system.
         sol_tot = torch.zeros(len(self.hps.I_unique),1)
-        sol_tot[self.I_Ctot] = uu_dir_func(self.hps.xx_active[self.I_Ctot]) #sol
+        sol_tot[self.I_Ctot] = sol #uu_dir_func(self.hps.xx_active[self.I_Ctot]) #sol
 
         # Here we set the true exterior to the given data:
         if uu_dir_vec is None:

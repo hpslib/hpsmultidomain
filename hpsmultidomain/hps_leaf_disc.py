@@ -145,14 +145,12 @@ def get_loc_interp_3d(p, q, l):
     # Vandermonde-based approach:
 
     # Vandermonde-based approach with Chebyshev expansion coefficients:
-    lmax   = max(l)
-    ChebVc = chebvander2d(croots2d[0], croots2d[1], (lmax,lmax))
-    ChebVl = chebvander2d(lroots2d[0], lroots2d[1], (lmax,lmax))
+    ChebVc = chebvander2d(croots2d[0], croots2d[1], (l[0],l[1]))
+    ChebVl = chebvander2d(lroots2d[0], lroots2d[1], (l[0],l[1]))
 
     # Vandermonde-based approach with Gaussian expansion coefficients:
-    qmax    = max(q)
-    GaussVc = legvander2d(croots2d[0], croots2d[1], (qmax,qmax))
-    GaussVl = legvander2d(lroots2d[0], lroots2d[1], (qmax,qmax))
+    GaussVc = legvander2d(croots2d[0], croots2d[1], (q[0],q[1]))
+    GaussVl = legvander2d(lroots2d[0], lroots2d[1], (q[0],q[1]))
 
     Interp_loc_CtG = np.linalg.lstsq(ChebVc.T,ChebVl.T,rcond=None)[0].T
     Interp_loc_GtC = np.linalg.lstsq(GaussVl.T,GaussVc.T,rcond=None)[0].T
@@ -302,22 +300,23 @@ def cheb_3d(a,p):
     I2 = np.eye(p[1])
     I3 = np.eye(p[2])
 
-    D1 = -np.kron(D_axis1, np.kron(I2, I3))
-    D2 = -np.kron(I1, np.kron(D_axis2, I3))
-    D3 = -np.kron(I1, np.kron(I2, D_axis3))
+    D1 = -np.kron(np.kron(D_axis1, I2), I3)
+    D2 = -np.kron(np.kron(I1, D_axis2), I3)
+    D3 = -np.kron(np.kron(I1, I2), D_axis3)
 
-    D11 = np.kron(D_axis1 @ D_axis1, np.kron(I2, I3))
-    D22 = np.kron(I1, np.kron(D_axis2 @ D_axis2, I3))
-    D33 = np.kron(I1, np.kron(I2, D_axis3 @ D_axis3))
+    D11 = np.kron(np.kron(D_axis1 @ D_axis1, I2), I3)
+    D22 = np.kron(np.kron(I1, D_axis2 @ D_axis2), I3)
+    D33 = np.kron(np.kron(I1, I2), D_axis3 @ D_axis3)
 
-    D12 = np.kron(D_axis1, np.kron(D_axis2, I3))
-    D13 = np.kron(D_axis1, np.kron(I2, D_axis3))
-    D23 = np.kron(I1, np.kron(D_axis2, D_axis3))
+    D12 = np.kron(np.kron(D_axis1, D_axis2), I3)
+    D13 = np.kron(np.kron(D_axis1, I2), D_axis3)
+    D23 = np.kron(np.kron(I1, D_axis2), D_axis3)
 
     zz1 = np.repeat(xvec1,p[1]*p[2])
     zz2 = np.repeat(xvec2,p[0]*p[2]).reshape(-1,p[0]).T.flatten()
     zz3 = np.repeat(xvec3,p[0]*p[1]).reshape(-1,p[0]*p[1]).T.flatten()
     zz  = np.vstack((zz1,zz2,zz3))
+
     Ds  = Ds_3d(D1=D1, D2=D2, D3=D3, D11=D11, D22=D22, D33=D33, D12=D12, D13=D13, D23=D23)
 
     return zz, Ds
