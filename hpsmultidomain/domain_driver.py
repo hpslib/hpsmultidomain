@@ -106,7 +106,6 @@ class Domain_Driver(AbstractHPSSolver):
         self.periodic_bc  = periodic_bc
         self.box_geometry = box_geom # The full BoxGeometry object
         self.box_geom     = self.box_geometry.bounds.T # The array itself
-        assert p > 0
         self.hps_disc(self.box_geom,a,p,d,pdo_op,periodic_bc)
 
     ################### Required functions for parent class AbstractHPSSolver #####################
@@ -279,6 +278,13 @@ class Domain_Driver(AbstractHPSSolver):
         if isinstance(a, (int, float)):
             a = np.array([a] * d)
 
+        if isinstance(p, (int)):
+            p = [p] * d
+
+        p = np.array(p)
+
+        assert p.all() > 0
+
         HPS_multi = hpsmultidomain.hps_multidomain_disc.HPS_Multidomain(pdo_op,box_geom,a,p,d, periodic_bc=periodic_bc)
 
         self.hps = HPS_multi
@@ -385,8 +391,8 @@ class Domain_Driver(AbstractHPSSolver):
         #
 
         # Set the blocksize using icntl(15) to the size of a face (q**2)
-        if self.d==3:
-            PETSc.Options()['mat_mumps_icntl_15'] = -self.hps.q**2
+        #if self.d==3:
+        #    PETSc.Options()['mat_mumps_icntl_15'] = -self.hps.q**2
 
         info_dict = dict()
         tmp = self.A_CC
@@ -659,10 +665,10 @@ class Domain_Driver(AbstractHPSSolver):
 
         true_err = torch.tensor([float('nan')])
         if (known_sol):
-            sol_boxes = torch.reshape(sol_tot, (self.hps.nboxes,self.hps.p**self.d))
+            sol_boxes = torch.reshape(sol_tot, (self.hps.nboxes,np.prod(self.hps.p)))
             XX       = self.hps.xx_tot
             uu_true  = uu_dir_func(XX.clone())
-            uu_true  = torch.reshape(uu_true, (self.hps.nboxes,self.hps.p**self.d))
+            uu_true  = torch.reshape(uu_true, (self.hps.nboxes,np.prod(self.hps.p)))
             Jx       = torch.tensor(self.hps.H.JJ.Jx)#.to(device)
             Jc       = torch.tensor(self.hps.H.JJ.Jc)#.to(device)
             Jtot     = torch.hstack((Jc,Jx))
