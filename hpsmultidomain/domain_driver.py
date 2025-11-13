@@ -279,7 +279,9 @@ class Domain_Driver(AbstractHPSSolver):
             a = np.array([a] * d)
 
         if isinstance(p, (int)):
-            p = np.array([p] * d)
+            p = [p] * d
+
+        p = np.array(p)
 
         assert p.all() > 0
 
