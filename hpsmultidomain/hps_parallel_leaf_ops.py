@@ -36,8 +36,8 @@ def get_Aloc_2d(p, xxloc, Ds, pdo, box_start, box_end, device):
     - Aloc (tensor): A tensor containing the assembled local blocks of the global matrix.
     """
     nboxes = box_end - box_start  # Number of boxes to process
-    Aloc = torch.zeros(nboxes, p[0]*p[1], p[0]*p[1], device=device)  # Initialize the tensor for local blocks
-    xx_flat = xxloc[box_start:box_end].reshape(nboxes*p[0]*p[1], 2)  # Flatten the grid points for the given range
+    Aloc = torch.zeros(nboxes, np.prod(p), np.prod(p), device=device)  # Initialize the tensor for local blocks
+    xx_flat = xxloc[box_start:box_end].reshape(nboxes*np.prod(p), 2)  # Flatten the grid points for the given range
 
     # Accumulate the contributions of each coefficient to the local blocks
     Aloc_acc(p, 2, nboxes, xx_flat, Aloc, pdo.c11, Ds[0], c=-1.)
@@ -70,8 +70,8 @@ def get_Aloc_3d(p, xxloc, Ds, pdo, box_start, box_end, device):
     - Aloc (tensor): A tensor containing the assembled local blocks of the global matrix.
     """
     nboxes = box_end - box_start  # Number of boxes to process
-    Aloc = torch.zeros(nboxes, p[0]*p[1]*p[2], p[0]*p[1]*p[2], device=device)  # Initialize the tensor for local blocks
-    xx_flat = xxloc[box_start:box_end].reshape(nboxes*p[0]*p[1]*p[2], 3)  # Flatten the grid points for the given range
+    Aloc = torch.zeros(nboxes, np.prod(p), np.prod(p), device=device)  # Initialize the tensor for local blocks
+    xx_flat = xxloc[box_start:box_end].reshape(nboxes*np.prod(p), 3)  # Flatten the grid points for the given range
 
     # Accumulate the contributions of each coefficient to the local blocks
     Aloc_acc(p, 3, nboxes, xx_flat, Aloc, pdo.c11, Ds[0], c=-1.)
