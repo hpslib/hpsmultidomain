@@ -47,11 +47,11 @@ The Hierarchical Poincaré-Steklov (HPS) Solver is a high-performance computing 
 ## Example usage
 For a 2D problem:
 ```
-python hps/argparse_driver.py --pde poisson --domain square --bc log_dist --n 1000 --p 12 --d 2 --solver superLU
+python hpsmultidomain/argparse_driver.py --pde poisson --domain square --bc log_dist --n 1000 --p 12 --d 2 --solver superLU
 ```
 And for a 3D problem:
 ```
-python hps/argparse_driver.py --pde poisson --domain square --bc log_dist --n 50 --p 12 --d 3 --solver MUMPS
+python hpsmultidomain/argparse_driver.py --pde poisson --domain square --bc log_dist --n 50 --p 12 --d 3 --solver MUMPS
 ```
 
 ## Notes
