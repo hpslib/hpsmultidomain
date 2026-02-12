@@ -103,6 +103,14 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
             ff_body       = lambda xx: -uu_dir_func_parabolic_heat(xx, 0)
         else:
             raise ValueError
+    elif (args.bc == 'sinsinh_test'):
+        if d== 2:
+            raise ValueError("sinsinh is 3D only")
+        if (args.pde == 'poisson'):
+            uu_dir    = lambda xx: sinsinh_test(xx)
+            known_sol = True
+            ff_body   = None
+
     else:
         raise ValueError("invalid bc")
 

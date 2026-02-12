@@ -376,3 +376,9 @@ def convection_u_init(xx):
     u = torch.exp(-((xx[:,2]-0.5)**2 / 0.002) - ((xx[:,0]-0.1)**2 + (xx[:,1]-0.1)**2) / 0.002)
     u[u < 1e-2] = 0.0
     return u.unsqueeze(-1)
+
+def  sinsinh_test(p):
+    k  = 2
+    Lx = 2
+    solution = torch.sin(np.pi*k*p[:,1])*torch.sin(np.pi*k*p[:,2])*torch.sinh(np.sqrt(2)*k*np.pi*(Lx-p[:,0]))/np.sinh(np.sqrt(2)*k*np.pi*Lx)
+    return solution.unsqueeze(-1)

@@ -136,7 +136,10 @@ if (args.p is None):
     raise ValueError('HPS selected but p not provided')
 p = args.p
 npan = args.n / (p-2)
-a = 1/(2*npan) # a is now an array
+a = np.array([args.box_xlim,args.box_ylim,args.box_zlim]) / (2*npan) # a is now an array
+
+print("p = ", p)
+print("a = ", a)
 
 # Inilialize the domain driver object - we do this separately from
 # build_operator_with_info so that, in the future, we could experiment

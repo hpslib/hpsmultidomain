@@ -55,7 +55,7 @@ class HPS_Multidomain:
         self.interpolate = True
         self.q = self.p - 2
 
-        """
+        
         if d==2:
             if (pdo.c12 is None):
                 self.interpolate = False
@@ -64,7 +64,7 @@ class HPS_Multidomain:
             if (pdo.c12 is None) and (pdo.c13 is None) and (pdo.c23 is None):
                 self.interpolate = False
                 self.q = self.p - 2
-        """
+        
 
         n = (self.domain[:,1] - self.domain[:,0]) / (2*self.a)
         # if n is a numpy array, make it a tensor
