@@ -136,7 +136,10 @@ if (args.p is None):
     raise ValueError('HPS selected but p not provided')
 p = args.p
 npan = args.n / (p-2)
-a = np.array([args.box_xlim,args.box_ylim,args.box_zlim]) / (2*npan) # a is now an array
+if args.d == 2:
+    a = np.array([args.box_xlim, args.box_ylim]) / (2*npan) # a is now an array
+else: #args.d == 3
+    a = np.array([args.box_xlim, args.box_ylim, args.box_zlim]) / (2*npan) # a is now an array
 
 print("p = ", p)
 print("a = ", a)
