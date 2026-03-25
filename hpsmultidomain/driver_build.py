@@ -136,6 +136,19 @@ def configure_pde_domain(args):
             curved_domain=True
         else:
             raise ValueError
+
+    elif (args.pde == "convection_steady_state"):
+        if (args.ppw is not None or args.kh is not None or args.nwaves is not None):
+            raise ValueError("Convection steady-stat has no wavenumber")
+        if args.d==3:
+            raise ValueError("Convection steady-state is 2D only")
+        if args.domain == "square":
+            curved_domain = False
+            b  = np.pi
+            op = pdo.PDO_2d(pdo.ones, pdo.ones, c1=pdo.const(c=b), c2=pdo.const(c=b))
+        else:
+            raise ValueError("Non-square domain geometries not supported on convection steady-state")
+
         
     elif args.pde == "convection_diffusion":
         if (args.ppw is not None):
