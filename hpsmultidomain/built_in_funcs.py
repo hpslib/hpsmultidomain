@@ -394,3 +394,21 @@ def convection_steady_state_body_load(xx):
                          + torch.cos(torch.pi*xx[:,0])*torch.sin(torch.pi*xx[:,1]))
 
     return f.unsqueeze(-1)
+
+def convection_steady_state_patch(xx):
+
+    f = torch.ones(xx.shape[0], 1)
+
+    midpatch = ((0.5 + 0.375) / 2) #(0.5 + 0.25) / 2
+    patch_width = 0.125
+
+    patch_indices_x = np.argwhere(np.abs(xx[:,0] - midpatch) <= (patch_width / 2)) # x between 0.25 and 0.5
+    patch_indices_y = np.argwhere(np.abs(xx[:,1] - midpatch) <= (patch_width / 2)) # y between 0.25 and 0.5
+
+    f[patch_indices_x] += 50
+    f[patch_indices_y] += 50
+
+    f[f < 100] = 1
+    f[f > 100] = 100
+
+    return f

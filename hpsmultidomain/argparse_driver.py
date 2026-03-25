@@ -177,7 +177,4 @@ if (args.pickle is not None):
 
 # Optional: visualization of computed solution
 if args.visualize:
-    if args.d == 2:
-        print("Warning: visualization for d=2 not yet implemented")
-    else:
-        visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh)
+    visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh, d=args.d)
