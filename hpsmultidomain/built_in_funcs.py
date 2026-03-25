@@ -382,3 +382,15 @@ def  sinsinh_test(p):
     Lx = 2
     solution = torch.sin(np.pi*k*p[:,1])*torch.sin(np.pi*k*p[:,2])*torch.sinh(np.sqrt(2)*k*np.pi*(Lx-p[:,0]))/np.sinh(np.sqrt(2)*k*np.pi*Lx)
     return solution.unsqueeze(-1)
+
+
+def convection_steady_state_manufactured(xx):
+    u = torch.sin(torch.pi * xx[:,0]) * torch.sin(torch.pi * xx[:,1])
+    return u.unsqueeze(-1)
+
+def convection_steady_state_body_load(xx):
+    f = (torch.pi**2) * (2*torch.sin(torch.pi*xx[:,0])*torch.sin(torch.pi*xx[:,1])
+                         + torch.sin(torch.pi*xx[:,0])*torch.cos(torch.pi*xx[:,1])
+                         + torch.cos(torch.pi*xx[:,0])*torch.sin(torch.pi*xx[:,1]))
+
+    return f.unsqueeze(-1)

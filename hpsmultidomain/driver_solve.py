@@ -87,9 +87,9 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
         if d == 3:
             raise ValueError("convection_steady_state is 3D only")
         if (args.pde == 'convection_steady_state'):
-            uu_dir    = lambda xx: torch.sin(torch.pi * xx[0]) * torch.sin(torch.pi * xx[1])
+            uu_dir    = lambda xx: convection_steady_state_manufactured(xx)
             known_sol = True
-            ff_body   = lambda xx: torch.pi ** 2 * (2*torch.sin(torch.pi*xx[0])*torch.sin(torch.pi*xx[1]) + torch.sin(torch.pi*xx[0])*torch.cos(torch.pi*xx[1]) + torch.cos(torch.pi*xx[0])*torch.sin(torch.pi*xx[1]))
+            ff_body   = lambda xx: convection_steady_state_body_load(xx)
         else:
             raise ValueError()
     elif (args.bc == 'convection_diffusion'):
