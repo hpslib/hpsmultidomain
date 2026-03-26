@@ -397,18 +397,23 @@ def convection_steady_state_body_load(xx):
 
 def convection_steady_state_patch(xx):
 
-    f = torch.ones(xx.shape[0], 1)
+    #f = torch.ones(xx.shape[0], 1)
+    #patch_lower = 0.375
+    #patch_upper = 0.5
+    #f[(xx[:,0] >= patch_lower) & (xx[:,0] <= patch_upper) & (xx[:,1] >= patch_lower) & (xx[:,1] <= patch_upper)] = 100
 
-    midpatch = ((0.5 + 0.375) / 2) #(0.5 + 0.25) / 2
-    patch_width = 0.125
+    f = torch.zeros(xx.shape[0], 1)
 
-    patch_indices_x = np.argwhere(np.abs(xx[:,0] - midpatch) <= (patch_width / 2)) # x between 0.25 and 0.5
-    patch_indices_y = np.argwhere(np.abs(xx[:,1] - midpatch) <= (patch_width / 2)) # y between 0.25 and 0.5
+    patch_size = 0.125
+    shift = 0
 
-    f[patch_indices_x] += 50
-    f[patch_indices_y] += 50
-
-    f[f < 100] = 1
-    f[f > 100] = 100
+    # Find which cell index each coordinate belongs to
+    cell_x = ((xx[:, 0] + shift) / patch_size).floor().long()
+    cell_y = ((xx[:, 1] + shift) / patch_size).floor().long()
+    
+    # Color cells where (cell_x + cell_y) is even, like a checkerboard
+    checkerboard_mask = ((cell_x + cell_y) % 2 == 0).unsqueeze(1)
+    
+    f[checkerboard_mask] = 100
 
     return f

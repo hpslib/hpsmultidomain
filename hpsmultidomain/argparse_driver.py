@@ -177,4 +177,4 @@ if (args.pickle is not None):
 
 # Optional: visualization of computed solution
 if args.visualize:
-    visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh, d=args.d)
+    visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh, d=args.d, f=convection_steady_state_patch)

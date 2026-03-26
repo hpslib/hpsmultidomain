@@ -10,7 +10,7 @@ plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
 # Several variables reuqire manual editing to get the best visual results
 # - such as center, interior, and the x, y, and z bounds
 
-def visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh=0, d=2):
+def visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh=0, d=2, f=None):
 
     center=np.array([0,0,0])
 
@@ -62,4 +62,15 @@ def visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh=0, d=2):
     plt.colorbar(sc, shrink=0.5)
     plt.rcParams['figure.figsize'] = [14, 6]
     #plt.savefig("3D-domain-faces-annulus-p18-h16x2x2.png")
+    plt.savefig("convection-checkerboard-p15-312.png")
     plt.show()
+
+    if f is not None:
+        fig2 = plt.figure(figsize=(12, 12))
+        ax2 = fig2.add_subplot()
+        sc2 = ax2.scatter(sequence_containing_x_vals, sequence_containing_y_vals, c=f(xx), marker='.', cmap="seismic") #, vmin=-max_result, vmax=max_result)
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.colorbar(sc2, shrink=0.5)
+        plt.rcParams['figure.figsize'] = [14, 6]
+        plt.show()
