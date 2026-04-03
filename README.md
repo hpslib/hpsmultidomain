@@ -50,6 +50,20 @@ The Hierarchical Poincaré-Steklov (HPS) Solver is a high-performance computing 
 3. Navigate to the repository directory and run `pip install .`. This will download hpsmultidomain itself as well as its dependencies.
 4. (Optional but recommended) Install `mpi4py` and `petsc4py` through either Conda or pip, since they generally give better performance than SuperLU.
 
+### (Optional but recommended) MUMPS via petsc4py:
+
+1. Install fortran into your environment if it's not there already: `conda install -c conda-forge gfortran`
+2. Set the proper petsc configure options:
+```export PETSC_CONFIGURE_OPTIONS="--with-64-bit-indices --download-mumps --with-debugging=0 --with-mpi=0 --with-mumps-serial --with-fortran-bindings=0 --download-metis --download-scotch --download-bison --download-flex"```
+This downloads `MUMPS` as well as `metis` for improved pivoting. This configuration does not provide MPI support (but still offers OpenMP, which is adequate for many workstations). It removes debugging and fortran bindings (but not compiled fortran) for performance.
+3. Install PETSc: `python -m pip install -v --no-binary=:all: --no-cache-dir petsc`
+4. Install petsc4py: `python -m pip install -v --no-build-isolation --no-binary=:all: --no-cache-dir petsc4py`
+
+YMMV depending on your machine. You may need to restrict the versions of pip and setuptools:
+`pip install -U "pip<26" "setuptools<75" wheel`
+and/or update cython:
+`python -m pip install --upgrade cython`
+
 ## Example usage
 For a 2D problem:
 ```
