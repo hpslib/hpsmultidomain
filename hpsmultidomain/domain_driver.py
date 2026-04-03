@@ -27,6 +27,14 @@ except ImportError:
     mumps_available = False
     print("python-mumps not available")
 
+# Attempting to import the python-mumps library for parallel computation, handling failure gracefully
+try:
+    import mumps
+    mumps_available = False
+except ImportError:
+    mumps_available = False
+    print("python-mumps not available")
+
 # Attempting to import the PETSc library for parallel computation, handling failure gracefully
 try:
     from petsc4py import PETSc
@@ -481,10 +489,13 @@ class Domain_Driver(AbstractHPSSolver):
     def build_factorize(self,solvertype,verbose):
         info_dict = dict()
         print("Trimmed the unnecessary parts to make A_CC, now assembly with PETSc (or maybe SuperLU)")
-        if (not petsc_available):
-            info_dict = self.build_superLU(verbose)
-        else:
+        if mumps_available:
+            info_dict = self.build_mumps(verbose)
+        elif petsc_available:
             info_dict = self.build_petsc(solvertype,verbose)
+        else:
+            info_dict = self.build_superLU(verbose)
+
         return info_dict
 
 
