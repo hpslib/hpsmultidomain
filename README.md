@@ -44,6 +44,12 @@ The Hierarchical Poincaré-Steklov (HPS) Solver is a high-performance computing 
 - [SciPy](https://scipy.org/): For sparse matrix operations and linear algebra.
 - [petsc4py](https://petsc.org/release/petsc4py/) (Optional): To use PETSc for sparse matrix operations. The solver can fall back to SciPy if petsc4py is not available. However, PETSc (particularly using the MUMPS direct solver) makes the code much faster.
 
+## Installation:
+1. Download the repository to your machine.
+2. (Recommended) create a clean Conda environment. Alternatively switch to the environment you wish to incorporate `hpsmultidomain` into.
+3. Navigate to the repository directory and run `pip install .`. This will download hpsmultidomain itself as well as its dependencies.
+4. (Optional but recommended) Install `mpi4py` and `petsc4py` through either Conda or pip, since they generally give better performance than SuperLU.
+
 ## Example usage
 For a 2D problem:
 ```
