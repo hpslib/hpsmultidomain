@@ -210,7 +210,7 @@ class ParametrizedGeometry2D(AbstractGeometry):
                 result = 0
                 for a, b in pairs:
                     if a is not None and b is not None:
-                        result += 2*np.multiply(a(yy), b(yy))
+                        result += 2*torch.multiply(a(yy), b(yy))
                 return result
 
         # Zeroth-order coefficient c(x) = bfield(yy, kh)
