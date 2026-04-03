@@ -75,28 +75,6 @@ def diag_mult(diag,M):
     """
     return (diag * M.T).T
 
-def get_loc_interp(x_cheb, x_cheb_nocorners, q):
-    """
-    Computes local interpolation matrices from Chebyshev points.
-    
-    Parameters:
-    - x_cheb: Chebyshev points including corner points
-    - x_cheb_nocorners: Chebyshev points excluding corner points
-    - q: The degree of the polynomial for interpolation
-    
-    Returns:
-    - Interp_loc: Local interpolation matrix
-    - err: Norm of the interpolation error
-    - cond: Condition number of the interpolation matrix
-    """
-    Vpoly_cheb = chebvander(x_cheb,q)
-    Vpoly_nocorner = chebvander(x_cheb_nocorners,q)
-
-    Interp_loc = np.linalg.lstsq(Vpoly_nocorner.T,Vpoly_cheb.T,rcond=None)[0].T
-    err  = np.linalg.norm(Interp_loc @ Vpoly_nocorner - Vpoly_cheb)
-    cond = np.linalg.cond(Interp_loc) 
-    return Interp_loc,err,cond
-
 def get_loc_interp_2d(p, q, l):
     """
     Computes local interpolation matrices from Chebyshev points.
@@ -149,27 +127,30 @@ def get_loc_interp_3d(p, q, l):
     - err: Norm of the interpolation error
     - cond: Condition number of the interpolation matrix
     """
-    _, croots  = cheb(p-1)
-    croots     = np.flip(croots)
-    croots2d   = np.array([np.repeat(croots, p), np.hstack([croots]*p)])
-    lcoeff     = np.zeros(q+1)
-    lcoeff[-1] = 1
+    _, croots1 = cheb(p[0]-1)
+    _, croots2 = cheb(p[1]-1)
+    croots1    = np.flip(croots1)
+    croots2    = np.flip(croots2)
+    croots2d   = np.array([np.repeat(croots1, p[1]), np.hstack([croots2]*p[0])])
 
-    #print(get_legendre_row(0, croots))
-
-    lroots   = legendre.legroots(lcoeff)
+    lcoeff1     = np.zeros(q[0]+1)
+    lcoeff2     = np.zeros(q[1]+1)
+    lcoeff1[-1] = 1
+    lcoeff2[-1] = 1
+    lroots1     = legendre.legroots(lcoeff1)
+    lroots2     = legendre.legroots(lcoeff2)
     #lroots[1:-1] = croots[1:-1]
-    lroots2d = np.array([np.repeat(lroots, q), np.hstack([lroots]*q)])
+    lroots2d = np.array([np.repeat(lroots1, q[1]), np.hstack([lroots2]*q[0])])
 
     # Vandermonde-based approach:
 
     # Vandermonde-based approach with Chebyshev expansion coefficients:
-    ChebVc = chebvander2d(croots2d[0], croots2d[1], (l,l))
-    ChebVl = chebvander2d(lroots2d[0], lroots2d[1], (l,l))
+    ChebVc = chebvander2d(croots2d[0], croots2d[1], (l[0],l[1]))
+    ChebVl = chebvander2d(lroots2d[0], lroots2d[1], (l[0],l[1]))
 
     # Vandermonde-based approach with Gaussian expansion coefficients:
-    GaussVc = legvander2d(croots2d[0], croots2d[1], (q,q))
-    GaussVl = legvander2d(lroots2d[0], lroots2d[1], (q,q))
+    GaussVc = legvander2d(croots2d[0], croots2d[1], (q[0],q[1]))
+    GaussVl = legvander2d(lroots2d[0], lroots2d[1], (q[0],q[1]))
 
     Interp_loc_CtG = np.linalg.lstsq(ChebVc.T,ChebVl.T,rcond=None)[0].T
     Interp_loc_GtC = np.linalg.lstsq(GaussVl.T,GaussVc.T,rcond=None)[0].T
@@ -181,23 +162,25 @@ def get_loc_interp_3d(p, q, l):
 #################################### 2D discretization ##########################################
 
 def cheb_2d(a,p):
-    D,xvec = cheb(p-1)
-    xvec1 = a[0] * np.flip(xvec)
-    xvec2 = a[1] * np.flip(xvec)
+    D_axis1, xvec1 = cheb(p[0]-1)
+    D_axis2, xvec2 = cheb(p[1]-1)
+    xvec1 = a[0] * np.flip(xvec1)
+    xvec2 = a[1] * np.flip(xvec2)
 
-    D_axis1 = (1/a[0]) * D
-    D_axis2 = (1/a[1]) * D
-    I = np.eye(p)
+    D_axis1 = (1/a[0]) * D_axis1
+    D_axis2 = (1/a[1]) * D_axis2
+    I1 = np.eye(p[0])
+    I2 = np.eye(p[1])
 
-    D1 = -np.kron(D_axis1,I)
-    D2 = -np.kron(I,D_axis2)
+    D1 = -np.kron(D_axis1,I2)
+    D2 = -np.kron(I1,D_axis2)
 
-    D11 = np.kron(D_axis1 @ D_axis1, I)
-    D22 = np.kron(I, D_axis2 @ D_axis2)
+    D11 = np.kron(D_axis1 @ D_axis1, I2)
+    D22 = np.kron(I1, D_axis2 @ D_axis2)
     D12 = np.kron(D_axis1, D_axis2)
 
-    zz1 = np.repeat(xvec1,p)
-    zz2 = np.repeat(xvec2,p).reshape(-1,p).T.flatten()
+    zz1 = np.repeat(xvec1,p[1])
+    zz2 = np.repeat(xvec2,p[0]).reshape(-1,p[0]).T.flatten()
     zz = np.vstack((zz1,zz2))
     Ds = Ds_2d(D1= D1, D2= D2, D11= D11, D22= D22, D12= D12)
     return zz, Ds 
@@ -207,16 +190,17 @@ def gauss_2d(a,p):
     Given polynomial order p and element size a,
     returns Gaussian collocation points on [-a,a]^3
     """
-    xvec  = gauss(p) # should this be p? We need p+1 points for a degree p polynomial
-    xvec1 = a[0] * xvec
-    xvec2 = a[1] * xvec
+    xvec1  = gauss(p[0])
+    xvec2  = gauss(p[1])
+    xvec1 = a[0] * xvec1
+    xvec2 = a[1] * xvec2
 
     # TODO: get the proper components D1, D2, D3, D11, D22, D33, D12, D13, D23
     # Note that Kronecker product is associative
     # Could replace some of these with np.eye(p**2)
 
-    zz1 = np.repeat(xvec1,p)
-    zz2 = np.repeat(xvec2,p).reshape(-1,p).T.flatten()
+    zz1 = np.repeat(xvec1,p[1])
+    zz2 = np.repeat(xvec2,p[0]).reshape(-1,p[0]).T.flatten()
     zz  = np.vstack((zz1,zz2))
 
     return zz
@@ -230,7 +214,7 @@ def leaf_discretization_2d(a,p,q):
     zz,Ds = cheb_2d(a,p)
     zzG   = gauss_2d(a,q)
 
-    hmin0 = zz[0,p] - zz[0,0]
+    hmin0 = zz[0,p[1]] - zz[0,0]
     hmin1 = zz[1,1] - zz[1,0]
 
     # Jl, Jr, Jd, Ju are RLDU as expected, with no corners
@@ -239,26 +223,26 @@ def leaf_discretization_2d(a,p,q):
     Jc0   = np.abs(zz[0,:]) < a[0] - 0.5*hmin0
     Jc1   = np.abs(zz[1,:]) < a[1] - 0.5*hmin1
     Jl    = np.argwhere(np.logical_and(zz[0,:] < - a[0] + 0.5 * hmin0, Jc1))
-    Jl    = Jl.copy().reshape((p-2),)
+    Jl    = Jl.copy().reshape((p[1]-2),)
     Jr    = np.argwhere(np.logical_and(zz[0,:] > + a[0] - 0.5 * hmin0, Jc1))
-    Jr    = Jr.copy().reshape((p-2),)
+    Jr    = Jr.copy().reshape((p[1]-2),)
     Jd    = np.argwhere(np.logical_and(zz[1,:] < - a[1] + 0.5 * hmin1, Jc0))
-    Jd    = Jd.copy().reshape((p-2),)
+    Jd    = Jd.copy().reshape((p[0]-2),)
     Ju    = np.argwhere(np.logical_and(zz[1,:] > + a[1] - 0.5 * hmin1, Jc0))
-    Ju    = Ju.copy().reshape((p-2),)
+    Ju    = Ju.copy().reshape((p[0]-2),)
 
     Jc    = np.argwhere(np.logical_and(Jc0, Jc1))
-    Jc    = Jc.copy().reshape((p-2)**2,)
+    Jc    = Jc.copy().reshape((p[0]-2)*(p[1]-2),)
     Jx    = np.concatenate((Jl,Jr,Jd,Ju))
 
     Jl_corner    = np.argwhere(zz[0,:] < - a[0] + 0.5 * hmin0)
-    Jl_corner    = Jl_corner.copy().reshape(p,)
+    Jl_corner    = Jl_corner.copy().reshape(p[1],)
     Jr_corner    = np.argwhere(zz[0,:] > + a[0] - 0.5 * hmin0)
-    Jr_corner    = Jr_corner.copy().reshape(p,)
+    Jr_corner    = Jr_corner.copy().reshape(p[1],)
     Jd_corner    = np.argwhere(zz[1,:] < - a[1] + 0.5 * hmin1)
-    Jd_corner    = Jd_corner.copy().reshape(p,)
+    Jd_corner    = Jd_corner.copy().reshape(p[0],)
     Ju_corner    = np.argwhere(zz[1,:] > + a[1] - 0.5 * hmin1)
-    Ju_corner    = Ju_corner.copy().reshape(p,)
+    Ju_corner    = Ju_corner.copy().reshape(p[0],)
 
     # TODO: figure out corners / switch to Legendre for this
     Jxreorder = np.concatenate((Jl_corner,Jr_corner,Jd_corner,Ju_corner))
@@ -269,21 +253,21 @@ def leaf_discretization_2d(a,p,q):
     a_gauss0 = np.max(zzG[0,:])
     a_gauss1 = np.max(zzG[1,:])
     Jl_gauss = np.argwhere(zzG[0,:] < - a_gauss0 + 0.5 * hmin0)
-    Jl_gauss = Jl_gauss.copy().reshape(q,)
+    Jl_gauss = Jl_gauss.copy().reshape(q[1],)
     Jr_gauss = np.argwhere(zzG[0,:] > + a_gauss0 - 0.5 * hmin0)
-    Jr_gauss = Jr_gauss.copy().reshape(q,)
+    Jr_gauss = Jr_gauss.copy().reshape(q[1],)
     Jd_gauss = np.argwhere(zzG[1,:] < - a_gauss1 + 0.5 * hmin1)
-    Jd_gauss = Jd_gauss.copy().reshape(q,)
+    Jd_gauss = Jd_gauss.copy().reshape(q[0],)
     Ju_gauss = np.argwhere(zzG[1,:] > + a_gauss1 - 0.5 * hmin1)
-    Ju_gauss = Ju_gauss.copy().reshape(q,)
+    Ju_gauss = Ju_gauss.copy().reshape(q[0],)
     Jgauss = np.concatenate((Jl_gauss,Jr_gauss,Jd_gauss,Ju_gauss))
     zzG = zzG.T[Jgauss,:]
     # Need to do a little surface cleaning to make sure the faces of our Gaussian box 
     # line up with the faces of our Chebyshev box:
-    zzG[:q,0]      = -a[0]
-    zzG[q:2*q,0]   =  a[0]
-    zzG[2*q:3*q,1] = -a[1]
-    zzG[3*q:4*q,1] =  a[1]
+    zzG[:q[1],0]                     = -a[0]
+    zzG[q[1]:2*q[1],0]               =  a[0]
+    zzG[2*q[1]:2*q[1]+q[0],1]        = -a[1]
+    zzG[2*q[1]+q[0]:2*q[1]+2*q[0],1] =  a[1]
 
     JJ    = JJ_2d(Jl= Jl, Jr= Jr, Ju= Ju, Jd= Jd, Jx=Jx,
                   Jlc=Jl_corner, Jrc=Jr_corner, Jdc=Jd_corner, Juc=Ju_corner,
@@ -301,32 +285,38 @@ def cheb_3d(a,p):
     Given polynomial order p and element size a,
     returns chebyshev collocation points on [-a,a]^3 and corresponding differentiation operators.
     """
-    D,xvec = cheb(p-1) # should this be p? We need p+1 points for a degree p polynomial
-    xvec1 = a[0] * np.flip(xvec)
-    xvec2 = a[1] * np.flip(xvec)
-    xvec3 = a[2] * np.flip(xvec)
+    D_axis1, xvec1 = cheb(p[0]-1)
+    D_axis2, xvec2 = cheb(p[1]-1)
+    D_axis3, xvec3 = cheb(p[2]-1)
+    xvec1 = a[0] * np.flip(xvec1)
+    xvec2 = a[1] * np.flip(xvec2)
+    xvec3 = a[2] * np.flip(xvec3)
 
-    D_axis1 = (1/a[0]) * D
-    D_axis2 = (1/a[1]) * D
-    D_axis3 = (1/a[2]) * D
+    D_axis1 = (1/a[0]) * D_axis1
+    D_axis2 = (1/a[1]) * D_axis2
+    D_axis3 = (1/a[2]) * D_axis3
 
-    I = np.eye(p)
-    D1 = -np.kron(D_axis1, np.kron(I, I))
-    D2 = -np.kron(I, np.kron(D_axis2, I))
-    D3 = -np.kron(I, np.kron(I, D_axis3))
+    I1 = np.eye(p[0])
+    I2 = np.eye(p[1])
+    I3 = np.eye(p[2])
 
-    D11 = np.kron(D_axis1 @ D_axis1, np.kron(I, I))
-    D22 = np.kron(I, np.kron(D_axis2 @ D_axis2, I))
-    D33 = np.kron(I, np.kron(I, D_axis3 @ D_axis3))
+    D1 = -np.kron(np.kron(D_axis1, I2), I3)
+    D2 = -np.kron(np.kron(I1, D_axis2), I3)
+    D3 = -np.kron(np.kron(I1, I2), D_axis3)
 
-    D12 = np.kron(D_axis1, np.kron(D_axis2, I))
-    D13 = np.kron(D_axis1, np.kron(I, D_axis3))
-    D23 = np.kron(I, np.kron(D_axis2, D_axis3))
+    D11 = np.kron(np.kron(D_axis1 @ D_axis1, I2), I3)
+    D22 = np.kron(np.kron(I1, D_axis2 @ D_axis2), I3)
+    D33 = np.kron(np.kron(I1, I2), D_axis3 @ D_axis3)
 
-    zz1 = np.repeat(xvec1,p**2)
-    zz2 = np.repeat(xvec2,p**2).reshape(-1,p).T.flatten()
-    zz3 = np.repeat(xvec3,p**2).reshape(-1,p**2).T.flatten()
+    D12 = np.kron(np.kron(D_axis1, D_axis2), I3)
+    D13 = np.kron(np.kron(D_axis1, I2), D_axis3)
+    D23 = np.kron(np.kron(I1, D_axis2), D_axis3)
+
+    zz1 = np.repeat(xvec1,p[1]*p[2])
+    zz2 = np.repeat(xvec2,p[0]*p[2]).reshape(-1,p[0]).T.flatten()
+    zz3 = np.repeat(xvec3,p[0]*p[1]).reshape(-1,p[0]*p[1]).T.flatten()
     zz  = np.vstack((zz1,zz2,zz3))
+
     Ds  = Ds_3d(D1=D1, D2=D2, D3=D3, D11=D11, D22=D22, D33=D33, D12=D12, D13=D13, D23=D23)
 
     return zz, Ds
@@ -336,18 +326,20 @@ def gauss_3d(a,p):
     Given polynomial order p and element size a,
     returns Gaussian collocation points on [-a,a]^3
     """
-    xvec  = gauss(p) # should this be p? We need p+1 points for a degree p polynomial
-    xvec1 = a[0] * xvec
-    xvec2 = a[1] * xvec
-    xvec3 = a[2] * xvec
+    xvec1  = gauss(p[0])
+    xvec2  = gauss(p[1])
+    xvec3  = gauss(p[2])
+    xvec1 = a[0] * xvec1
+    xvec2 = a[1] * xvec2
+    xvec3 = a[2] * xvec3
 
     # TODO: get the proper components D1, D2, D3, D11, D22, D33, D12, D13, D23
     # Note that Kronecker product is associative
     # Could replace some of these with np.eye(p**2)
 
-    zz1 = np.repeat(xvec1,p**2)
-    zz2 = np.repeat(xvec2,p**2).reshape(-1,p).T.flatten()
-    zz3 = np.repeat(xvec3,p**2).reshape(-1,p**2).T.flatten()
+    zz1 = np.repeat(xvec1,p[1]*p[2])
+    zz2 = np.repeat(xvec2,p[0]*p[2]).reshape(-1,p[0]).T.flatten()
+    zz3 = np.repeat(xvec3,p[0]*p[1]).reshape(-1,p[0]*p[1]).T.flatten()
     zz  = np.vstack((zz1,zz2,zz3))
 
     return zz
@@ -361,9 +353,9 @@ def leaf_discretization_3d(a,p,q):
     zz,Ds = cheb_3d(a,p)
     zzG   = gauss_3d(a,q)
 
-    hmin0 = zz[0,p**2] - zz[0,0]
-    hmin1 = zz[1,p]    - zz[1,0]
-    hmin2 = zz[2,1]    - zz[2,0]
+    hmin0 = zz[0,p[1]*p[2]] - zz[0,0]
+    hmin1 = zz[1,p[2]]      - zz[1,0]
+    hmin2 = zz[2,1]         - zz[2,0]
 
     # Jl, Jr, Jd, Ju are RLDU as expected, with no corners
     # Jc is interior, Jx is all boundaries without corners
@@ -373,38 +365,38 @@ def leaf_discretization_3d(a,p,q):
     Jc2   = np.abs(zz[2,:]) < a[2] - 0.5*hmin2
     Jl    = np.argwhere(np.logical_and(zz[0,:] < - a[0] + 0.5 * hmin0,
                                             np.logical_and(Jc1,Jc2)))
-    Jl    = Jl.copy().reshape((p-2)**2,)
+    Jl    = Jl.copy().reshape((p[1]-2)*(p[2]-2),)
     Jr    = np.argwhere(np.logical_and(zz[0,:] > + a[0] - 0.5 * hmin0,
                                             np.logical_and(Jc1,Jc2)))
-    Jr    = Jr.copy().reshape((p-2)**2,)
+    Jr    = Jr.copy().reshape((p[1]-2)*(p[2]-2),)
     Jd    = np.argwhere(np.logical_and(zz[1,:] < - a[1] + 0.5 * hmin1,
                                             np.logical_and(Jc0,Jc2)))
-    Jd    = Jd.copy().reshape((p-2)**2,)
+    Jd    = Jd.copy().reshape((p[0]-2)*(p[2]-2),)
     Ju    = np.argwhere(np.logical_and(zz[1,:] > + a[1] - 0.5 * hmin1,
                                             np.logical_and(Jc0,Jc2)))
-    Ju    = Ju.copy().reshape((p-2)**2,)
+    Ju    = Ju.copy().reshape((p[0]-2)*(p[2]-2),)
     Jb    = np.argwhere(np.logical_and(zz[2,:] < - a[2] + 0.5 * hmin2,
                                             np.logical_and(Jc0,Jc1)))
-    Jb    = Jb.copy().reshape((p-2)**2,)
+    Jb    = Jb.copy().reshape((p[0]-2)*(p[1]-2),)
     Jf    = np.argwhere(np.logical_and(zz[2,:] > + a[2] - 0.5 * hmin2,
                                             np.logical_and(Jc0,Jc1)))
-    Jf    = Jf.copy().reshape((p-2)**2,)
+    Jf    = Jf.copy().reshape((p[0]-2)*(p[1]-2),)
     Jc    = np.argwhere(np.logical_and(Jc0, np.logical_and(Jc1,Jc2)))
-    Jc    = Jc.copy().reshape((p-2)**3,)
+    Jc    = Jc.copy().reshape((p[0]-2)*(p[1]-2)*(p[2]-2),)
     Jx    = np.concatenate((Jl,Jr,Jd,Ju,Jb,Jf))
 
     Jl_corner    = np.argwhere(zz[0,:] < - a[0] + 0.5 * hmin0)
-    Jl_corner    = Jl_corner.copy().reshape(p**2,)
+    Jl_corner    = Jl_corner.copy().reshape(p[1]*p[2],)
     Jr_corner    = np.argwhere(zz[0,:] > + a[0] - 0.5 * hmin0)
-    Jr_corner    = Jr_corner.copy().reshape(p**2,)
+    Jr_corner    = Jr_corner.copy().reshape(p[1]*p[2],)
     Jd_corner    = np.argwhere(zz[1,:] < - a[1] + 0.5 * hmin1)
-    Jd_corner    = Jd_corner.copy().reshape(p**2,)
+    Jd_corner    = Jd_corner.copy().reshape(p[0]*p[2],)
     Ju_corner    = np.argwhere(zz[1,:] > + a[1] - 0.5 * hmin1)
-    Ju_corner    = Ju_corner.copy().reshape(p**2,)
+    Ju_corner    = Ju_corner.copy().reshape(p[0]*p[2],)
     Jb_corner    = np.argwhere(zz[2,:] < - a[2] + 0.5 * hmin2)
-    Jb_corner    = Jb_corner.copy().reshape(p**2,)
+    Jb_corner    = Jb_corner.copy().reshape(p[0]*p[1],)
     Jf_corner    = np.argwhere(zz[2,:] > + a[2] - 0.5 * hmin2)
-    Jf_corner    = Jf_corner.copy().reshape(p**2,)
+    Jf_corner    = Jf_corner.copy().reshape(p[0]*p[1],)
 
     # TODO: figure out corners / switch to Legendre for this
     Jxreorder = np.concatenate((Jl_corner,Jr_corner,Jd_corner,Ju_corner,Jb_corner,Jf_corner))
@@ -416,27 +408,27 @@ def leaf_discretization_3d(a,p,q):
     a_gauss1 = np.max(zzG[1,:])
     a_gauss2 = np.max(zzG[2,:])
     Jl_gauss = np.argwhere(zzG[0,:] < - a_gauss0 + 0.5 * hmin0)
-    Jl_gauss = Jl_gauss.copy().reshape(q**2,)
+    Jl_gauss = Jl_gauss.copy().reshape(q[1]*q[2],)
     Jr_gauss = np.argwhere(zzG[0,:] > + a_gauss0 - 0.5 * hmin0)
-    Jr_gauss = Jr_gauss.copy().reshape(q**2,)
+    Jr_gauss = Jr_gauss.copy().reshape(q[1]*q[2],)
     Jd_gauss = np.argwhere(zzG[1,:] < - a_gauss1 + 0.5 * hmin1)
-    Jd_gauss = Jd_gauss.copy().reshape(q**2,)
+    Jd_gauss = Jd_gauss.copy().reshape(q[0]*q[2],)
     Ju_gauss = np.argwhere(zzG[1,:] > + a_gauss1 - 0.5 * hmin1)
-    Ju_gauss = Ju_gauss.copy().reshape(q**2,)
+    Ju_gauss = Ju_gauss.copy().reshape(q[0]*q[2],)
     Jb_gauss = np.argwhere(zzG[2,:] < - a_gauss2 + 0.5 * hmin2)
-    Jb_gauss = Jb_gauss.copy().reshape(q**2,)
+    Jb_gauss = Jb_gauss.copy().reshape(q[0]*q[1],)
     Jf_gauss = np.argwhere(zzG[2,:] > + a_gauss2 - 0.5 * hmin2)
-    Jf_gauss = Jf_gauss.copy().reshape(q**2,)
+    Jf_gauss = Jf_gauss.copy().reshape(q[0]*q[1],)
     Jgauss = np.concatenate((Jl_gauss,Jr_gauss,Jd_gauss,Ju_gauss,Jb_gauss,Jf_gauss))
     zzG = zzG.T[Jgauss,:]
     # Need to do a little surface cleaning to make sure the faces of our Gaussian box 
     # line up with the faces of our Chebyshev box:
-    zzG[:q**2,0]         = -a[0]
-    zzG[q**2:2*q**2,0]   =  a[0]
-    zzG[2*q**2:3*q**2,1] = -a[1]
-    zzG[3*q**2:4*q**2,1] =  a[1]
-    zzG[4*q**2:5*q**2,2] = -a[2]
-    zzG[5*q**2:,2]       =  a[2]
+    zzG[:q[1]*q[2],0]                                                      = -a[0]
+    zzG[q[1]*q[2]:2*q[1]*q[2],0]                                           =  a[0]
+    zzG[2*q[1]*q[2]:2*q[1]*q[2] + q[0]*q[2],1]                             = -a[1]
+    zzG[2*q[1]*q[2] + q[0]*q[2]:2*q[1]*q[2] + 2*q[0]*q[2],1]               =  a[1]
+    zzG[2*q[1]*q[2] + 2*q[0]*q[2]:2*q[1]*q[2] + 2*q[0]*q[2] + q[0]*q[1],2] = -a[2]
+    zzG[2*q[1]*q[2] + 2*q[0]*q[2] + q[0]*q[1]:,2]                          =  a[2]
 
     JJ    = JJ_3d(Jl= Jl, Jr= Jr, Ju= Ju, Jd= Jd, Jb= Jb, Jf=Jf, Jx=Jx,
                   Jlc=Jl_corner, Jrc=Jr_corner, Jdc=Jd_corner,
@@ -520,9 +512,10 @@ class HPS_Disc:
         if self.d==2:
             tic = time()
             l = p
-            Interp_loc_GtC,Interp_loc_CtG,err,cond = get_loc_interp_2d(p, q, l)
-            self.Interp_mat         = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_GtC,0),4,axis=0))
-            self.Interp_mat_reverse = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_CtG,0),4,axis=0))
+            Interp_loc_GtC_1,Interp_loc_CtG_1,err,cond = get_loc_interp_2d(p[1], q[1], l[1])
+            Interp_loc_GtC_2,Interp_loc_CtG_2,err,cond = get_loc_interp_2d(p[0], q[0], l[0])
+            self.Interp_mat         = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_GtC_1,0),2,axis=0),*np.repeat(np.expand_dims(Interp_loc_GtC_2,0),2,axis=0))
+            self.Interp_mat_reverse = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_CtG_1,0),2,axis=0),*np.repeat(np.expand_dims(Interp_loc_CtG_2,0),2,axis=0),)
 
             # Form averaging operator P. Currently we have two approaches, one is local averaging (P)
             # and the other is orthogonal projection (Pnew):
@@ -555,9 +548,17 @@ class HPS_Disc:
         else:
             tic = time()
             l = p #min(p,q) + 10
-            Interp_loc_GtC,Interp_loc_CtG,err,cond = get_loc_interp_3d(p, q, l)
-            self.Interp_mat         = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_GtC,0),6,axis=0))
-            self.Interp_mat_reverse = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_CtG,0),6,axis=0))
+            Interp_loc_GtC1,Interp_loc_CtG1,err,cond = get_loc_interp_3d([p[1], p[2]], [q[1], q[2]], [l[1], l[2]])
+            Interp_loc_GtC2,Interp_loc_CtG2,err,cond = get_loc_interp_3d([p[0], p[2]], [q[0], q[2]], [l[0], l[2]])
+            Interp_loc_GtC3,Interp_loc_CtG3,err,cond = get_loc_interp_3d([p[0], p[1]], [q[0], q[1]], [l[0], l[1]])
+
+            self.Interp_mat         = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_GtC1,0),2,axis=0),
+                                                              *np.repeat(np.expand_dims(Interp_loc_GtC2,0),2,axis=0),
+                                                              *np.repeat(np.expand_dims(Interp_loc_GtC3,0),2,axis=0))
+
+            self.Interp_mat_reverse = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_CtG1,0),2,axis=0),
+                                                              *np.repeat(np.expand_dims(Interp_loc_CtG2,0),2,axis=0),
+                                                              *np.repeat(np.expand_dims(Interp_loc_CtG3,0),2,axis=0))
 
             # Form averaging operator P. Currently we have two approaches, one is local averaging (P)
             # and the other is orthogonal projection (Pnew):

@@ -1,10 +1,10 @@
 import torch
 import numpy as np
 
-from hps.geom import ParametrizedGeometry2D, ParametrizedGeometry3D
-from hps.domain_driver import Domain_Driver
+from hpsmultidomain.geom import ParametrizedGeometry2D, ParametrizedGeometry3D
+from hpsmultidomain.domain_driver import Domain_Driver
 
-from hps.built_in_funcs import uu_dir_func_greens
+from hpsmultidomain.built_in_funcs import uu_dir_func_greens
 
 def test_hps_multidomain_curved_2d(sparse_assembly='reduced_gpu',solver_type='MUMPS'):
 
@@ -51,6 +51,7 @@ def test_hps_multidomain_curved_2d(sparse_assembly='reduced_gpu',solver_type='MU
 
     solver = Domain_Driver(param_geom, pdo_mod, 0, a, p=p, d=2)
     solver.build(sparse_assembly, solver_type,verbose=False)
+    solver.build_factorize(solver_type, True)
     relerr = solver.verify_discretization(kh)
     assert relerr < 1e-6, f"Relative error too high in 2D: {relerr:.2e}"
     print("Relative error for box interfaces: ", relerr)

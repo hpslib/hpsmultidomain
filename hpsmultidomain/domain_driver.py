@@ -3,7 +3,8 @@ import numpy as np  # For numerical operations, especially those not directly su
 import sys  # System-specific parameters and functions
 
 # Importing parent class:
-from abstract_hps_solver import AbstractHPSSolver
+from hpsmultidomain.abstract_hps_solver import AbstractHPSSolver
+import hpsmultidomain.pdo as pdo
 
 # Importing necessary components for sparse matrix operations
 from scipy.sparse import kron, diags, block_diag, eye as speye, hstack as sp_hstack
@@ -12,11 +13,20 @@ from time import time  # For timing operations
 torch.set_default_dtype(torch.double)  # Setting default tensor type to double for precision
 
 # Import custom modules for handling multidomain discretization and partial differential operators
-import hps_multidomain_disc
-import pdo
+import hpsmultidomain.hps_multidomain_disc
+import hpsmultidomain.pdo
 from functools import reduce  # For performing cumulative operations
 import scipy.sparse.linalg as sla  # For sparse linear algebra operations, alternative variable
-from built_in_funcs import uu_dir_func_greens
+from hpsmultidomain.built_in_funcs import uu_dir_func_greens
+from hpsmultidomain.sparse_utils import SparseSolver
+
+# Attempting to import the python-mumps library for parallel computation, handling failure gracefully
+try:
+    import mumps
+    mumps_available = True
+except ImportError:
+    mumps_available = False
+    print("python-mumps not available")
 
 # Attempting to import the python-mumps library for parallel computation, handling failure gracefully
 try:
@@ -37,11 +47,11 @@ try:
     # Set relative threshold for numerical pivoting:
     #PETSc.Options()['mat_mumps_cntl_1'] = 0.0
     # Set matrix permutation. 7 is automatically decided, 1-6 are different choices.
-    PETSc.Options()['mat_mumps_icntl_6']  = 7
-    PETSc.Options()['mat_mumps_icntl_8']  = 77 # Scaling strategy, set to be automatically picked
-    PETSc.Options()['mat_mumps_icntl_10'] = 0 # No iterative refinement
-    PETSc.Options()['mat_mumps_icntl_12'] = 1 # Ordering strategy with icntl 6
-    PETSc.Options()['mat_mumps_icntl_13'] = 0 # Parallel factorization of root node
+    #PETSc.Options()['mat_mumps_icntl_6']  = 7
+    #PETSc.Options()['mat_mumps_icntl_8']  = 77 # Scaling strategy, set to be automatically picked
+    #PETSc.Options()['mat_mumps_icntl_10'] = 0 # No iterative refinement
+    #PETSc.Options()['mat_mumps_icntl_12'] = 1 # Ordering strategy with icntl 6
+    #PETSc.Options()['mat_mumps_icntl_13'] = 0 # Parallel factorization of root node
     petsc_available = True
 except ImportError:
     petsc_available = False
@@ -80,7 +90,6 @@ def apply_sparse_lowmem(A, I, J, v, transpose=False):
     Returns:
     - The resulting vector after applying A (or A^T if transpose=True) to v, extracting indices I.
     """
-
     vec_full = torch.zeros(A.shape[1], v.shape[-1])
     vec_full[J] = v
     vec_full = A.T @ vec_full if transpose else A @ vec_full
@@ -106,10 +115,7 @@ class Domain_Driver(AbstractHPSSolver):
         self.periodic_bc  = periodic_bc
         self.box_geometry = box_geom # The full BoxGeometry object
         self.box_geom     = self.box_geometry.bounds.T # The array itself
-        assert p > 0
         self.hps_disc(self.box_geom,a,p,d,pdo_op,periodic_bc)
-
-        print("n is:", self.hps.n)
 
     ################### Required functions for parent class AbstractHPSSolver #####################
 
@@ -139,7 +145,7 @@ class Domain_Driver(AbstractHPSSolver):
         """
         Flattened array of coordinates for all discretization (including interiors) nodes:
         """
-        return self.XXfull_reshape
+        return self._XXfull
        
     @property 
     def p(self):
@@ -153,14 +159,14 @@ class Domain_Driver(AbstractHPSSolver):
         """
         Index array for interior (duplicated interface) points in the global boundary ordering.
         """
-        return self.I_Ctot #self.hps.I_copy1
+        return self._Ji # aka self.I_Ctot
 
     @property
     def Jx(self):
         """
         Index array for unique exterior (non-duplicated) boundary points.
         """
-        return self.I_Xtot
+        return self._Jx # aka self.I_Xtot
 
     @property
     def npoints_dim(self):
@@ -168,6 +174,10 @@ class Domain_Driver(AbstractHPSSolver):
         Total number of Chebyshev points per dimension (npan_dim * p for each dimension).
         """
         return self.hps.n * self.p
+
+    @property
+    def npan_dim(self):
+        return self.hps.n
 
     #################################################
     # Abstract properties defining Schur complement blocks
@@ -233,6 +243,43 @@ class Domain_Driver(AbstractHPSSolver):
         relerr = err / np.linalg.norm(uu_true, ord=2)
         return relerr
 
+    #################################################
+    # Setup and retrieve a solver for the Aii block
+    #################################################
+
+    def setup_solver_Aii(self, solve_op=None, use_approx=False):
+        """
+        Initialize a linear solver for the Aii block. If solve_op is provided,
+        use it directly. Otherwise, create a SparseSolver on Aii.
+
+        Parameters:
+        - solve_op:   Optionally, a pre‐constructed LinearOperator for Aii^{-1}.
+        - use_approx: If True and PETSc is available, use an approximate iterative solver.
+        """
+        sparse_solver = SparseSolver(self.Aii, use_approx=use_approx)
+        if solve_op is None:
+            # Build a new SparseSolver on Aii; solver_Aii property will wrap it
+            self.solve_op = sparse_solver.solve_op
+        else:
+            self.solve_op = solve_op
+
+        if mumps_available:
+            self.mumps_LU = sparse_solver.ksp
+        elif petsc_available:
+            self.petsc_LU = sparse_solver.ksp
+        else:
+            self.superLU = sparse_solver.ksp
+
+    @property
+    def solver_Aii(self):
+        """
+        Return the LinearOperator that applies Aii^{-1}. If not yet set up,
+        call setup_solver_Aii with default parameters.
+        """
+        if not hasattr(self, 'solve_op'):
+            self.setup_solver_Aii()
+        return self.solve_op
+
             
     ############################### HPS discretization and panel split #####################
     def hps_disc(self,box_geom,a,p,d,pdo_op,periodic_bc):
@@ -240,7 +287,14 @@ class Domain_Driver(AbstractHPSSolver):
         if isinstance(a, (int, float)):
             a = np.array([a] * d)
 
-        HPS_multi = hps_multidomain_disc.HPS_Multidomain(pdo_op,box_geom,a,p,d, periodic_bc=periodic_bc)
+        if isinstance(p, (int)):
+            p = [p] * d
+
+        p = np.array(p)
+
+        assert p.all() > 0
+
+        HPS_multi = hpsmultidomain.hps_multidomain_disc.HPS_Multidomain(pdo_op,box_geom,a,p,d, periodic_bc=periodic_bc)
 
         self.hps = HPS_multi
 
@@ -298,7 +352,10 @@ class Domain_Driver(AbstractHPSSolver):
         # Note that I_Xtot and I_Ctot are both out of all XX, not just the unique
         # boundaries.
 
-        self.XXfull_reshape = torch.reshape(self.hps.grid_xx, (self.hps.grid_xx.shape[0] * self.hps.grid_xx.shape[1], -1))
+        self._XXfull = torch.reshape(self.hps.grid_xx, (self.hps.grid_xx.shape[0] * self.hps.grid_xx.shape[1], -1))
+
+        self._Ji = self.I_Ctot
+        self._Jx = self.I_Xtot
             
     
     def build_superLU(self,verbose):
@@ -320,7 +377,9 @@ class Domain_Driver(AbstractHPSSolver):
                       % (toc_superLU))
                 print("\t--total memory = %5.2f GB"\
                       % (stor_superLU))
-            self.superLU = LU
+
+            self.superLU    = LU
+            #self.solver_Aii = self.superLU
 
             info_dict['toc_build_superLU'] = toc_superLU
             info_dict['toc_build_blackbox']= toc_superLU
@@ -341,8 +400,8 @@ class Domain_Driver(AbstractHPSSolver):
         #
 
         # Set the blocksize using icntl(15) to the size of a face (q**2)
-        if self.d==3:
-            PETSc.Options()['mat_mumps_icntl_15'] = -self.hps.q**2
+        #if self.d==3:
+        #    PETSc.Options()['mat_mumps_icntl_15'] = -self.hps.q**2
 
         info_dict = dict()
         tmp = self.A_CC
@@ -370,7 +429,8 @@ class Domain_Driver(AbstractHPSSolver):
         info_dict['toc_build_blackbox']   = toc_build
         info_dict['solver_type']          = "petsc_"+solvertype
         
-        self.petsc_LU = ksp
+        self.petsc_LU   = ksp
+        #self.solver_Aii = self.petsc_LU
 
         return info_dict
 
@@ -383,17 +443,16 @@ class Domain_Driver(AbstractHPSSolver):
             tic = time()
             inst = mumps.Context()
             inst.analyze(self.A_CC, ordering='pord')
-            inst.factor(self.A_CC)
-            mumps_LU = inst
+            mumps_LU = inst.factor(self.A_CC)
             toc_mumps_LU = time() - tic
             if (verbose):
-                print("\t--time mumps build = %5.2f seconds"\
+                print("\t--time superLU build = %5.2f seconds"\
                       % (toc_mumps_LU))
 
             self.mumps_LU    = mumps_LU
             #self.solver_Aii = self.superLU
 
-            info_dict['toc_build_mumps'] = toc_mumps_LU
+            info_dict['toc_build_superLU'] = toc_mumps_LU
             info_dict['toc_build_blackbox']= toc_mumps_LU
             info_dict['solver_type']       = 'python-mumps'
         except:
@@ -402,7 +461,6 @@ class Domain_Driver(AbstractHPSSolver):
     
     # Builds the sparse matrix that encodes the solutions to boundary points.
     def build_blackboxsolver(self,solvertype,verbose):
-
         info_dict = dict()
         #print("Made it to build_blackboxsolver")
         I_copy1 = self.hps.I_copy1.detach().cpu().numpy()
@@ -420,6 +478,17 @@ class Domain_Driver(AbstractHPSSolver):
         self.A_CX = A_CX
         self.A_XC = A_XC
         self.A_XX = A_XX
+        """
+        print("Trimmed the unnecessary parts to make A_CC, now assembly with PETSc (or maybe SuperLU)")
+        if (not petsc_available):
+            info_dict = self.build_superLU(verbose)
+        else:
+            info_dict = self.build_petsc(solvertype,verbose)
+        """
+        return info_dict
+
+    def build_factorize(self,solvertype,verbose):
+        info_dict = dict()
         print("Trimmed the unnecessary parts to make A_CC, now assembly with PETSc (or maybe SuperLU)")
         if mumps_available:
             info_dict = self.build_mumps(verbose)
@@ -429,6 +498,7 @@ class Domain_Driver(AbstractHPSSolver):
             info_dict = self.build_superLU(verbose)
 
         return info_dict
+
 
     def build(self,sparse_assembly, solver_type,verbose=True):
         """
@@ -459,7 +529,7 @@ class Domain_Driver(AbstractHPSSolver):
             print("\t--memory for (A sparse) (%5.2f) GB"\
                   % (csr_stor))
         
-            
+        
         ########## sparse slab operations ##########
         info_dict = dict()
         if (solver_type == 'slabLU'):
@@ -468,8 +538,9 @@ class Domain_Driver(AbstractHPSSolver):
             info_dict = self.build_blackboxsolver(solver_type,verbose)
             if ('toc_build_blackbox' in info_dict):
                 info_dict['toc_build_blackbox'] += toc_assembly_tot
-                    
+               
         info_dict['toc_assembly'] = assembly_time_dict['toc_DtN']
+
         return info_dict
                 
     def get_rhs(self,uu_dir_func,uu_dir_vec=None,ff_body_func=None,ff_body_vec=None,sum_body_load=True):
@@ -606,10 +677,10 @@ class Domain_Driver(AbstractHPSSolver):
 
         true_err = torch.tensor([float('nan')])
         if (known_sol):
-            sol_boxes = torch.reshape(sol_tot, (self.hps.nboxes,self.hps.p**self.d))
+            sol_boxes = torch.reshape(sol_tot, (self.hps.nboxes,np.prod(self.hps.p)))
             XX       = self.hps.xx_tot
             uu_true  = uu_dir_func(XX.clone())
-            uu_true  = torch.reshape(uu_true, (self.hps.nboxes,self.hps.p**self.d))
+            uu_true  = torch.reshape(uu_true, (self.hps.nboxes,np.prod(self.hps.p)))
             Jx       = torch.tensor(self.hps.H.JJ.Jx)#.to(device)
             Jc       = torch.tensor(self.hps.H.JJ.Jc)#.to(device)
             Jtot     = torch.hstack((Jc,Jx))

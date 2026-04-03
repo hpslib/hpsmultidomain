@@ -4,16 +4,16 @@ import numpy as np                     # For numerical operations
 from time import time                  # For timing operations
 torch.set_default_dtype(torch.double)  # Set default tensor type to double precision
 
-from driver_build import *
-from driver_solve import run_solver
+from hpsmultidomain.driver_build import *
+from hpsmultidomain.driver_solve import run_solver
 
-from domain_driver import *  # Importing domain driver utilities for PDE solving
-from built_in_funcs import *  # Importing built-in functions for specific PDEs or conditions
-from visualize_problem import visualize_problem
+from hpsmultidomain.domain_driver import *  # Importing domain driver utilities for PDE solving
+from hpsmultidomain.built_in_funcs import *  # Importing built-in functions for specific PDEs or conditions
+from hpsmultidomain.visualize_problem import visualize_problem
 import pickle  # For serializing and saving results
 import os  # For interacting with the operating system, e.g., environment variables
 
-from geom import *
+from hpsmultidomain.geom import *
 
 # Initialize argument parser to define and read command-line arguments
 parser = argparse.ArgumentParser("Call direct solver for 2D/3D domain.")
@@ -22,10 +22,13 @@ parser.add_argument('--p',type=int,required=False)  # Polynomial order for certa
 parser.add_argument('--n', type=int, required=False)  # Number of discretization points
 parser.add_argument('--d', type=int, required=False, default=2)  # Spatial dimension of problem
 
-
 parser.add_argument('--n0', type=int, required=False)  # Number of discretization points in x0
 parser.add_argument('--n1', type=int, required=False)  # Number of discretization points in x1
 parser.add_argument('--n2', type=int, required=False)  # Number of discretization points in x2
+
+parser.add_argument('--p0', type=int, required=False)  # Polynomail order in x0
+parser.add_argument('--p1', type=int, required=False)  # Polynomail order in x1
+parser.add_argument('--p2', type=int, required=False)  # Polynomail order in x2
 
 # Arguments defining the PDE problem
 parser.add_argument('--pde', type=str, required=True)  # Type of PDE
@@ -62,18 +65,37 @@ args = parser.parse_args()  # Parse arguments from command line
 test_components = args.test_components
 param_map = None
 
-# Extract and setup basic parameters from parsed arguments
-redundant_n = (args.n is not None) and ((args.n0 is not None) or (args.n1 is not None) or (args.n2 is not None))
-if redundant_n:
-    ValueError("Cannot have n and n0,n1,n2 set")
-elif (args.n is not None) and (args.d==2):
-    args.n = np.array([args.n, args.n])
-elif args.n is not None:
-    args.n = np.array([args.n, args.n, args.n])
-elif ((args.n0 is not None) and (args.n1 is not None) and (args.n2 is not None)):
-    args.n = np.array([args.n0, args.n1, args.n2])
+# Extract and setup basic parameters from parsed arguments:
+if args.d == 2:
+    if args.n is not None:
+        args.n = np.array([args.n, args.n])
+    elif ((args.n0 is not None) and (args.n1 is not None)):
+        args.n = np.array([args.n0, args.n1])
+    else:
+        ValueError("Need to set either n or (for 2D only) n0,n1")
+
+    if args.p is not None:
+        args.p = np.array([args.p, args.p])
+    elif ((args.p0 is not None) and (args.p1 is not None)):
+        args.p = np.array([args.p0, args.p1])
+    else:
+        ValueError("Need to set either p or (for 2D only) p0,p1")
+elif args.d == 3:
+    if args.n is not None:
+        args.n = np.array([args.n, args.n, args.n])
+    elif ((args.n0 is not None) and (args.n1 is not None) and (args.n2 is not None)):
+        args.n = np.array([args.n0, args.n1, args.n2])
+    else:
+        ValueError("Need to set either n or (for 3D only) n0,n1,n2")
+
+    if args.p is not None:
+        args.p = np.array([args.p, args.p, args.p])
+    elif ((args.p0 is not None) and (args.p1 is not None) and (args.p2 is not None)):
+        args.p = np.array([args.p0, args.p1, args.p2])
+    else:
+        ValueError("Need to set either p or (for 3D only) p0,p1,p2")
 else:
-    ValueError("Need to set either n or (for 3D only) n0,n1,n2")
+    ValueError("dimension d must be 2 or 3")
 
 d = args.d
 box = torch.tensor([[0,0],[args.box_xlim,args.box_ylim]])  # Domain geometry tensor
@@ -113,7 +135,13 @@ if (args.p is None):
     raise ValueError('HPS selected but p not provided')
 p = args.p
 npan = args.n / (p-2)
-a = 1/(2*npan) # a is now an array
+if args.d == 2:
+    a = np.array([args.box_xlim, args.box_ylim]) / (2*npan) # a is now an array
+else: #args.d == 3
+    a = np.array([args.box_xlim, args.box_ylim, args.box_zlim]) / (2*npan) # a is now an array
+
+print("p = ", p)
+print("a = ", a)
 
 # Inilialize the domain driver object - we do this separately from
 # build_operator_with_info so that, in the future, we could experiment
@@ -148,4 +176,7 @@ if (args.pickle is not None):
 
 # Optional: visualization of computed solution
 if args.visualize:
-    visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh)
+    if args.d == 2:
+        print("Warning: visualization for d=2 not yet implemented")
+    else:
+        visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh)
