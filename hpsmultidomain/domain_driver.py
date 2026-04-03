@@ -4,6 +4,7 @@ import sys  # System-specific parameters and functions
 
 # Importing parent class:
 from hpsmultidomain.abstract_hps_solver import AbstractHPSSolver
+import hpsmultidomain.pdo as pdo
 
 # Importing necessary components for sparse matrix operations
 from scipy.sparse import kron, diags, block_diag, eye as speye, hstack as sp_hstack
