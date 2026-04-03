@@ -151,6 +151,53 @@ class HPS_Multidomain:
         t_dict['toc_DtN'] = toc_DtN
         t_dict['toc_sparse'] = toc_csr_scipy
         return sp_mat,t_dict
+
+    def sparse_mat_uncondensed(self, device, verbose=False):
+        """
+        Constructs the larger sparse matrix that keeps leaf interior collocation
+        unknowns instead of eliminating them locally.
+        """
+        if self.interpolate:
+            raise NotImplementedError("Uncondensed assembly is only supported without interpolation.")
+
+        tic = time()
+        xxloc = self.grid_xx.to(device)
+        Ds = self.H.Ds.to(device)
+        Jc = torch.tensor(self.H.JJ.Jc).to(device)
+        Jx = torch.tensor(self.H.JJ.Jx).to(device)
+        Nx = torch.tensor(self.H.Nx).to(device)
+
+        nboxes = int(self.nboxes)
+        chunk_size = min(16, nboxes)
+        blocks = []
+
+        for box_start in range(0, nboxes, chunk_size):
+            box_end = min(box_start + chunk_size, nboxes)
+            args = (self.p, xxloc, Ds, self.pdo, box_start, box_end, device)
+            if self.d == 2:
+                Aloc = leaf_ops.get_Aloc_2d(*args)
+            else:
+                Aloc = leaf_ops.get_Aloc_3d(*args)
+
+            A_cc = Aloc[:, Jc[:, None], Jc]
+            A_cx = Aloc[:, Jc[:, None], Jx]
+            N_xc = Nx[:, Jc].unsqueeze(0).repeat(box_end - box_start, 1, 1)
+            N_xx = Nx[:, Jx].unsqueeze(0).repeat(box_end - box_start, 1, 1)
+
+            Bloc_top = torch.concat((A_cc, A_cx), dim=2)
+            Bloc_bot = torch.concat((N_xc, N_xx), dim=2)
+            Bloc = torch.concat((Bloc_top, Bloc_bot), dim=1).detach().cpu().numpy()
+            blocks.extend(sp.csr_matrix(Bloc[i]) for i in range(Bloc.shape[0]))
+
+        sp_mat = sp.block_diag(blocks, format='csr')
+        toc_sparse = time() - tic
+
+        print("Assembled sparse matrix")
+
+        t_dict = dict()
+        t_dict['toc_DtN'] = toc_sparse
+        t_dict['toc_sparse'] = toc_sparse
+        return sp_mat, t_dict
     
     def get_grid(self):
         """
@@ -440,14 +487,11 @@ class HPS_Multidomain:
         nboxes   = torch.prod(self.n)
         uu_sol   = uu_sol.to(device)
         
-        # Put the solution on all subdomain boundaries (inclduing global DBC) into one array:
-        uu_sol_bnd = torch.zeros(nboxes*size_ext,nrhs,device=device)
-        uu_sol_bnd[self.I_unique] = uu_sol
-        uu_sol_bnd[self.I_copy2]  = uu_sol_bnd[self.I_copy1]
+        uu_sol_bnd = self.expand_boundary_data(device, uu_sol)
         
         # Compute the subdomain interiors using get_DtNs, then flatten:
-        uu_sol_bnd  = uu_sol_bnd.reshape(nboxes,size_ext,nrhs)
         uu_sol_tot  = self.get_DtNs(device,mode='solve',data=uu_sol_bnd,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
+        uu_sol_tot  = self.fill_missing_boundary_values(device, uu_sol_tot, uu_sol_bnd)
         uu_sol_flat = uu_sol_tot[...,:nrhs].flatten(start_dim=0,end_dim=-2)
 
         resvec_blocks = torch.linalg.norm(uu_sol_tot[...,nrhs:])
@@ -464,3 +508,36 @@ class HPS_Multidomain:
         ff_red_flatten = ff_red.flatten(start_dim=0,end_dim=-2)
         ff_red_flatten[self.I_copy1] += ff_red_flatten[self.I_copy2]
         return ff_red_flatten[self.I_unique]
+
+    def expand_boundary_data(self, device, uu_sol):
+        """
+        Expands unique surface data to one reduced boundary trace per box.
+        """
+        nrhs = uu_sol.shape[-1]
+        if self.d == 2:
+            size_ext = 2*self.q[1] + 2*self.q[0]
+        else:
+            size_ext = 2*self.q[1]*self.q[2] + 2*self.q[0]*self.q[2] + 2*self.q[0]*self.q[1]
+
+        nboxes = int(torch.prod(self.n))
+        uu_sol = uu_sol.to(device)
+        uu_sol_bnd = torch.zeros(nboxes*size_ext, nrhs, device=device)
+        uu_sol_bnd[self.I_unique] = uu_sol
+        uu_sol_bnd[self.I_copy2] = uu_sol_bnd[self.I_copy1]
+        return uu_sol_bnd.reshape(nboxes, size_ext, nrhs)
+
+    def fill_missing_boundary_values(self, device, uu_sol_tot, uu_sol_bnd):
+        """
+        Lifts reduced face data to the full leaf boundary, including the points
+        omitted from Jx such as 2D corners and 3D edges/corners.
+        """
+        if self.interpolate:
+            return uu_sol_tot
+
+        nrhs = uu_sol_bnd.shape[-1]
+        Jx = torch.tensor(self.H.JJ.Jx).to(device)
+        Jxun = torch.tensor(self.H.JJ.Jxunique).to(device)
+        Intmap_unq = torch.tensor(self.H.Interp_mat_unique).to(device)
+        uu_sol_tot[:, Jxun, :nrhs] = Intmap_unq.unsqueeze(0) @ uu_sol_bnd
+        uu_sol_tot[:, Jx, :nrhs] = uu_sol_bnd
+        return uu_sol_tot

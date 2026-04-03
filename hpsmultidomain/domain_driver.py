@@ -7,7 +7,7 @@ from hpsmultidomain.abstract_hps_solver import AbstractHPSSolver
 import hpsmultidomain.pdo as pdo
 
 # Importing necessary components for sparse matrix operations
-from scipy.sparse import kron, diags, block_diag, eye as speye, hstack as sp_hstack
+from scipy.sparse import kron, diags, block_diag, eye as speye, hstack as sp_hstack, vstack as sp_vstack
 import scipy.sparse.linalg as spla  # For sparse linear algebra operations
 from time import time  # For timing operations
 torch.set_default_dtype(torch.double)  # Setting default tensor type to double for precision
@@ -97,7 +97,7 @@ def apply_sparse_lowmem(A, I, J, v, transpose=False):
 
 # Domain_Driver class for setting up and solving the discretized PDE
 class Domain_Driver(AbstractHPSSolver):
-    def __init__(self, box_geom, pdo_op, kh, a, p=12, d=2, periodic_bc=False):
+    def __init__(self, box_geom, pdo_op, kh, a, p=12, d=2, periodic_bc=False, statically_condense=True):
         """
         Initializes the domain and discretization for solving a PDE.
         
@@ -113,6 +113,7 @@ class Domain_Driver(AbstractHPSSolver):
         self.d = d
         self.kh = kh
         self.periodic_bc  = periodic_bc
+        self.statically_condense = statically_condense
         self.box_geometry = box_geom # The full BoxGeometry object
         self.box_geom     = self.box_geometry.bounds.T # The array itself
         self.hps_disc(self.box_geom,a,p,d,pdo_op,periodic_bc)
@@ -224,6 +225,8 @@ class Domain_Driver(AbstractHPSSolver):
         return sol_tot
 
     def verify_discretization(self, kh):
+        if not self.statically_condense:
+            raise NotImplementedError("verify_discretization currently uses the condensed interface solve.")
         # 1) Possibly map XX through a parameterization, if geometry defines one
         if hasattr(self.geom, 'parameter_map'):
             XX_mapped = self.geom.parameter_map(self.XX)
@@ -459,9 +462,41 @@ class Domain_Driver(AbstractHPSSolver):
         except:
             print("python-mumps had an error.")
         return info_dict
-    
+
+    def _require_uncondensed_supported(self):
+        if self.hps.interpolate:
+            raise NotImplementedError(
+                "statically_condense=False is currently supported only for non-interpolating square/cube cases."
+            )
+
+    def _get_uncondensed_indices(self):
+        self._require_uncondensed_supported()
+
+        nboxes = int(self.hps.nboxes)
+        nint_leaf = int(np.prod(self.hps.p - 2))
+        size_ext = len(self.hps.H.JJ.Jx)
+        block_size = nint_leaf + size_ext
+
+        I_int = np.concatenate(
+            [np.arange(box * block_size, box * block_size + nint_leaf) for box in range(nboxes)]
+        )
+
+        def lift_surface_inds(surface_inds):
+            surface_inds = np.asarray(surface_inds, dtype=int)
+            box = surface_inds // size_ext
+            local = surface_inds % size_ext
+            return box * block_size + nint_leaf + local
+
+        I_copy1 = lift_surface_inds(self.hps.I_copy1.detach().cpu().numpy())
+        I_copy2 = lift_surface_inds(self.hps.I_copy2.detach().cpu().numpy())
+        I_ext = lift_surface_inds(self.I_Xtot_in_unique.detach().cpu().numpy())
+        return I_int, I_copy1, I_copy2, I_ext, nint_leaf, size_ext
+
     # Builds the sparse matrix that encodes the solutions to boundary points.
     def build_blackboxsolver(self,solvertype,verbose):
+        if not self.statically_condense:
+            return self.build_blackboxsolver_uncondensed(solvertype, verbose)
+
         info_dict = dict()
         #print("Made it to build_blackboxsolver")
         I_copy1 = self.hps.I_copy1.detach().cpu().numpy()
@@ -486,6 +521,31 @@ class Domain_Driver(AbstractHPSSolver):
         else:
             info_dict = self.build_petsc(solvertype,verbose)
         """
+        return info_dict
+
+    def build_blackboxsolver_uncondensed(self, solvertype, verbose):
+        info_dict = dict()
+        I_int, I_copy1, I_copy2, I_ext, nint_leaf, size_ext = self._get_uncondensed_indices()
+
+        tmp_int = self.A[I_copy1] + self.A[I_copy2]
+        A_UU = self.A[I_int][:, I_int]
+        A_US = self.A[I_int][:, I_copy1] + self.A[I_int][:, I_copy2]
+        A_UX = self.A[I_int][:, I_ext]
+        A_SU = tmp_int[:, I_int]
+        A_SS = tmp_int[:, I_copy1] + tmp_int[:, I_copy2]
+        A_SX = tmp_int[:, I_ext]
+        A_XU = self.A[I_ext][:, I_int]
+        A_XS = self.A[I_ext][:, I_copy1] + self.A[I_ext][:, I_copy2]
+        A_XX = self.A[I_ext][:, I_ext]
+
+        self.A_CC = sp_vstack((sp_hstack((A_UU, A_US)), sp_hstack((A_SU, A_SS))), format='csr')
+        self.A_CX = sp_vstack((A_UX, A_SX), format='csr')
+        self.A_XC = sp_hstack((A_XU, A_XS), format='csr')
+        self.A_XX = A_XX.tocsr()
+
+        self.uncondensed_nint_leaf = nint_leaf
+        self.uncondensed_size_ext = size_ext
+        self.uncondensed_nint_total = len(I_int)
         return info_dict
 
     def build_factorize(self,solvertype,verbose):
@@ -516,7 +576,11 @@ class Domain_Driver(AbstractHPSSolver):
 
         #print("About to build sparse matrix")
         tic = time()
-        self.A,assembly_time_dict = self.hps.sparse_mat(device,verbose)
+        if self.statically_condense:
+            self.A,assembly_time_dict = self.hps.sparse_mat(device,verbose)
+        else:
+            self._require_uncondensed_supported()
+            self.A,assembly_time_dict = self.hps.sparse_mat_uncondensed(device,verbose)
         toc_assembly_tot = time() - tic
 
         #print("Built sparse matrix A")
@@ -543,6 +607,16 @@ class Domain_Driver(AbstractHPSSolver):
         info_dict['toc_assembly'] = assembly_time_dict['toc_DtN']
 
         return info_dict
+
+    def _solve_factorized_system(self, ff_body):
+        if mumps_available:
+            return self.mumps_LU.solve(ff_body)
+        if petsc_available:
+            psol = PETSc.Vec().createWithArray(np.ones(ff_body.shape))
+            pb   = PETSc.Vec().createWithArray(ff_body.copy())
+            self.petsc_LU.solve(pb,psol)
+            return psol.getArray().reshape(ff_body.shape)
+        return self.superLU.solve(ff_body)
                 
     def get_rhs(self,uu_dir_func,uu_dir_vec=None,ff_body_func=None,ff_body_vec=None,sum_body_load=True):
         """
@@ -604,15 +678,7 @@ class Domain_Driver(AbstractHPSSolver):
         ff_body = self.get_rhs(uu_dir_func,uu_dir_vec=uu_dir_vec,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
         ff_body = np.array(ff_body)
 
-        if mumps_available:
-            sol = self.mumps_LU.solve(ff_body)
-        elif petsc_available:
-            psol = PETSc.Vec().createWithArray(np.ones(ff_body.shape))
-            pb   = PETSc.Vec().createWithArray(ff_body.copy())
-            self.petsc_LU.solve(pb,psol)
-            sol  = psol.getArray().reshape(ff_body.shape)
-        else:
-            sol = self.superLU.solve(ff_body)
+        sol = self._solve_factorized_system(ff_body)
 
         res     = self.A_CC @ sol - ff_body
         relerr  = np.linalg.norm(res,ord=2)/np.linalg.norm(ff_body,ord=2)
@@ -622,6 +688,52 @@ class Domain_Driver(AbstractHPSSolver):
         toc_solve = time() - tic
 
         return sol,toc_solve, ff_body
+
+    def solve_helper_uncondensed(self, uu_dir_func, uu_dir_vec=None, ff_body_func=None, ff_body_vec=None):
+        if (ff_body_func is not None) or (ff_body_vec is not None):
+            raise NotImplementedError("statically_condense=False currently supports no body load.")
+
+        tic = time()
+        if uu_dir_vec is None:
+            uu_dir = uu_dir_func(self.XX_active[self.I_Xtot,:])
+        else:
+            uu_dir = uu_dir_vec
+
+        uu_dir_np = np.array(uu_dir)
+        ff_body = -self.A_CX @ uu_dir_np
+        sol = self._solve_factorized_system(ff_body)
+
+        res = self.A_CC @ sol - ff_body
+        relerr = np.linalg.norm(res, ord=2) / np.linalg.norm(ff_body, ord=2)
+        print("NORM OF RESIDUAL for solver %5.2e" % relerr)
+
+        toc_solve = time() - tic
+        return torch.tensor(sol), toc_solve, torch.tensor(ff_body), uu_dir
+
+    def reconstruct_uncondensed_solution(self, uu_dir_func, sol, uu_dir_vec=None):
+        if self.sparse_assembly == 'reduced_gpu':
+            device = torch.device('cuda')
+        else:
+            device = torch.device('cpu')
+
+        nboxes = int(self.hps.nboxes)
+        nrhs = sol.shape[-1]
+        Jc = torch.tensor(self.hps.H.JJ.Jc).to(device)
+
+        surface_sol = torch.zeros((len(self.hps.I_unique), nrhs), device=device)
+        surface_sol[self.I_Ctot] = sol[self.uncondensed_nint_total:].to(device)
+        if uu_dir_vec is None:
+            surface_sol[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot]).to(device)
+        else:
+            surface_sol[self.I_Xtot] = uu_dir_vec.to(device)
+
+        uu_sol_bnd = self.hps.expand_boundary_data(device, surface_sol)
+        interior_sol = sol[:self.uncondensed_nint_total].to(device).reshape(nboxes, self.uncondensed_nint_leaf, nrhs)
+
+        uu_sol_tot = torch.zeros(nboxes, np.prod(self.hps.p), nrhs, device=device)
+        uu_sol_tot[:, Jc, :] = interior_sol
+        uu_sol_tot = self.hps.fill_missing_boundary_values(device, uu_sol_tot, uu_sol_bnd)
+        return uu_sol_tot.flatten(start_dim=0, end_dim=-2).cpu()
         
 
     def solve(self,uu_dir_func,uu_dir_vec=None,ff_body_func=None,ff_body_vec=None,known_sol=False):
@@ -630,51 +742,78 @@ class Domain_Driver(AbstractHPSSolver):
         """
         if (self.solver_type == 'slabLU'):
             raise ValueError("not included in this version")
+        elif not self.statically_condense:
+            sol,toc_system_solve, ff_body, uu_dir = self.solve_helper_uncondensed(
+                uu_dir_func, uu_dir_vec=uu_dir_vec, ff_body_func=ff_body_func, ff_body_vec=ff_body_vec
+            )
         else:
             sol,toc_system_solve, ff_body = self.solve_helper_blackbox(uu_dir_func,uu_dir_vec=uu_dir_vec,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
 
-        # We set the solution on the subdomain boundaries to the result of our sparse system.
-        sol_tot = torch.zeros(len(self.hps.I_unique),1)
-        sol_tot[self.I_Ctot] = sol
+        if not self.statically_condense:
+            interior_coords = self.hps.grid_xx[:, self.hps.H.JJ.Jc, :].reshape(-1, self.d)
+            if uu_dir_vec is None:
+                true_int_sol = uu_dir_func(interior_coords)
+                true_c_sol = torch.vstack((true_int_sol, uu_dir_func(self.hps.xx_active[self.I_Ctot])))
+            else:
+                print("We don't have a function for subdomain boundaries, so we're just assessing stability")
+                true_c_sol = sol
 
-        # Here we set the true exterior to the given data:
-        if uu_dir_vec is None:
-            true_c_sol = uu_dir_func(self.hps.xx_active[self.I_Ctot])
-            sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
+            res = np.linalg.norm(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body)
+            forward_bdry_error = res
+            reverse_bdry_error = torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)
+            reverse_bdry_error = reverse_bdry_error.item()
+
+            rel_err = forward_bdry_error
+            if known_sol:
+                print("Relative error when applying the sparse system as a FORWARD operator on the true solution, i.e. ||A u_true - b||: %5.2e" % forward_bdry_error)
+                print("Relative error when using the factorized sparse system to solve, i.e. ||A^-1 b - u_true||: %5.2e" % reverse_bdry_error)
+
+            sol_tot = self.reconstruct_uncondensed_solution(uu_dir_func, sol, uu_dir_vec=uu_dir_vec)
+            resloc_hps = torch.tensor([float('nan')])
+            toc_leaf_solve = 0.0
         else:
-            print("We don't have a function for subdomain boundaries, so we're just assessing stability")
-            true_c_sol = sol
-            sol_tot[self.I_Xtot] = uu_dir_vec
+            # We set the solution on the subdomain boundaries to the result of our sparse system.
+            sol_tot = torch.zeros(len(self.hps.I_unique),1)
+            sol_tot[self.I_Ctot] = sol
 
-        res = np.linalg.norm(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body)
-        forward_bdry_error = res
-        reverse_bdry_error = torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)
-        reverse_bdry_error = reverse_bdry_error.item()
+            # Here we set the true exterior to the given data:
+            if uu_dir_vec is None:
+                true_c_sol = uu_dir_func(self.hps.xx_active[self.I_Ctot])
+                sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
+            else:
+                print("We don't have a function for subdomain boundaries, so we're just assessing stability")
+                true_c_sol = sol
+                sol_tot[self.I_Xtot] = uu_dir_vec
 
-        rel_err = forward_bdry_error
+            res = np.linalg.norm(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body)
+            forward_bdry_error = res
+            reverse_bdry_error = torch.linalg.norm(sol - true_c_sol) / torch.linalg.norm(true_c_sol)
+            reverse_bdry_error = reverse_bdry_error.item()
 
-        if known_sol:
-            print("Relative error when applying the sparse system as a FORWARD operator on the true solution, i.e. ||A u_true - b||: %5.2e" % forward_bdry_error)
-            print("Relative error when using the factorized sparse system to solve, i.e. ||A^-1 b - u_true||: %5.2e" % reverse_bdry_error)
+            rel_err = forward_bdry_error
 
-        resloc_hps = torch.tensor([float('nan')])
-        if (self.sparse_assembly == 'reduced_gpu'):
-            device=torch.device('cuda')
-        else:
-            device = torch.device('cpu')
+            if known_sol:
+                print("Relative error when applying the sparse system as a FORWARD operator on the true solution, i.e. ||A u_true - b||: %5.2e" % forward_bdry_error)
+                print("Relative error when using the factorized sparse system to solve, i.e. ||A^-1 b - u_true||: %5.2e" % reverse_bdry_error)
 
-        # Creating the true solution for comparison's sake.
-        uu_true = None
-        if known_sol and uu_dir_vec is not None:
-            GridX   = self.hps.grid_xx.clone()
-            uu_true = torch.zeros((GridX.shape[0], GridX.shape[1],1), device=device)
-            for i in range(GridX.shape[0]):
-                uu_true[i] = uu_dir_func(GridX[i])
-        
-        tic = time()
-        sol_tot,resloc_hps = self.hps.solve(device,sol_tot,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
-        toc_leaf_solve = time() - tic
-        sol_tot = sol_tot.cpu()
+            resloc_hps = torch.tensor([float('nan')])
+            if (self.sparse_assembly == 'reduced_gpu'):
+                device=torch.device('cuda')
+            else:
+                device = torch.device('cpu')
+
+            # Creating the true solution for comparison's sake.
+            uu_true = None
+            if known_sol and uu_dir_vec is not None:
+                GridX   = self.hps.grid_xx.clone()
+                uu_true = torch.zeros((GridX.shape[0], GridX.shape[1],1), device=device)
+                for i in range(GridX.shape[0]):
+                    uu_true[i] = uu_dir_func(GridX[i])
+            
+            tic = time()
+            sol_tot,resloc_hps = self.hps.solve(device,sol_tot,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
+            toc_leaf_solve = time() - tic
+            sol_tot = sol_tot.cpu()
 
         true_err = torch.tensor([float('nan')])
         if (known_sol):
