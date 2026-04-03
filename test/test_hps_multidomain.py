@@ -2,9 +2,9 @@ import numpy as np
 import scipy
 import torch
 
-from hps.pdo               import PDO_2d,PDO_3d,const
-from hps.geom              import BoxGeometry
-from hps.domain_driver     import Domain_Driver
+from hpsmultidomain.pdo               import PDO_2d,PDO_3d,const
+from hpsmultidomain.geom              import BoxGeometry
+from hpsmultidomain.domain_driver     import Domain_Driver
 
 import matplotlib.pyplot as plt
 
@@ -35,6 +35,7 @@ def get_discretization_relerr(a,p,kh,ndim,elongated_x=False,elongated_y=False,sp
 
 	solver    = Domain_Driver(geom,pdo,0,a,p,d=ndim)
 	solver.build(sparse_assembly, solver_type,verbose=False)
+	solver.build_factorize(solver_type, True)
 	return  solver.verify_discretization(kh)
 
 
