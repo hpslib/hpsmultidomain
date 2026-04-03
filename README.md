@@ -60,6 +60,8 @@ And for a 3D problem:
 python hpsmultidomain/argparse_driver.py --pde poisson --domain square --bc log_dist --n 50 --p 12 --d 3 --solver MUMPS
 ```
 
+You can also test on preconfigured basic problems by calling `python test/test_multidomain.py` and `python test/test_multidomain_curved.py`
+
 ## Notes
 A series of command line arguments can be seen in `argparse_driver.py`. These include:
 - `pde` to specify the partial differential equation to solve, such as `poisson` or `bfield_constant` (i.e. constant-coefficient Helmholtz equation)
