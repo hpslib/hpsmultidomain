@@ -2,7 +2,7 @@
 import torch  # For tensor computations
 import numpy as np  # For numerical operations
 torch.set_default_dtype(torch.double)  # Set default tensor data type to double precision for higher numerical accuracy
-import pdo  # Import a custom library for dealing with Partial Differential Operators
+import hpsmultidomain.pdo  # Import a custom library for dealing with Partial Differential Operators
 
 from scipy.special import hankel1, j0  # Import the Hankel function of the first kind for wave-related computations
 
