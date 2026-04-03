@@ -145,7 +145,8 @@ def configure_pde_domain(args):
         if args.domain == "square":
             curved_domain = False
             b  = np.pi
-            op = pdo.PDO_2d(pdo.ones, pdo.ones, c1=pdo.const(c=b), c2=pdo.const(c=b))
+            #op = pdo.PDO_2d(pdo.ones, pdo.ones, c1=pdo.const(c=b), c2=pdo.const(c=b))
+            op = pdo.PDO_2d(pdo.ones, pdo.ones, c1=convection_steady_state_patch, c2=convection_steady_state_patch)
         else:
             raise ValueError("Non-square domain geometries not supported on convection steady-state")
 

@@ -405,7 +405,7 @@ def convection_steady_state_patch(xx):
     f = torch.zeros(xx.shape[0], 1)
 
     patch_size = 0.125
-    shift = 0
+    shift = 0 #0.01
 
     # Find which cell index each coordinate belongs to
     cell_x = ((xx[:, 0] + shift) / patch_size).floor().long()

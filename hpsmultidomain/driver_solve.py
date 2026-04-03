@@ -89,7 +89,7 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
         if (args.pde == 'convection_steady_state'):
             uu_dir    = lambda xx: torch.zeros(xx.shape[0], 1) #convection_steady_state_manufactured(xx)
             known_sol = True
-            ff_body   = lambda xx: convection_steady_state_patch(xx) #convection_steady_state_body_load(xx)
+            ff_body   = lambda xx: torch.ones(xx.shape[0], 1) #convection_steady_state_patch(xx) #convection_steady_state_body_load(xx)
         else:
             raise ValueError()
     elif (args.bc == 'convection_diffusion'):

@@ -10,7 +10,7 @@ plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
 # Several variables reuqire manual editing to get the best visual results
 # - such as center, interior, and the x, y, and z bounds
 
-def visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh=0, d=2, f=None):
+def visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh=0, d=2, n=0, f=None):
 
     center=np.array([0,0,0])
 
@@ -57,14 +57,16 @@ def visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh=0, d=2, f=Non
     #ax.set_xticklabels(["1.4", "1.6"])
 
     #plt.title("Helmholtz Equation: $\kappa = $" + str(kh) + ", $p = $" + str(p) + ", $h$ = 0.625 x 0.5 x 0.5")
+    plt.title("Checkerboard convection-diffusion steady state, p = " + str(p[0]) + ", n = " + str(n))
     plt.xlabel("x")
     plt.ylabel("  y")
     plt.colorbar(sc, shrink=0.5)
     plt.rcParams['figure.figsize'] = [14, 6]
     #plt.savefig("3D-domain-faces-annulus-p18-h16x2x2.png")
-    plt.savefig("convection-checkerboard-p15-312.png")
-    plt.show()
+    plt.savefig("data-convection-checkerboard-p-refine/convection-checkerboard-p" + str(p[0]) + "-" + str(n) + ".png")
+    #plt.show()
 
+    """
     if f is not None:
         fig2 = plt.figure(figsize=(12, 12))
         ax2 = fig2.add_subplot()
@@ -74,3 +76,4 @@ def visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh=0, d=2, f=Non
         plt.colorbar(sc2, shrink=0.5)
         plt.rcParams['figure.figsize'] = [14, 6]
         plt.show()
+    """
