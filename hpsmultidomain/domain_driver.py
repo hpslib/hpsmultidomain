@@ -365,7 +365,8 @@ class Domain_Driver(AbstractHPSSolver):
         info_dict = dict()
         try:
             tic = time()
-            LU = sla.splu(self.A_CC)          
+            # SuperLU expects CSC input; convert once here to avoid repeated warnings.
+            LU = sla.splu(self.A_CC.tocsc())          
             toc_superLU = time() - tic
             if (verbose):
                 print("SUPER LU BUILD SUMMARY")

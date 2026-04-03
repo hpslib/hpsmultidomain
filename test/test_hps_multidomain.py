@@ -8,7 +8,7 @@ from hpsmultidomain.domain_driver     import Domain_Driver
 
 import matplotlib.pyplot as plt
 
-def get_discretization_relerr(a,p,kh,ndim,elongated_x=False,elongated_y=False,sparse_assembly='reduced_gpu',solver_type='MUMPS'):
+def get_discretization_relerr(a,p,kh,ndim,elongated_x=False,elongated_y=False,sparse_assembly='reduced_cpu',solver_type='superLU'):
 
 	# Check CUDA availability and adjust settings accordingly
 	print("CUDA available %s" % torch.cuda.is_available())
@@ -76,8 +76,3 @@ def test_hps_3d():
 	relerr = get_discretization_relerr(a,p,kh,ndim)
 	print(f"Relative error for 3D Helmholtz with kh={kh} is {relerr}")
 	assert relerr < 5e-8
-
-
-test_hps_2d()
-test_hps_2d_elongated()
-test_hps_3d()

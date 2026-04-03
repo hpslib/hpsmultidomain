@@ -6,7 +6,7 @@ from hpsmultidomain.domain_driver import Domain_Driver
 
 from hpsmultidomain.built_in_funcs import uu_dir_func_greens
 
-def test_hps_multidomain_curved_2d(sparse_assembly='reduced_gpu',solver_type='MUMPS'):
+def test_hps_multidomain_curved_2d(sparse_assembly='reduced_cpu',solver_type='superLU'):
 
     # Check CUDA availability and adjust settings accordingly
     print("CUDA available %s" % torch.cuda.is_available())
@@ -84,6 +84,3 @@ def test_hps_multidomain_curved_2d(sparse_assembly='reduced_gpu',solver_type='MU
     relerr = np.linalg.norm(uu_sol - uu_full) / np.linalg.norm(uu_full)
     assert relerr < 3e-7, f"Relative error too high in 2D: {relerr:.2e}"
     print("Relative error for box interfaces and interiors with body load: ", relerr)
-    
-
-test_hps_multidomain_curved_2d()
