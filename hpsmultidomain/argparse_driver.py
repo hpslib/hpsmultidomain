@@ -1,5 +1,4 @@
 import argparse                        # For parsing command-line arguments
-import jax # for reasons
 import torch                           # PyTorch library for tensor computations and GPU support
 import numpy as np                     # For numerical operations
 from time import time                  # For timing operations
