@@ -79,10 +79,19 @@ def fit_slope(h_vals, err_vals, n_tail=4):
     return slope, intercept
 
 for i, p in enumerate(p_list):
-    r, intercept = fit_slope([_**(-1) for _ in nboxes_list], rel_errors[i], n_tail=3)
-    h_fit = nboxes_list[-3:]
-    plt.loglog(nboxes_list, rel_errors[i])
-    plt.loglog(nboxes_list, np.exp(intercept) * nboxes_list**(-r), 'k--', alpha=0.5)
+    if i == len(p_list)-1:
+        r, intercept = fit_slope([_**(-1) for _ in nboxes_list[:-1]], rel_errors[i,:-1], n_tail=3)
+        plt.loglog(nboxes_list[:-1], rel_errors[i,:-1], label="p=" + str(p))
+        plt.loglog(nboxes_list, np.exp(intercept) * nboxes_list**(-r), 'k--', alpha=0.5)
+    else:
+        r, intercept = fit_slope([_**(-1) for _ in nboxes_list], rel_errors[i], n_tail=3)
+        plt.loglog(nboxes_list, rel_errors[i], label="p=" + str(p))
+        plt.loglog(nboxes_list, np.exp(intercept) * nboxes_list**(-r), 'k--', alpha=0.5)
     print("p, r = ", p, r)
 
+plt.title("Self-convergence of checkerboard convection field")
+plt.xlabel("h^{-1}")
+plt.ylabel("l^2 error relative to p=21, h = 1/216")
+plt.legend()
+plt.savefig("checkerboard_convergence.pdf")
 plt.show()
