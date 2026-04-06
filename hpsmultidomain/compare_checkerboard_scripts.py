@@ -5,7 +5,7 @@ import pickle
 import matplotlib.pyplot as plt
 
 p_list = [9, 11, 13, 15, 17, 19, 21]
-nboxes_list = [8, 24, 72, 216]
+nboxes_list = [8, 24, 72] #, 216]
 
 solutions = []
 
@@ -15,7 +15,7 @@ for i, p in enumerate(p_list):
     for j, n in enumerate(n_list):
         print(f"Running p={p}, n={n}...")
 
-        file_path = f"data-convection-checkerboard/checkerboard-p{p}-n{n}.pkl"
+        file_path = f"data-convection-helmholtz-kh100/helmholtz-p{p}-n{n}.pkl"
 
         # Open the file in read-binary mode ('rb')
         with open(file_path, 'rb') as file:
@@ -56,14 +56,12 @@ hi_res_midpoints = midpoints[-1, -1, :]
 
 #print(hi_res)
 
-nboxes_list = [8, 24, 72, 216]
-
 rel_errors = torch.zeros(len(p_list), len(nboxes_list))
 
 for i, p in enumerate(p_list):
     for j, nboxes in enumerate(nboxes_list):
         mp = midpoints[i, j, :]
-        rel_error = torch.linalg.norm(mp - hi_res_midpoints) / torch.linalg.norm(hi_res_midpoints)
+        rel_error = torch.linalg.norm(mp - midpoints[i, -1, :]) / torch.linalg.norm(midpoints[i, -1, :])
         print("p = " + str(p) + ", nboxes = " + str(nboxes))
         print(rel_error)
         rel_errors[i, j] = rel_error.item()
@@ -79,19 +77,14 @@ def fit_slope(h_vals, err_vals, n_tail=4):
     return slope, intercept
 
 for i, p in enumerate(p_list):
-    if i == len(p_list)-1:
-        r, intercept = fit_slope([_**(-1) for _ in nboxes_list[:-1]], rel_errors[i,:-1], n_tail=3)
-        plt.loglog(nboxes_list[:-1], rel_errors[i,:-1], label="p=" + str(p))
-        plt.loglog(nboxes_list, np.exp(intercept) * nboxes_list**(-r), 'k--', alpha=0.5)
-    else:
-        r, intercept = fit_slope([_**(-1) for _ in nboxes_list], rel_errors[i], n_tail=3)
-        plt.loglog(nboxes_list, rel_errors[i], label="p=" + str(p))
-        plt.loglog(nboxes_list, np.exp(intercept) * nboxes_list**(-r), 'k--', alpha=0.5)
+    r, intercept = fit_slope([_**(-1) for _ in nboxes_list[:-1]], rel_errors[i,:-1], n_tail=3)
+    plt.loglog(nboxes_list[:-1], rel_errors[i,:-1], label="p=" + str(p))
+    plt.loglog(nboxes_list[:-1], np.exp(intercept) * nboxes_list[:-1]**(-r), 'k--', alpha=0.5)
     print("p, r = ", p, r)
 
 plt.title("Self-convergence of checkerboard convection field")
 plt.xlabel("h^{-1}")
-plt.ylabel("l^2 error relative to p=21, h = 1/216")
+plt.ylabel("l^2 error relative to h = 1/216")
 plt.legend()
 plt.savefig("checkerboard_convergence.pdf")
 plt.show()

@@ -63,7 +63,7 @@ def visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh=0, d=2, n=0, 
     plt.colorbar(sc, shrink=0.5)
     plt.rcParams['figure.figsize'] = [14, 6]
     #plt.savefig("3D-domain-faces-annulus-p18-h16x2x2.png")
-    plt.savefig("data-convection-checkerboard-p-refine/convection-checkerboard-p" + str(p[0]) + "-" + str(n) + ".png")
+    plt.savefig("data-convection-helmholtz-kh100/convection-helmholtz-p" + str(p[0]) + "-" + str(n) + ".png")
     #plt.show()
 
     """
