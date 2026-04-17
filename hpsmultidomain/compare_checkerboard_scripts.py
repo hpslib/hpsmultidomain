@@ -4,10 +4,34 @@ import pickle
 
 import matplotlib.pyplot as plt
 
-p_list = [9, 11, 13, 15, 17, 19, 21]
-nboxes_list = [8, 24, 72] #, 216]
+from relative_error_with_interpolation import relative_L2_error
+
+#p_list = [9, 11, 13, 15, 17, 19, 21]
+#p_list = [4, 6, 8, 10, 12, 14, 16, 18] #, 20]
+#nboxes_list = [8, 16, 32, 64, 128] #, 256]
+#nboxes_list = [2, 6, 18, 54, 162]
+
+p_list = [5, 7, 9, 11, 13, 15, 17] #, 19]
+#nboxes_list = [2, 6, 18, 54, 162]
+nboxes_list = [8, 24, 72, 216]
+
+base = nboxes_list[0] # number of boxes along axis for lowest res runs
 
 solutions = []
+
+kh        = 50
+b         = 0
+checkered = True
+shifted   = False
+
+directory = "midpoint-data-helmholtz-"
+
+if checkered:
+    directory = directory + "checkerboard-"
+    if shifted:
+        directory = directory + "shifted-"
+
+directory = directory + "kh" + str(kh) + "-b" + str(b)
 
 for i, p in enumerate(p_list):
     n_list = [(p-2) * _ for _ in nboxes_list]
@@ -15,7 +39,7 @@ for i, p in enumerate(p_list):
     for j, n in enumerate(n_list):
         print(f"Running p={p}, n={n}...")
 
-        file_path = f"data-convection-helmholtz-kh100/helmholtz-p{p}-n{n}.pkl"
+        file_path = directory + f"/helmholtz-p{p}-n{n}.pkl"
 
         # Open the file in read-binary mode ('rb')
         with open(file_path, 'rb') as file:
@@ -27,8 +51,6 @@ for i, p in enumerate(p_list):
 print("All runs complete.")
 
 #print([(p**2 * (n // (p-2))**2, sol.shape) for (p, n, sol) in solutions])
-
-base = 8 # number of boxes alongaxis for lowest res runs
 
 midpoints = torch.zeros(len(p_list), len(nboxes_list), base**2)
 
@@ -67,6 +89,16 @@ for i, p in enumerate(p_list):
         rel_errors[i, j] = rel_error.item()
 
 
+"""
+rel_errors = torch.zeros(len(p_list), len(nboxes_list))
+
+for i, p in enumerate(p_list):
+    for j, nboxes in enumerate(nboxes_list[:-1]):
+        rel_error = relative_L2_error(solutions[i][j], solutions[i][-1], nboxes, nboxes_list[-1], p)
+        print("p = " + str(p) + ", nboxes = " + str(nboxes) + ", nobxes_fine = " + str(nboxes_list[-1]))
+        print(rel_error)
+        rel_errors[i, j] = rel_error
+"""
 print(rel_errors)
 
 def fit_slope(h_vals, err_vals, n_tail=4):
@@ -78,13 +110,19 @@ def fit_slope(h_vals, err_vals, n_tail=4):
 
 for i, p in enumerate(p_list):
     r, intercept = fit_slope([_**(-1) for _ in nboxes_list[:-1]], rel_errors[i,:-1], n_tail=3)
-    plt.loglog(nboxes_list[:-1], rel_errors[i,:-1], label="p=" + str(p))
-    plt.loglog(nboxes_list[:-1], np.exp(intercept) * nboxes_list[:-1]**(-r), 'k--', alpha=0.5)
+    plt.loglog(nboxes_list[:-1], rel_errors[i,:-1], label=f"p={p}, r={r:.2f}")
+    #plt.loglog(nboxes_list[:-1], np.exp(intercept) * nboxes_list[:-1]**(-r), 'k--', alpha=0.5)
     print("p, r = ", p, r)
 
-plt.title("Self-convergence of checkerboard convection field")
+title_start = "Self-convergence of field, kh = "
+if checkered:
+    title_start = "Self-convergence of checkerboard field, kh = "
+    if shifted:
+        title_start = "Self-convergence of shifted checkerboard field, kh = "
+
+plt.title(title_start + str(kh) + ", b = " + str(b))
 plt.xlabel("h^{-1}")
-plt.ylabel("l^2 error relative to h = 1/216")
+plt.ylabel("l^2 error relative to h = 1/" + str(nboxes_list[-1]))
 plt.legend()
-plt.savefig("checkerboard_convergence.pdf")
+plt.savefig(directory + "/convection-convergence.png")
 plt.show()

@@ -176,7 +176,108 @@ def configure_pde_domain(args):
             def c(xx):
                 return bfield_constant(xx,kh)
             #op = pdo.PDO_2d(pdo.ones, pdo.ones, c1=pdo.const(c=b), c2=pdo.const(c=b))
-            op = pdo.PDO_2d(pdo.ones, pdo.ones, c1=pdo.ones, c2=pdo.ones, c=c)
+
+            b = 10
+
+            if kh == 0:
+                print("kh 0 so no helmholtz")
+                op = pdo.PDO_2d(pdo.ones, pdo.ones, c1=pdo.const(c=b), c2=pdo.const(c=b))
+            else:
+                op = pdo.PDO_2d(pdo.ones, pdo.ones, c1=pdo.const(c=b), c2=pdo.const(c=b), c=c)
+        else:
+            raise ValueError("Non-square domain geometries not supported on convection helmholtz steady-state")
+
+    elif (args.pde == "convection_helmholtz_steady_state_checkerboard"):
+        ppw_set = args.ppw is not None
+        nwaves_set = args.nwaves is not None
+        kh_set = args.kh is not None
+        
+        if ((not ppw_set and not nwaves_set and not kh_set)):
+            raise ValueError('oscillatory bfield chosen but ppw and nwaves NOT set')
+        elif (ppw_set and nwaves_set) or (kh_set and nwaves_set) or (ppw_set and kh_set):
+            raise ValueError('At least two of the three between ppw, nwaves, and kh are set. Only use 1!')
+        elif (kh_set):
+            kh = args.kh
+        elif (ppw_set):
+            nwaves = int(args.n[0]/args.ppw)
+            kh = (nwaves+0.03)*2*np.pi+1.8
+        else:
+            nwaves = args.nwaves
+            kh = (nwaves)*2*np.pi
+        
+        if args.d==3:
+            raise ValueError("Convection helmholtz steady-state is 2D only")
+        if args.domain == "square":
+            curved_domain = False
+            b  = np.pi
+            def c(xx):
+                return bfield_constant(xx,kh)
+            #op = pdo.PDO_2d(pdo.ones, pdo.ones, c1=pdo.const(c=b), c2=pdo.const(c=b))
+            if kh == 0:
+                print("kh 0 so no helmholtz")
+                op = pdo.PDO_2d(pdo.ones, pdo.ones, c1=convection_steady_state_patch, c2=convection_steady_state_patch)
+            else:
+                op = pdo.PDO_2d(pdo.ones, pdo.ones, c1=convection_steady_state_patch, c2=convection_steady_state_patch, c=c)
+        else:
+            raise ValueError("Non-square domain geometries not supported on convection helmholtz steady-state")
+
+    elif (args.pde == "helmholtz"):
+        ppw_set = args.ppw is not None
+        nwaves_set = args.nwaves is not None
+        kh_set = args.kh is not None
+        
+        if ((not ppw_set and not nwaves_set and not kh_set)):
+            raise ValueError('oscillatory bfield chosen but ppw and nwaves NOT set')
+        elif (ppw_set and nwaves_set) or (kh_set and nwaves_set) or (ppw_set and kh_set):
+            raise ValueError('At least two of the three between ppw, nwaves, and kh are set. Only use 1!')
+        elif (kh_set):
+            kh = args.kh
+        elif (ppw_set):
+            nwaves = int(args.n[0]/args.ppw)
+            kh = (nwaves+0.03)*2*np.pi+1.8
+        else:
+            nwaves = args.nwaves
+            kh = (nwaves)*2*np.pi
+        
+        if args.d==3:
+            raise ValueError("helmholtz is 2D only")
+        if args.domain == "square":
+            curved_domain = False
+            b  = np.pi
+            def c(xx):
+                return bfield_constant(xx,kh)
+            #op = pdo.PDO_2d(pdo.ones, pdo.ones, c1=pdo.const(c=b), c2=pdo.const(c=b))
+            op = pdo.PDO_2d(pdo.ones, pdo.ones, c=c)
+        else:
+            raise ValueError("Non-square domain geometries not supported on convection helmholtz steady-state")
+
+    elif (args.pde == "helmholtz_checkerboard"):
+        ppw_set = args.ppw is not None
+        nwaves_set = args.nwaves is not None
+        kh_set = args.kh is not None
+        
+        if ((not ppw_set and not nwaves_set and not kh_set)):
+            raise ValueError('oscillatory bfield chosen but ppw and nwaves NOT set')
+        elif (ppw_set and nwaves_set) or (kh_set and nwaves_set) or (ppw_set and kh_set):
+            raise ValueError('At least two of the three between ppw, nwaves, and kh are set. Only use 1!')
+        elif (kh_set):
+            kh = args.kh
+        elif (ppw_set):
+            nwaves = int(args.n[0]/args.ppw)
+            kh = (nwaves+0.03)*2*np.pi+1.8
+        else:
+            nwaves = args.nwaves
+            kh = (nwaves)*2*np.pi
+        
+        if args.d==3:
+            raise ValueError("helmholtz checkerboard is 2D only")
+        if args.domain == "square":
+            curved_domain = False
+            b  = np.pi
+            def c(xx):
+                return bfield_constant(xx,kh) * convection_steady_state_patch(xx).squeeze()
+            #op = pdo.PDO_2d(pdo.ones, pdo.ones, c1=pdo.const(c=b), c2=pdo.const(c=b))
+            op = pdo.PDO_2d(pdo.ones, pdo.ones, c=c)
         else:
             raise ValueError("Non-square domain geometries not supported on convection helmholtz steady-state")
 

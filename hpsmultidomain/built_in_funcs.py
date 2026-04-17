@@ -414,6 +414,6 @@ def convection_steady_state_patch(xx):
     # Color cells where (cell_x + cell_y) is even, like a checkerboard
     checkerboard_mask = ((cell_x + cell_y) % 2 == 0).unsqueeze(1)
     
-    f[checkerboard_mask] = 100
+    f[checkerboard_mask] = 1
 
     return f

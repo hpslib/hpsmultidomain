@@ -95,7 +95,7 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
     elif (args.bc == 'convection_helmholtz_steady_state'):
         if d == 3:
             raise ValueError("convection_steady_state is 3D only")
-        if (args.pde == 'convection_helmholtz_steady_state'):
+        if (args.pde == 'convection_helmholtz_steady_state') or (args.pde == 'convection_helmholtz_steady_state_checkerboard') or (args.pde == 'helmholtz') or (args.pde == 'helmholtz_checkerboard'):
             uu_dir    = lambda xx: torch.zeros(xx.shape[0], 1) #convection_steady_state_manufactured(xx)
             known_sol = True
             ff_body   = lambda xx: torch.ones(xx.shape[0], 1) #convection_steady_state_patch(xx) #convection_steady_state_body_load(xx)
