@@ -3,10 +3,10 @@ from pathlib import Path
 
 kh        = 50
 b         = 0
-checkered = True
+checkered = False
 shifted   = False
 
-directory = "midpoint-data-helmholtz-"
+directory = "data-helmholtz-"
 
 if checkered:
     directory = directory + "checkerboard-"
@@ -20,8 +20,7 @@ dir_path = Path(directory_name)
 dir_path.mkdir(parents=True, exist_ok=True)
 
 #p_list = [9, 11, 13, 15, 17, 19, 21]
-#p_list = [4, 6, 8, 10, 12, 14, 16, 18] #, 20]
-#p_list = [4, 6, 8, 10, 12, 14]
+#p_list = [4, 6, 8, 10, 12, 14, 16, 18]
 
 p_list = [5, 7, 9, 11, 13, 15, 17]
 
@@ -30,9 +29,9 @@ if checkered:
     pde = pde + "_checkerboard"
 
 for p in p_list:
-    #n_list = [2*(p-2), 4*(p-2), 8*(p-2), 16*(p-2), 32*(p-2), 64*(p-2), 128*(p-2)]
+    n_list = [2*(p-2), 4*(p-2), 8*(p-2), 16*(p-2), 32*(p-2), 64*(p-2), 128*(p-2)]
     #n_list = [2*(p-2), 6*(p-2), 18*(p-2), 54*(p-2), 162*(p-2)]
-    n_list = [8*(p-2), 24*(p-2), 72*(p-2), 216*(p-2)]
+    #n_list = [8*(p-2), 24*(p-2), 72*(p-2), 216*(p-2)]
     #n_list = [256*(p-2)]
     for n in n_list:
         cmd = [

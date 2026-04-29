@@ -8,12 +8,12 @@ from relative_error_with_interpolation import relative_L2_error
 
 #p_list = [9, 11, 13, 15, 17, 19, 21]
 #p_list = [4, 6, 8, 10, 12, 14, 16, 18] #, 20]
-#nboxes_list = [8, 16, 32, 64, 128] #, 256]
+nboxes_list = [2, 4, 8, 16, 32, 64, 128] #, 256]
 #nboxes_list = [2, 6, 18, 54, 162]
 
 p_list = [5, 7, 9, 11, 13, 15, 17] #, 19]
 #nboxes_list = [2, 6, 18, 54, 162]
-nboxes_list = [8, 24, 72, 216]
+#nboxes_list = [8, 24, 72, 216]
 
 base = nboxes_list[0] # number of boxes along axis for lowest res runs
 
@@ -21,10 +21,10 @@ solutions = []
 
 kh        = 50
 b         = 0
-checkered = True
+checkered = False
 shifted   = False
 
-directory = "midpoint-data-helmholtz-"
+directory = "data-helmholtz-"
 
 if checkered:
     directory = directory + "checkerboard-"
@@ -51,7 +51,7 @@ for i, p in enumerate(p_list):
 print("All runs complete.")
 
 #print([(p**2 * (n // (p-2))**2, sol.shape) for (p, n, sol) in solutions])
-
+"""
 midpoints = torch.zeros(len(p_list), len(nboxes_list), base**2)
 
 for i, p in enumerate(p_list):
@@ -87,9 +87,9 @@ for i, p in enumerate(p_list):
         print("p = " + str(p) + ", nboxes = " + str(nboxes))
         print(rel_error)
         rel_errors[i, j] = rel_error.item()
-
-
 """
+
+
 rel_errors = torch.zeros(len(p_list), len(nboxes_list))
 
 for i, p in enumerate(p_list):
@@ -98,7 +98,7 @@ for i, p in enumerate(p_list):
         print("p = " + str(p) + ", nboxes = " + str(nboxes) + ", nobxes_fine = " + str(nboxes_list[-1]))
         print(rel_error)
         rel_errors[i, j] = rel_error
-"""
+
 print(rel_errors)
 
 def fit_slope(h_vals, err_vals, n_tail=4):
