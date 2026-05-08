@@ -178,3 +178,32 @@ if (args.pickle is not None):
 # Optional: visualization of computed solution
 if args.visualize:
     visualize_problem(dom, curved_domain, param_map, uu_sol, p, args.visualize, kh, d=args.d, n=args.n[0], f=convection_steady_state_patch)
+
+
+# print shared interface solver if you can:
+#dense_ACC = dom.Aii.toarray()
+
+#print(np.linalg.norm(dense_ACC - dense_ACC.T) / np.linalg.norm(dense_ACC))
+
+import matplotlib.pyplot as plt
+import scipy.sparse as sp
+
+def plot_sparsity(matrix, title="Sparsity Pattern", figsize=(6, 6)):
+    """
+    Plot the sparsity pattern of a matrix.
+    Works with scipy sparse CSR matrices or dense NumPy arrays.
+    """
+    if sp.issparse(matrix):
+        matrix = matrix.toarray()
+
+    plt.figure(figsize=figsize)
+    plt.spy(matrix, markersize=1)
+    #print(f"{title}  ({np.count_nonzero(matrix)} nonzeros, "
+    #          f"{100 * np.count_nonzero(matrix) / matrix.size:.1f}\% dense)")
+    print(100 * np.count_nonzero(matrix) / matrix.size)
+    plt.title("Slab of 10x10 boxes: sparsity")
+    plt.tight_layout()
+    plt.savefig("sparsity_pattern.png")
+    plt.show()
+
+#plot_sparsity(dom.Aii, title="")
