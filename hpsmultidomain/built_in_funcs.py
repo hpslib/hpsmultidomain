@@ -382,3 +382,38 @@ def  sinsinh_test(p):
     Lx = 2
     solution = torch.sin(np.pi*k*p[:,1])*torch.sin(np.pi*k*p[:,2])*torch.sinh(np.sqrt(2)*k*np.pi*(Lx-p[:,0]))/np.sinh(np.sqrt(2)*k*np.pi*Lx)
     return solution.unsqueeze(-1)
+
+
+def convection_steady_state_manufactured(xx):
+    u = torch.sin(torch.pi * xx[:,0]) * torch.sin(torch.pi * xx[:,1])
+    return u.unsqueeze(-1)
+
+def convection_steady_state_body_load(xx):
+    f = (torch.pi**2) * (2*torch.sin(torch.pi*xx[:,0])*torch.sin(torch.pi*xx[:,1])
+                         + torch.sin(torch.pi*xx[:,0])*torch.cos(torch.pi*xx[:,1])
+                         + torch.cos(torch.pi*xx[:,0])*torch.sin(torch.pi*xx[:,1]))
+
+    return f.unsqueeze(-1)
+
+def convection_steady_state_patch(xx):
+
+    #f = torch.ones(xx.shape[0], 1)
+    #patch_lower = 0.375
+    #patch_upper = 0.5
+    #f[(xx[:,0] >= patch_lower) & (xx[:,0] <= patch_upper) & (xx[:,1] >= patch_lower) & (xx[:,1] <= patch_upper)] = 100
+
+    f = torch.zeros(xx.shape[0], 1)
+
+    patch_size = 0.125
+    shift = 0 #0.01
+
+    # Find which cell index each coordinate belongs to
+    cell_x = ((xx[:, 0] + shift) / patch_size).floor().long()
+    cell_y = ((xx[:, 1] + shift) / patch_size).floor().long()
+    
+    # Color cells where (cell_x + cell_y) is even, like a checkerboard
+    checkerboard_mask = ((cell_x + cell_y) % 2 == 0).unsqueeze(1)
+    
+    f[checkerboard_mask] = 1
+
+    return f
