@@ -2,13 +2,13 @@ import numpy as np
 import scipy
 import torch
 
-from hps.pdo               import PDO_2d,PDO_3d,const
-from hps.geom              import BoxGeometry
-from hps.domain_driver     import Domain_Driver
+from hpsmultidomain.pdo               import PDO_2d,PDO_3d,const
+from hpsmultidomain.geom              import BoxGeometry
+from hpsmultidomain.domain_driver     import Domain_Driver
 
 import matplotlib.pyplot as plt
 
-def get_discretization_relerr(a,p,kh,ndim,elongated_x=False,elongated_y=False,sparse_assembly='reduced_gpu',solver_type='MUMPS'):
+def get_discretization_relerr(a,p,kh,ndim,elongated_x=False,elongated_y=False,sparse_assembly='reduced_cpu',solver_type='superLU'):
 
 	# Check CUDA availability and adjust settings accordingly
 	print("CUDA available %s" % torch.cuda.is_available())
@@ -35,6 +35,7 @@ def get_discretization_relerr(a,p,kh,ndim,elongated_x=False,elongated_y=False,sp
 
 	solver    = Domain_Driver(geom,pdo,0,a,p,d=ndim)
 	solver.build(sparse_assembly, solver_type,verbose=False)
+	solver.build_factorize(solver_type, True)
 	return  solver.verify_discretization(kh)
 
 
@@ -75,8 +76,3 @@ def test_hps_3d():
 	relerr = get_discretization_relerr(a,p,kh,ndim)
 	print(f"Relative error for 3D Helmholtz with kh={kh} is {relerr}")
 	assert relerr < 5e-8
-
-
-test_hps_2d()
-test_hps_2d_elongated()
-test_hps_3d()
