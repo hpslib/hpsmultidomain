@@ -11,7 +11,7 @@ p_list = [10,12,14,16,18,20,22]
 
 domain = "square"
 pde = "bfield_constant"
-bc = "log_dist"
+bc = "free_space"
 ppw = None
 kh = 40
 delta_t = None
