@@ -116,7 +116,7 @@ def Aloc_acc(p, d, nboxes, xx_flat, Aloc, func, D, c=1.):
     Aloc     += f_vals * D.unsqueeze(0)
 
     
-def form_DtNs(p,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,
+def form_DtNs(p,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,Extrap_unq,pdo,
           box_start,box_end,device,mode,interpolate,data,ff_body_func,ff_body_vec,uu_true):
     args = p,xxloc,Ds,pdo,box_start,box_end
     """
@@ -176,9 +176,23 @@ def form_DtNs(p,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,
     
     # Solve for the subdomain interiors:
     elif (mode == 'solve'):
-
-        # First we may need to compute the RHS if it has a body load:
+        
         nrhs   = data.shape[-1]
+        uu_sol = torch.zeros(box_end-box_start,np.prod(p),2*nrhs,device=device)
+        
+        # We use different indexing schemes for dropped corners and Gaussian:
+        if interpolate == False:
+            if d==2: # Extrapolation matrix:
+                uu_sol[:,Jxun,:nrhs] = Extrap_unq.unsqueeze(0) @ data[box_start:box_end]
+            else:
+                uu_sol[:,Jx,:nrhs] = data[box_start:box_end]
+            uu_sol[:,Jc,:nrhs] = -Aloc[:,Jc[:,None],Jx] @ data[box_start:box_end]
+        else:
+            # Need to make this Jxunique:
+            uu_sol[:,Jxun,:nrhs] = Intmap_unq.unsqueeze(0) @ data[box_start:box_end]
+            uu_sol[:,Jc,:nrhs]   = -Aloc[:,Jc[:,None],Jxun] @ uu_sol[:,Jxun,:nrhs]
+
+        # We may need to compute the RHS if it has a body load:
         f_body = torch.zeros(box_end-box_start,Jc.shape[0],nrhs,device=device)
         if (ff_body_func is not None):
             xx_flat = xxloc[box_start:box_end,Jc].reshape((box_end-box_start)*np.prod(p-2),d)
@@ -186,18 +200,6 @@ def form_DtNs(p,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,
         if (ff_body_vec is not None):
             f_body_vec_part = ff_body_vec[box_start*np.prod(p):box_end*np.prod(p)].reshape(box_end-box_start,np.prod(p),nrhs)
             f_body         += f_body_vec_part[:,Jc]
-        
-
-        uu_sol = torch.zeros(box_end-box_start,np.prod(p),2*nrhs,device=device)
-        
-        # We use different indexing schemes for dropped corners and Gaussian:
-        if interpolate == False:
-            uu_sol[:,Jx,:nrhs] = data[box_start:box_end]
-            uu_sol[:,Jc,:nrhs] = -Aloc[:,Jc[:,None],Jx] @ data[box_start:box_end]
-        else:
-            # Need to make this Jxunique:
-            uu_sol[:,Jxun,:nrhs] = Intmap_unq.unsqueeze(0) @ data[box_start:box_end]
-            uu_sol[:,Jc,:nrhs]   = -Aloc[:,Jc[:,None],Jxun] @ uu_sol[:,Jxun,:nrhs]
 
         uu_sol[:,Jc,:nrhs]  += f_body    
         uu_sol[:,Jc,:nrhs]   = torch.linalg.solve(Acc, uu_sol[:,Jc,:nrhs])
@@ -234,7 +236,7 @@ def get_DtN_chunksize(p,d,device,mode):
     return np.max([chunk_max, 1])
 
 
-def get_DtNs_helper(p,q,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,\
+def get_DtNs_helper(p,q,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,Extrap_unq,pdo,\
                     box_start,box_end,chunk_init,device,mode,interpolate,data,ff_body_func,ff_body_vec,uu_true):
     """
     Handles the batch scheduling for computing DtNs and leaf solves - designates how many
@@ -254,7 +256,7 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Int
         DtNs = torch.zeros(nboxes,size_surface,1,device=device)
     #print("Built zero arrays in helper")
     chunk_size = chunk_init
-    args = p,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
+    args = p,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,Extrap_unq,pdo
     chunk_list = torch.zeros(int(nboxes/chunk_init)+100,device=device).int(); 
     box_curr = 0; nchunks = 0
 

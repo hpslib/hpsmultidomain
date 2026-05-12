@@ -6,7 +6,7 @@ b         = 0
 checkered = False
 shifted   = False
 
-directory = "data-helmholtz-"
+directory = "new-data-helmholtz-"
 
 if checkered:
     directory = directory + "checkerboard-"

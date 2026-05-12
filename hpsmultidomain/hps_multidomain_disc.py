@@ -434,6 +434,7 @@ class HPS_Multidomain:
         Jxun  = torch.tensor(self.H.JJ.Jxunique).to(device)
         Intmap_rev = torch.tensor(self.H.Interp_mat_reverse).to(device)
         Intmap_unq = torch.tensor(self.H.Interp_mat_unique).to(device)
+        Extrap_unq = torch.tensor(self.H.Extrap_mat_unique).to(device)
             
         Intmap = torch.tensor(self.H.Interp_mat).to(device)
         Ds     = self.H.Ds.to(device)
@@ -441,7 +442,7 @@ class HPS_Multidomain:
         if (mode =='solve'):
             data = data.to(device)
 
-        args = p,q,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
+        args = p,q,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,Extrap_unq,pdo
         
         # reserve at most 1GB memory for stored DtNs at a time
         f = 0.8e9 # 1 * 0.8 = 0.8 GB in bytes
@@ -534,10 +535,13 @@ class HPS_Multidomain:
         if self.interpolate:
             return uu_sol_tot
 
-        nrhs = uu_sol_bnd.shape[-1]
-        Jx = torch.tensor(self.H.JJ.Jx).to(device)
-        Jxun = torch.tensor(self.H.JJ.Jxunique).to(device)
-        Intmap_unq = torch.tensor(self.H.Interp_mat_unique).to(device)
-        uu_sol_tot[:, Jxun, :nrhs] = Intmap_unq.unsqueeze(0) @ uu_sol_bnd
-        uu_sol_tot[:, Jx, :nrhs] = uu_sol_bnd
+        if self.d==3:
+            return uu_sol_tot
+
+        else:
+            nrhs = uu_sol_bnd.shape[-1]
+            Jx = torch.tensor(self.H.JJ.Jx).to(device)
+            Jxun = torch.tensor(self.H.JJ.Jxunique).to(device)
+            uu_sol_tot[:, Jx, :nrhs] = uu_sol_bnd
+        
         return uu_sol_tot

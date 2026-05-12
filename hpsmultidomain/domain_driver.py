@@ -813,7 +813,11 @@ class Domain_Driver(AbstractHPSSolver):
             tic = time()
             sol_tot,resloc_hps = self.hps.solve(device,sol_tot,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
             toc_leaf_solve = time() - tic
+            
             sol_tot = sol_tot.cpu()
+
+            if (known_sol and (uu_dir_vec is None) and self.d==2):
+                sol_tot = self.solve_postprocessing(sol_tot, uu_dir_func)
 
         true_err = torch.tensor([float('nan')])
         if (known_sol):
@@ -821,7 +825,7 @@ class Domain_Driver(AbstractHPSSolver):
             XX       = self.hps.xx_tot
             uu_true  = uu_dir_func(XX.clone())
             uu_true  = torch.reshape(uu_true, (self.hps.nboxes,np.prod(self.hps.p)))
-            Jx       = torch.tensor(self.hps.H.JJ.Jx)#.to(device)
+            Jx       = torch.tensor(self.hps.H.JJ.Jxunique)#.to(device)
             Jc       = torch.tensor(self.hps.H.JJ.Jc)#.to(device)
             Jtot     = torch.hstack((Jc,Jx))
             true_err = torch.linalg.norm(sol_boxes[:,Jtot]-uu_true[:,Jtot]) / torch.linalg.norm(uu_true[:,Jtot])
@@ -830,3 +834,20 @@ class Domain_Driver(AbstractHPSSolver):
             true_err = true_err.item()
 
         return sol_tot,rel_err,true_err,resloc_hps,toc_system_solve,toc_leaf_solve,forward_bdry_error, reverse_bdry_error
+
+
+    def solve_postprocessing(self, sol_tot, uu_dir_func):
+
+        tol = 0.01 * self.hps.hmin # Adding a tolerance to avoid potential numerical error
+
+        coordinates = torch.reshape(self.hps.grid_xx, (-1, 2))
+
+        col0 = coordinates[:, 0]
+        col1 = coordinates[:, 1]
+
+        mask = (col0 < self.box_geom[0,0] + tol) | (col0 > self.box_geom[0,1] - tol) | (col1 < self.box_geom[1,0] + tol) | (col1 > self.box_geom[1,1] - tol)
+        idx  = torch.where(mask)[0]
+
+        sol_tot[idx] = uu_dir_func(coordinates[idx])
+
+        return sol_tot

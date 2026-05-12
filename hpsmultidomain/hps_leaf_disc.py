@@ -8,7 +8,7 @@ from numpy.polynomial  import legendre
 from numpy.polynomial.polynomial import polyvander2d
 from numpy.polynomial.chebyshev import chebvander, chebvander2d
 from numpy.polynomial.legendre import legvander, legvander2d
-from scipy.interpolate import interpn
+from scipy.interpolate import interpn, barycentric_interpolate
 
 from scipy.linalg import null_space
 
@@ -158,6 +158,29 @@ def get_loc_interp_3d(p, q, l):
     condGtC = np.linalg.cond(Interp_loc_GtC)
     condCtG = np.linalg.cond(Interp_loc_CtG)
     return Interp_loc_GtC,Interp_loc_CtG,condGtC,condCtG
+
+
+def get_loc_corner_extrap_2D(p):
+
+    _, croots  = cheb(p-1)
+    croots     = np.flip(croots)
+
+    croots_interior = croots[1:-1]
+    corners         = [-1, 1]
+    mat_rows        = []
+
+    for i in range(croots_interior.shape[0]):
+        input    = np.zeros(croots_interior.shape)
+        input[i] = 1.0
+
+        mat_rows.append(barycentric_interpolate(croots_interior, input, corners))
+
+    extrap_loc = np.vstack(mat_rows).T
+
+    extrap_loc = np.vstack([extrap_loc[0,:], np.eye(p-2), extrap_loc[1,:]])
+
+    return extrap_loc
+
 
 #################################### 2D discretization ##########################################
 
@@ -517,6 +540,11 @@ class HPS_Disc:
             self.Interp_mat         = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_GtC_1,0),2,axis=0),*np.repeat(np.expand_dims(Interp_loc_GtC_2,0),2,axis=0))
             self.Interp_mat_reverse = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_CtG_1,0),2,axis=0),*np.repeat(np.expand_dims(Interp_loc_CtG_2,0),2,axis=0),)
 
+            Extrap_loc_1 = get_loc_corner_extrap_2D(p[0])
+            Extrap_loc_2 = get_loc_corner_extrap_2D(p[1])
+
+            self.Extrap_mat = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Extrap_loc_1,0),2,axis=0),*np.repeat(np.expand_dims(Extrap_loc_2,0),2,axis=0))
+
             # Form averaging operator P. Currently we have two approaches, one is local averaging (P)
             # and the other is orthogonal projection (Pnew):
             P = np.eye(self.Interp_mat.shape[0])
@@ -538,8 +566,11 @@ class HPS_Disc:
             Pnew = V_null @ np.transpose(V_null)
             
             # Apply this to our interpolation matrix to ensure continuity at corner nodes:
-            self.Interp_mat        = P @ self.Interp_mat    # with redundant corners
+            self.Interp_mat        = Pnew @ self.Interp_mat    # with redundant corners
             self.Interp_mat_unique = self.Interp_mat[self.JJ.unique_in_reorder,:] # without redundant corners
+
+            self.Extrap_mat = P @ self.Extrap_mat    # with redundant corners
+            self.Extrap_mat_unique = self.Extrap_mat[self.JJ.unique_in_reorder,:] # without redundant corners
 
             toc = time() - tic
             print ("--Interp_mat has GtC condition number %5.5f, CtG condition number %5.5e, and time to calculate %12.5f"\
@@ -604,6 +635,9 @@ class HPS_Disc:
             # Apply this to our interpolation matrix to ensure continuity at corner nodes:
             self.Interp_mat        = Pnew @ self.Interp_mat    # with redundant corners
             self.Interp_mat_unique = self.Interp_mat[self.JJ.unique_in_reorder,:] # without redundant corners
+
+            # TODO: implement corner/edge extrapolation for 3D
+            self.Extrap_mat_unique = np.zeros(self.Interp_mat_unique.shape)
 
             toc = time() - tic
             print ("--Interp_mat has GtC condition number %5.5f, CtG condition number %5.5e, and time to calculate %12.5f"\
