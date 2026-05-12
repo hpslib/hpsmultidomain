@@ -141,10 +141,7 @@ def run_from_args(args):
             pickle.dump(info, f)
 
     if args.visualize:
-        if args.d == 2:
-            print("Warning: visualization for d=2 not yet implemented")
-        else:
-            visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh)
+        visualize_problem(dom, curved_domain, param_map, uu_sol, p, "new-sinforcing20-data-helmholtz-kh50-b0", kh=kh, n=args.n[0])
 
     return {
         "args": args,
