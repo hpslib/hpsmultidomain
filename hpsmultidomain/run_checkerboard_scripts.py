@@ -3,10 +3,10 @@ from pathlib import Path
 
 kh        = 50
 b         = 0
-checkered = False
-shifted   = False
+checkered = True
+shifted   = True
 
-directory = "new-data-helmholtz-"
+directory = "new-sinforcing20-data-helmholtz-"
 
 if checkered:
     directory = directory + "checkerboard-"

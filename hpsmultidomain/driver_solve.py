@@ -100,7 +100,7 @@ def run_solver(dom, args, curved_domain, kh=0, param_map=None, delta_t=0, num_ti
             #ff_body   = lambda xx: torch.zeros(xx.shape[0], 1) #torch.ones(xx.shape[0], 1)
 
             uu_dir    = lambda xx: torch.zeros(xx.shape[0], 1)
-            ff_body   = lambda xx: torch.ones(xx.shape[0], 1)
+            ff_body   = lambda xx: torch.sin(20 * torch.pi * xx[:,0]) * torch.sin(20 * torch.pi * xx[:,1]) #torch.ones(xx.shape[0], 1)
             known_sol = True
         else:
             raise ValueError()
