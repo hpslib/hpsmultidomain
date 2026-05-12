@@ -16,7 +16,7 @@ ppw = None
 kh = 40
 delta_t = None
 
-output_path = "output/poisson_test/" # Folder needs to exist
+output_path = "output/condensed_test_helmholtz_kh40/" # Folder needs to exist
 
 for p in p_list:
     n_list = list(range(2*(p-2), 150, p-2))
