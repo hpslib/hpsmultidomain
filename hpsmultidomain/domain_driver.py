@@ -606,6 +606,8 @@ class Domain_Driver(AbstractHPSSolver):
             print("\t--memory for (A sparse) (%5.2f) GB"\
                   % (csr_stor))
 
+        info_dict['sparse_mem'] = csr_stor
+
         return info_dict
 
     def _solve_factorized_system(self, ff_body):

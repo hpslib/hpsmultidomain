@@ -10,16 +10,16 @@ from test_3d import run_test_via_argparse
 p_list = [10,12,14,16,18,20,22]
 
 domain = "square"
-pde = "poisson"
+pde = "bfield_constant"
 bc = "log_dist"
 ppw = None
-kh = None
+kh = 40
 delta_t = None
 
 output_path = "output/poisson_test/" # Folder needs to exist
 
 for p in p_list:
-    n_list = list(range(2*(p-2), 200, p-2))
+    n_list = list(range(2*(p-2), 150, p-2))
     
     for n in n_list:
         print("\nRunning " + str(p) + ", " + str(n) + "\n")
