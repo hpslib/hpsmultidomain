@@ -31,6 +31,7 @@ def make_args(**overrides):
         store_sol=False,
         disable_cuda=True,
         periodic_bc=False,
+        no_condense=False,
         test_components=False,
         visualize=False,
     )

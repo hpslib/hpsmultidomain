@@ -167,13 +167,16 @@ def run_from_args(args):
         plt.spy(matrix, markersize=1)
         #print(f"{title}  ({np.count_nonzero(matrix)} nonzeros, "
         #          f"{100 * np.count_nonzero(matrix) / matrix.size:.1f}\% dense)")
+        print(matrix.shape)
+        print(matrix.size)
+        print(np.count_nonzero(matrix))
         print(100 * np.count_nonzero(matrix) / matrix.size)
         plt.title(str(100 * np.count_nonzero(matrix) / matrix.size) + "\% nonzeros")
         plt.tight_layout()
         plt.savefig("sparsity_pattern.png")
         plt.show()
 
-    #plot_sparsity(dom.Aii, title="")
+    plot_sparsity(dom.Aii, title="")
 
     return {
         "args": args,
