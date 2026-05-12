@@ -77,8 +77,8 @@ class HPS_Multidomain:
         self.hmin = self.H.hmin
 
         
-        #print("Boxes", self.n)
-        #print("Total boxes", self.nboxes)
+        print("Boxes", self.n)
+        print("Total boxes", self.nboxes)
         
         Dtmp  = self.H.Ds
         Ds = 0

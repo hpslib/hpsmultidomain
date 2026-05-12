@@ -48,6 +48,7 @@ def build_parser():
     parser.add_argument('--store_sol', action='store_true')
     parser.add_argument('--disable_cuda', action='store_true')
     parser.add_argument('--periodic_bc', action='store_true')
+    parser.add_argument('--no_condense', action='store_true')
 
     parser.add_argument('--test_components', type=bool, required=False, default=False)
     parser.add_argument('--visualize', type=bool, required=False, default=False)
@@ -117,7 +118,7 @@ def run_from_args(args):
     print("p = ", p)
     print("a = ", a)
 
-    dom = Domain_Driver(box_geom, op, kh, a, p=p, d=args.d, periodic_bc=args.periodic_bc)
+    dom = Domain_Driver(box_geom, op, kh, a, p=p, d=args.d, periodic_bc=args.periodic_bc, statically_condense=(not args.no_condense))
 
     print(args.sparse_assembly)
     build_info = build_operator_with_info(dom, args, box_geom, kh)
@@ -145,6 +146,34 @@ def run_from_args(args):
             print("Warning: visualization for d=2 not yet implemented")
         else:
             visualize_problem(dom, curved_domain, param_map, uu_sol, p, kh)
+
+    # print shared interface solver if you can:
+    #dense_ACC = dom.Aii.toarray()
+
+    #print(np.linalg.norm(dense_ACC - dense_ACC.T) / np.linalg.norm(dense_ACC))
+
+    import matplotlib.pyplot as plt
+    import scipy.sparse as sp
+
+    def plot_sparsity(matrix, title="Sparsity Pattern", figsize=(6, 6)):
+        """
+        Plot the sparsity pattern of a matrix.
+        Works with scipy sparse CSR matrices or dense NumPy arrays.
+        """
+        if sp.issparse(matrix):
+            matrix = matrix.toarray()
+
+        plt.figure(figsize=figsize)
+        plt.spy(matrix, markersize=1)
+        #print(f"{title}  ({np.count_nonzero(matrix)} nonzeros, "
+        #          f"{100 * np.count_nonzero(matrix) / matrix.size:.1f}\% dense)")
+        print(100 * np.count_nonzero(matrix) / matrix.size)
+        plt.title(str(100 * np.count_nonzero(matrix) / matrix.size) + "\% nonzeros")
+        plt.tight_layout()
+        plt.savefig("sparsity_pattern.png")
+        plt.show()
+
+    #plot_sparsity(dom.Aii, title="")
 
     return {
         "args": args,

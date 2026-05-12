@@ -582,17 +582,6 @@ class Domain_Driver(AbstractHPSSolver):
             self._require_uncondensed_supported()
             self.A,assembly_time_dict = self.hps.sparse_mat_uncondensed(device,verbose)
         toc_assembly_tot = time() - tic
-
-        #print("Built sparse matrix A")
-        csr_stor  = self.A.data.nbytes
-        csr_stor += self.A.indices.nbytes + self.A.indptr.nbytes
-        csr_stor /= 1e9
-        if (verbose):
-            print("SPARSE ASSEMBLY")
-            print("\t--time for (sparse assembly) (%5.2f) s"\
-                  % (toc_assembly_tot))
-            print("\t--memory for (A sparse) (%5.2f) GB"\
-                  % (csr_stor))
         
         
         ########## sparse slab operations ##########
@@ -605,6 +594,17 @@ class Domain_Driver(AbstractHPSSolver):
                 info_dict['toc_build_blackbox'] += toc_assembly_tot
                
         info_dict['toc_assembly'] = assembly_time_dict['toc_DtN']
+
+        #print("Built sparse matrix A")
+        csr_stor  = self.A_CC.data.nbytes
+        csr_stor += self.A_CC.indices.nbytes + self.A.indptr.nbytes
+        csr_stor /= 1e9
+        if (verbose):
+            print("SPARSE ASSEMBLY")
+            print("\t--time for (sparse assembly) (%5.2f) s"\
+                  % (toc_assembly_tot))
+            print("\t--memory for (A sparse) (%5.2f) GB"\
+                  % (csr_stor))
 
         return info_dict
 
