@@ -21,6 +21,7 @@ def make_p_results(mypath, p_list):
         leaf_res = []
 
         sparse_mem = []
+        factorized_mem = []
 
         #forward_bdry_error = []
         #reverse_bdry_error = []
@@ -49,7 +50,7 @@ def make_p_results(mypath, p_list):
                 #reverse_bdry_error.append(x["reverse_bdry_error"])
 
                 sparse_mem.append(x["sparse_mem"])
-
+                factorized_mem.append(x["factorized_mem"])
 
                 # Interpolation stuff
                 """
@@ -67,7 +68,8 @@ def make_p_results(mypath, p_list):
         p_result = dict(n=n, toc_invert=toc_invert, toc_build_dtn=toc_build_dtn, toc_leaf_solve=toc_leaf_solve,
                         sparse_solve_res=sparse_solve_res, true_res=true_res, leaf_res=leaf_res,
                         toc_system_solve=toc_system_solve,
-                        sparse_mem=sparse_mem, toc_total_build=toc_total_build, toc_total_solve=toc_total_solve)
+                        sparse_mem=sparse_mem, factorized_mem=factorized_mem,
+                        toc_total_build=toc_total_build, toc_total_solve=toc_total_solve)
                         #delta_t=delta_t)
                         #forward_bdry_error=forward_bdry_error, reverse_bdry_error=reverse_bdry_error,
                         #GtC_error=GtC_error, CtG_error=CtG_error, GtC_cond=GtC_cond,CtG_cond=CtG_cond, #INTERPOLATION
@@ -80,9 +82,30 @@ def make_p_results(mypath, p_list):
 
         p_result.set_index('n', inplace=True)
         p_result.sort_index(inplace=True)
+
+        # Postprocessing on factorized memory:
+        p_result = postprocess_factorized_memory(p_result)
+
         p_results.append(pd.DataFrame.from_dict(p_result))
 
     return p_results
+
+# This is needed since some matrices get too large and # nonzeros is stored as int32
+def postprocess_factorized_memory(p_result):
+
+    overflow = False
+
+    col = p_result.columns.get_loc("factorized_mem")
+
+    for i in range(len(p_result)):
+        if (p_result.iat[i, col] < 0) or overflow:
+            p_result.iat[i, col] += 2**32
+            overflow = True
+
+    p_result["factorized_mem"] = (p_result["factorized_mem"] * 8 + p_result["factorized_mem"] * 4) / 1e9
+
+    return p_result
+
 
 def make_plot(p_list, p_results, field, title, xlabel, ylabel, type="plot"):
     legend = []
@@ -277,6 +300,11 @@ plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmhol
 title     = "Sparse system memory for CPU Helmholtz Equation"
 filename  = "output/sparse_system_memory.png"
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, "Memory (GB)", "sparse_mem", filename, type="plot")
+
+
+title     = "Factorized system memory for CPU Helmholtz Equation"
+filename  = "output/factorized_system_memory.png"
+plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, "Memory (GB)", "factorized_mem", filename, type="plot")
 
 """
 p_list_poisson   = [6, 8, 10, 12, 14]
