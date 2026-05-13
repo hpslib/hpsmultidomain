@@ -21,8 +21,8 @@ solutions = []
 
 kh        = 50
 b         = 0
-checkered = True
-shifted   = True
+checkered = False
+shifted   = False
 
 directory = "new-sinforcing20-data-helmholtz-"
 
@@ -108,21 +108,29 @@ def fit_slope(h_vals, err_vals, n_tail=4):
     slope, intercept = np.polyfit(log_h, log_e, 1)
     return slope, intercept
 
+title_start = "Self-convergence of field, $\kappa = "
+if checkered:
+    title_start = "Self-convergence of checkerboard field, $\kappa = "
+    if shifted:
+        title_start = "Self-convergence of shifted checkerboard field, $\kappa = "
+
+figsize = (8,8)
+
+plt.rcParams['figure.figsize'] = [figsize[0],figsize[1]]
+plt.rc('text',usetex=True)
+plt.rc('font',**{'family':'serif','size':18})
+plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
+
 for i, p in enumerate(p_list):
     r, intercept = fit_slope([_**(-1) for _ in nboxes_list[:-1]], rel_errors[i,:-1], n_tail=3)
     plt.loglog(nboxes_list[:-1], rel_errors[i,:-1], label=f"p={p}, r={r:.2f}")
     #plt.loglog(nboxes_list[:-1], np.exp(intercept) * nboxes_list[:-1]**(-r), 'k--', alpha=0.5)
     print("p, r = ", p, r)
 
-title_start = "Self-convergence of field, kh = "
-if checkered:
-    title_start = "Self-convergence of checkerboard field, kh = "
-    if shifted:
-        title_start = "Self-convergence of shifted checkerboard field, kh = "
-
-plt.title(title_start + str(kh) + ", b = " + str(b))
-plt.xlabel("h^{-1}")
-plt.ylabel("l^2 error relative to h = 1/" + str(nboxes_list[-1]))
+plt.title(title_start + str(kh) + "$")
+plt.xlabel("$h^{-1}$")
+plt.ylabel("$l^2$ error relative to $h = 1 / " + str(nboxes_list[-1]) + "$")
 plt.legend()
+plt.grid(True)
 plt.savefig(directory + "/convection-convergence.png")
 plt.show()
