@@ -426,12 +426,27 @@ class Domain_Driver(AbstractHPSSolver):
         ksp.solve(pb, px)
         toc_build = time() - tic
 
+        #ksp.view()
+
+        pc = ksp.getPC()
+        factor = pc.getFactorMatrix()   # returns the Mat holding the factor
+        info   = factor.getInfo()
+
+        print("Fill ratio achieved:", info['fill_ratio_needed'])
+        print("Mallocs during factorization:", info['mallocs'])
+        print("Non-zeros in factor:", info['nz_used'])
+
+        nz = info['nz_used']
+        bytes_estimate = nz * 8 + nz * 4  # 8 bytes/double + 4 bytes/int column index
+        print(f"Rough factor memory: {bytes_estimate / 1e9:.2f} GB")
+
         if (verbose):
             print("\t--time for %s build through petsc = %5.2f seconds"\
                   % (solvertype,toc_build))
                
-        info_dict['toc_build_blackbox']   = toc_build
-        info_dict['solver_type']          = "petsc_"+solvertype
+        info_dict['toc_build_blackbox'] = toc_build
+        info_dict['solver_type']        = "petsc_"+solvertype
+        info_dict['factorized_mem']     = info['nz_used']
         
         self.petsc_LU   = ksp
         #self.solver_Aii = self.petsc_LU

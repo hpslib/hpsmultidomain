@@ -219,5 +219,6 @@ def build_operator_with_info(dom, args, box_geom, kh=0):
     build_info['p'] = args.p
     build_info['delta_t'] = args.delta_t
     build_info['toc_build_blackbox'] = info_dict['toc_build_blackbox']
+    build_info['factorized_mem'] = info_dict['factorized_mem']
 
     return build_info

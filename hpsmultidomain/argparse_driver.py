@@ -176,7 +176,7 @@ def run_from_args(args):
         plt.savefig("sparsity_pattern.png")
         plt.show()
 
-    plot_sparsity(dom.Aii, title="")
+    #plot_sparsity(dom.Aii, title="")
 
     return {
         "args": args,
