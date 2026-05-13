@@ -16,6 +16,7 @@ bc = "free_space"
 ppw = None
 kh = 40
 delta_t = None
+disable_cuda = False
 
 no_condense=False
 
@@ -27,4 +28,4 @@ for p in p_list:
     for n in n_list:
         print("\nRunning " + str(p) + ", " + str(n) + "\n")
         test_file = output_path + "/test_results_p_" + str(p) + "_n_" + str(n) + ".pkl"
-        run_test_case(domain=domain, pde=pde, bc=bc, n=n, p=p, ppw=ppw, kh=kh, delta_t=delta_t, num_timesteps=None, box_xlim=1.0, box_ylim=1.0, periodic_bc=False, components=False, store_sol=False, solver="mumps", assembly_type="reduced_gpu", no_condense=no_condense, pickle=test_file)
+        run_test_case(domain=domain, pde=pde, bc=bc, n=n, p=p, ppw=ppw, kh=kh, delta_t=delta_t, num_timesteps=None, box_xlim=1.0, box_ylim=1.0, periodic_bc=False, components=False, store_sol=False, solver="mumps", disable_cuda=disable_cuda, assembly_type="reduced_gpu", no_condense=no_condense, pickle=test_file)
