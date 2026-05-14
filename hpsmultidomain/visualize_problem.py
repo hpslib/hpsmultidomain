@@ -57,7 +57,8 @@ def visualize_problem(dom, curved_domain, param_map, uu_sol, p, output_start, kh
     #ax.set_xticklabels(["1.4", "1.6"])
 
     #plt.title("Helmholtz Equation: $\kappa = $" + str(kh) + ", $p = $" + str(p) + ", $h$ = 0.625 x 0.5 x 0.5")
-    plt.title("Checkerboard convection steady state, p = " + str(p[0]) + ", n = " + str(n))
+    #plt.title("Checkerboard convection steady state, p = " + str(p[0]) + ", n = " + str(n))
+    #plt.title("Solution to Checkerboard Helmholtz with $f = \sin(20 \pi x) \sin(20 \pi y)$")
     plt.xlabel("x")
     plt.ylabel("  y")
     plt.colorbar(sc, shrink=0.5)
@@ -66,7 +67,7 @@ def visualize_problem(dom, curved_domain, param_map, uu_sol, p, output_start, kh
     plt.savefig(output_start + "/convection-p" + str(p[0]) + "-" + str(n) + ".png")
     #plt.show()
 
-    """
+    
     if f is not None:
         fig2 = plt.figure(figsize=(12, 12))
         ax2 = fig2.add_subplot()
@@ -76,4 +77,4 @@ def visualize_problem(dom, curved_domain, param_map, uu_sol, p, output_start, kh
         plt.colorbar(sc2, shrink=0.5)
         plt.rcParams['figure.figsize'] = [14, 6]
         plt.show()
-    """
+    

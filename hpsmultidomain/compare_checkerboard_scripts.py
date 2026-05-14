@@ -114,7 +114,7 @@ if checkered:
     if shifted:
         title_start = "Self-convergence of shifted checkerboard field, $\kappa = "
 
-figsize = (8,8)
+figsize = (10,8)
 
 plt.rcParams['figure.figsize'] = [figsize[0],figsize[1]]
 plt.rc('text',usetex=True)
@@ -127,7 +127,7 @@ for i, p in enumerate(p_list):
     #plt.loglog(nboxes_list[:-1], np.exp(intercept) * nboxes_list[:-1]**(-r), 'k--', alpha=0.5)
     print("p, r = ", p, r)
 
-plt.title(title_start + str(kh) + "$")
+#plt.title(title_start + str(kh) + "$")
 plt.xlabel("$h^{-1}$")
 plt.ylabel("$l^2$ error relative to $h = 1 / " + str(nboxes_list[-1]) + "$")
 plt.legend()

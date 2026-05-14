@@ -50,7 +50,7 @@ def build_parser():
     parser.add_argument('--periodic_bc', action='store_true')
 
     parser.add_argument('--test_components', type=bool, required=False, default=False)
-    parser.add_argument('--visualize', type=bool, required=False, default=False)
+    parser.add_argument('--visualize', type=str, required=False, default=None)
 
     return parser
 
@@ -140,8 +140,8 @@ def run_from_args(args):
         with open(args.pickle, "wb+") as f:
             pickle.dump(info, f)
 
-    if args.visualize:
-        visualize_problem(dom, curved_domain, param_map, uu_sol, p, "new-sinforcing20-data-helmholtz-kh50-b0", kh=kh, n=args.n[0])
+    if args.visualize is not None:
+        visualize_problem(dom, curved_domain, param_map, uu_sol, p, args.visualize, kh=kh, n=args.n[0])
 
     return {
         "args": args,
