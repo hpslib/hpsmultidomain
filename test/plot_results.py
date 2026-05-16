@@ -6,9 +6,12 @@ import matplotlib.pyplot as plt
 import pickle
 
 def make_p_results(mypath, p_list):
+    print("mypath: " + mypath)
+    print("p_list: " + str(p_list))
     onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
     p_results = []
     for p in p_list:
+        print("p = " + str(p))
         p_files = [_ for _ in onlyfiles if "_p_" + str(p) + "_" in _]
         n = []
         delta_t = []
@@ -262,11 +265,11 @@ path_helmholtz = "output/not_condensed_test_helmholtz_kh40/"
 
 # With GPU:
 
-p_list_poisson   = [10, 12, 14, 16, 18, 20, 22]
+p_list_poisson   = [10] #, 12, 14, 16, 18, 20, 22]
 p_list_helmholtz = p_list_poisson
 
-path_poisson   = "condense_or_no_output/condensed_test_helmholtz_kh40_gpu/"
-path_helmholtz = "condense_or_no_output/not_condensed_test_helmholtz_kh40/"
+path_poisson   = "condense_or_no_output/condensed_test_helmholtz_kh40/"
+path_helmholtz = "output/not_condensed_test_helmholtz_kh40/"
 
 
 p_results_poisson = make_p_results(path_poisson, p_list_poisson)

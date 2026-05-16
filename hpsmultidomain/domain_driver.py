@@ -605,8 +605,7 @@ class Domain_Driver(AbstractHPSSolver):
             raise ValueError("not included in this version")
         else:
             info_dict = self.build_blackboxsolver(solver_type,verbose)
-            if ('toc_build_blackbox' in info_dict):
-                info_dict['toc_build_blackbox'] += toc_assembly_tot
+            info_dict['toc_build_blackbox'] += toc_assembly_tot
                
         info_dict['toc_assembly'] = assembly_time_dict['toc_DtN']
 
