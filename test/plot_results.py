@@ -251,13 +251,23 @@ def plot_trio_results(p_list1, p_list2, p_list3,
     plt.savefig(filename)
     plt.show()
 
-
+# CPU only comparison
+"""
 p_list_poisson   = [10, 14, 18, 22]
 p_list_helmholtz = p_list_poisson
 
-
-path_poisson   = "output/condensed_test_helmholtz_kh40/"
+path_poisson   = "output/condensed_test_helmholtz_kh40_gpu/"
 path_helmholtz = "output/not_condensed_test_helmholtz_kh40/"
+"""
+
+# With GPU:
+
+p_list_poisson   = [10, 12, 14, 16, 18, 20, 22]
+p_list_helmholtz = p_list_poisson
+
+path_poisson   = "condense_or_no_output/condensed_test_helmholtz_kh40_gpu/"
+path_helmholtz = "condense_or_no_output/not_condensed_test_helmholtz_kh40/"
+
 
 p_results_poisson = make_p_results(path_poisson, p_list_poisson)
 

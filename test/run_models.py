@@ -7,8 +7,8 @@ from test_3d import run_test_case
 # Can set different parameters for a longer test here:
 # ranges of p, domain shape, pde and bc of choice,
 # and more (depending on the PDE you wish to solve)
-#p_list = [10,12,14,16,18,20,22]
-p_list = [10,14,18,22]
+p_list = [10,12,14,16,18,20,22]
+#p_list = [10,14,18,22]
 
 domain = "square"
 pde = "bfield_constant"
@@ -18,7 +18,7 @@ kh = 40
 delta_t = None
 disable_cuda = False
 
-no_condense=False
+no_condense = False
 
 output_path = "output/condensed_test_helmholtz_kh40" # Folder needs to exist
 
