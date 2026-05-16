@@ -491,7 +491,7 @@ class HPS_Multidomain:
         
         # Compute the subdomain interiors using get_DtNs, then flatten:
         uu_sol_tot  = self.get_DtNs(device,mode='solve',data=uu_sol_bnd,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=uu_true)
-        uu_sol_tot  = self.fill_missing_boundary_values(device, uu_sol_tot, uu_sol_bnd)
+        #uu_sol_tot  = self.fill_missing_boundary_values(device, uu_sol_tot, uu_sol_bnd)
         uu_sol_flat = uu_sol_tot[...,:nrhs].flatten(start_dim=0,end_dim=-2)
 
         resvec_blocks = torch.linalg.norm(uu_sol_tot[...,nrhs:])
