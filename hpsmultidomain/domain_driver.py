@@ -574,6 +574,8 @@ class Domain_Driver(AbstractHPSSolver):
         elif (sparse_assembly == 'reduced_gpu'):
             device = torch.device('cuda')
 
+        print("backend for assembly and leaf solves = ", device)
+
         #print("About to build sparse matrix")
         tic = time()
         if self.statically_condense:
@@ -732,7 +734,7 @@ class Domain_Driver(AbstractHPSSolver):
 
         uu_sol_tot = torch.zeros(nboxes, np.prod(self.hps.p), nrhs, device=device)
         uu_sol_tot[:, Jc, :] = interior_sol
-        uu_sol_tot = self.hps.fill_missing_boundary_values(device, uu_sol_tot, uu_sol_bnd)
+        #uu_sol_tot = self.hps.fill_missing_boundary_values(device, uu_sol_tot, uu_sol_bnd)
         return uu_sol_tot.flatten(start_dim=0, end_dim=-2).cpu()
         
 
