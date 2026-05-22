@@ -5,13 +5,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import pickle
 
-def make_p_results(mypath, p_list):
-    print("mypath: " + mypath)
-    print("p_list: " + str(p_list))
+
+def make_p_results(mypath, p_list, sparse_diag=False):
     onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
     p_results = []
     for p in p_list:
-        print("p = " + str(p))
         p_files = [_ for _ in onlyfiles if "_p_" + str(p) + "_" in _]
         n = []
         delta_t = []
@@ -44,6 +42,9 @@ def make_p_results(mypath, p_list):
                 #delta_t.append(x["delta_t"])
                 toc_invert.append(x["toc_build_blackbox"])
                 toc_build_dtn.append(x["toc_assembly"])
+                if sparse_diag:
+                    toc_build_dtn[-1] += x["toc_sparse_arrange"]
+
                 toc_system_solve.append(x["toc_solve_petsc"]) # Old
                 toc_leaf_solve.append(x["toc_solve_leaf"])
                 sparse_solve_res.append(x["res_solve_petsc"])
@@ -96,14 +97,14 @@ def make_p_results(mypath, p_list):
 # This is needed since some matrices get too large and # nonzeros is stored as int32
 def postprocess_factorized_memory(p_result):
 
-    overflow = False
+    overflow = 0
 
     col = p_result.columns.get_loc("factorized_mem")
 
     for i in range(len(p_result)):
-        if (p_result.iat[i, col] < 0) or overflow:
-            p_result.iat[i, col] += 2**32
-            overflow = True
+        if (i != 0) and ((p_result.iat[i, col] + overflow * 2**32) < p_result.iat[i - 1, col]):
+            overflow += 1
+        p_result.iat[i, col] += overflow * 2**32
 
     p_result["factorized_mem"] = (p_result["factorized_mem"] * 8 + p_result["factorized_mem"] * 4) / 1e9
 
@@ -133,7 +134,7 @@ def make_plot(p_list, p_results, field, title, xlabel, ylabel, type="plot"):
 # Here we'll create a figure plot:
 def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, title, ylabel, data_col, filename, type="loglog"):
     figsize = (16,6)
-    p_results_poisson = make_p_results(path1, p_list1)
+    p_results_poisson = make_p_results(path1, p_list1, sparse_diag=True)
     p_results_helmholtz = make_p_results(path2, p_list2)
 
 
@@ -179,6 +180,7 @@ def plot_paired_results(p_list1, p_list2, path1, path2, subtitle1, subtitle2, ti
     ax2.grid(True)
 
     ax2.sharey(ax1)
+    ax2.sharex(ax1)
 
     plt.savefig(filename)
     plt.show()
@@ -190,7 +192,7 @@ def plot_trio_results(p_list1, p_list2, p_list3,
                       title, ylabel,
                       data_col, filename, type="loglog"):
     figsize = (24,6)
-    p_results_poisson = make_p_results(path1, p_list1)
+    p_results_poisson = make_p_results(path1, p_list1, sparse_diag=True)
     p_results_helmholtz = make_p_results(path2, p_list2)
     p_results_3 = make_p_results(path3, p_list3)
 
@@ -254,6 +256,92 @@ def plot_trio_results(p_list1, p_list2, p_list3,
     plt.savefig(filename)
     plt.show()
 
+
+# Here we'll create a figure plot:
+def plot_trio_results_new(p_list1, p_list2, path1, path2, subtitle1, subtitle2, subtitle3, title, ylabel1, ylabel2, ylabel3, data_col1, data_col2, data_col3, filename, type="loglog"):
+    figsize = (25,6)
+    p_results_poisson = make_p_results(path1, p_list1, sparse_diag=True)
+    p_results_helmholtz = make_p_results(path2, p_list2)
+
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=figsize)
+    fig.subplots_adjust(wspace=0.2)
+    #fig.suptitle(title)
+
+    plt.rcParams['figure.figsize'] = [figsize[0],figsize[1]]
+    plt.rc('text',usetex=True)
+    plt.rc('font',**{'family':'serif','size':22})
+    plt.rc('text.latex',preamble=r'\usepackage{amsfonts,bm}')
+
+    plot_fn = {"loglog": ax1.loglog, "plot": ax1.plot, "semilogy": ax1.semilogy}.get(type)
+    if plot_fn is None:
+        raise ValueError("Type needs to be loglog, plot, or semilogy")
+    
+    for i in range(len(p_list1)):
+        plot_fn(p_results_poisson[i].index**3, p_results_poisson[i][data_col1], '.-', label="$p$ = " + str(p_list1[i]) + " (two-level)")
+
+    ax1.set_prop_cycle(None)
+
+    for i in range(len(p_list2)):
+        plot_fn(p_results_helmholtz[i].index**3, p_results_helmholtz[i][data_col1], '.--', label="$p$ = " + str(p_list2[i]) + " (unreduced)")
+    
+    #ax1.legend(["$p$ = " + str(_) for _ in p_list1] + ["$p$ = " + str(_) for _ in p_list2]) #, loc='upper left', bbox_to_anchor=(1, 1))
+    ax1.set_xlabel("$N$")
+    ax1.set_ylabel(ylabel1)
+    ax1.set_title(subtitle1)
+    ax1.grid(True)
+
+    plot_fn = {"loglog": ax2.loglog, "plot": ax2.plot, "semilogy": ax2.semilogy}.get(type)
+    if plot_fn is None:
+        raise ValueError("Type needs to be loglog, plot, or semilogy")
+
+    for i in range(len(p_list1)):
+        plot_fn(p_results_poisson[i].index**3, p_results_poisson[i][data_col2], '.-')
+
+    ax2.set_prop_cycle(None)
+
+    for i in range(len(p_list2)):
+        plot_fn(p_results_helmholtz[i].index**3, p_results_helmholtz[i][data_col2], '.--')
+    
+    #ax2.legend(["$p$ = " + str(_) for _ in p_list2])
+    ax2.set_xlabel("$N$")
+    ax2.set_ylabel(ylabel2)
+    ax2.set_title(subtitle2)
+    ax2.grid(True)
+
+    plot_fn = {"loglog": ax3.loglog, "plot": ax3.plot, "semilogy": ax3.semilogy}.get(type)
+    if plot_fn is None:
+        raise ValueError("Type needs to be loglog, plot, or semilogy")
+
+    for i in range(len(p_list1)):
+        plot_fn(p_results_poisson[i].index**3, p_results_poisson[i][data_col3], '.-')
+
+    ax3.set_prop_cycle(None)
+
+    for i in range(len(p_list2)):
+        plot_fn(p_results_helmholtz[i].index**3, p_results_helmholtz[i][data_col3], '.--')
+    
+    #ax3.legend(["$p$ = " + str(_) for _ in p_list2])
+    ax3.set_xlabel("$N$")
+    ax3.set_ylabel(ylabel3)
+    ax3.set_title(subtitle3)
+    ax3.grid(True)
+
+    #labels = ["$p$ = " + str(_) for _ in p_list1] + ["$p$ = " + str(_) for _ in p_list2]
+
+    handles, labels = ax1.get_legend_handles_labels()
+
+    num_p = len(p_list_poisson)
+
+    # Interleave: [solid_p8, dashed_p8, solid_p10, dashed_p10, ...]
+    interleaved_handles = [h for pair in zip(handles[:num_p], handles[num_p:]) for h in pair]
+    interleaved_labels  = [l for pair in zip(labels[:num_p],  labels[num_p:])  for l in pair]
+
+    fig.legend(interleaved_handles, interleaved_labels,
+            loc='upper center', bbox_to_anchor=(0.5, 0), ncols=num_p)
+
+    plt.savefig(filename, bbox_inches='tight')
+    plt.show()
+
 # CPU only comparison
 """
 p_list_poisson   = [10, 14, 18, 22]
@@ -265,59 +353,76 @@ path_helmholtz = "output/not_condensed_test_helmholtz_kh40/"
 
 # With GPU:
 
-p_list_poisson   = [10] #, 12, 14, 16, 18, 20, 22]
+p_list_poisson   = [10, 14, 18, 22] #[5, 10, 15, 20]
 p_list_helmholtz = p_list_poisson
 
-path_poisson   = "condense_or_no_output/condensed_test_helmholtz_kh40/"
-path_helmholtz = "output/not_condensed_test_helmholtz_kh40/"
+path_poisson   = "condense_or_no_output/condensed_test_helmholtz_kh40_gpu_sparse_diag/"
+path_helmholtz = "condense_or_no_output/no_condensed_test_helmholtz_kh40_gpu/"
 
 
 p_results_poisson = make_p_results(path_poisson, p_list_poisson)
 
-
+"""
 subtitle1 = "Statically Condensed"
 subtitle2 = "Not Statically Condensed"
-title     = "Relative Errors for CPU Helmholtz Equation"
+title     = "Relative Errors for GPU Helmholtz Equation"
 ylabel    = "Relative Error"
 filename  = "output/compared_accuracy.png"
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "true_res", filename)
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "true_res", filename)
 
 
-title     = "Matrix factorization time for CPU Helmholtz Equation"
+title     = "Matrix factorization time for GPU Helmholtz Equation"
 ylabel    = "Seconds"
 filename  = "output/factor_time.png"
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_invert", filename)
 
-title     = "Prefactor Assembly time for CPU Helmholtz Equation"
+title     = "Prefactor Assembly time for GPU Helmholtz Equation"
 filename  = "output/DtN_time.png"
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_build_dtn", filename, type="plot")
 
-title     = "Leaf solve time for CPU Helmholtz Equation"
+title     = "Leaf solve time for GPU Helmholtz Equation"
 filename  = "output/leaf_time.png"
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_leaf_solve", filename, type="plot")
 
-title     = "Factorized system solve time for CPU Helmholtz Equation"
+title     = "Factorized system solve time for GPU Helmholtz Equation"
 filename  = "output/system_solve_time.png"
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_system_solve", filename)
 
-title     = "Total build time for CPU Helmholtz Equation"
+title     = "Total build time for GPU Helmholtz Equation"
 ylabel    = "Seconds"
 filename  = "output/total_build_time.png"
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_total_build", filename)
 
-title     = "Total system solve time for CPU Helmholtz Equation"
+title     = "Total system solve time for GPU Helmholtz Equation"
 filename  = "output/total_solve_time.png"
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, ylabel, "toc_total_solve", filename)
 
-title     = "Sparse system memory for CPU Helmholtz Equation"
+title     = "Sparse system memory for GPU Helmholtz Equation"
 filename  = "output/sparse_system_memory.png"
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, "Memory (GB)", "sparse_mem", filename, type="plot")
 
 
-title     = "Factorized system memory for CPU Helmholtz Equation"
+title     = "Factorized system memory for GPU Helmholtz Equation"
 filename  = "output/factorized_system_memory.png"
 plot_paired_results(p_list_poisson, p_list_helmholtz, path_poisson, path_helmholtz, subtitle1, subtitle2, title, "Memory (GB)", "factorized_mem", filename, type="plot")
+"""
+
+
+title = "Comparison of Statically-Condensed to Non-Condensed Solver"
+subtitle1 = "Build Stage Time"
+subtitle2 = "Solve Stage Time"
+subtitle3 = "Factorized System Memory"
+ylabel1 = "Seconds"
+ylabel2 = "Seconds"
+ylabel3 = "GB"
+data_col1 = "toc_total_build"
+data_col2 = "toc_total_solve"
+data_col3 = "factorized_mem"
+filename = "new-condensed-not-condensed-comp.png"
+plot_trio_results_new(p_list_poisson, p_list_poisson, path_poisson, path_helmholtz, subtitle1, subtitle2, subtitle3, title, ylabel1, ylabel2, ylabel3, data_col1, data_col2, data_col3, filename, type="loglog")
+plot_trio_results_new(p_list_poisson, p_list_poisson, path_poisson, path_helmholtz, subtitle1, subtitle2, subtitle3, title, ylabel1, ylabel2, ylabel3, data_col1, data_col2, data_col3, filename, type="loglog")
+
 
 """
 p_list_poisson   = [6, 8, 10, 12, 14]
