@@ -1,7 +1,15 @@
 import numpy as np
-from scipy.sparse.linalg import LinearOperator, splu
+from scipy.linalg import lu_factor, lu_solve
+from scipy.sparse.linalg import LinearOperator, aslinearoperator, splu
 from scipy.sparse import csr_matrix, coo_matrix
 from time import time
+
+# python-mumps builds against MPI MUMPS on some systems; importing mpi4py first
+# initializes MPI and avoids low-level MPICH errors when creating a Context.
+try:
+    from mpi4py import MPI as _MPI  # noqa: F401
+except ImportError:
+    _MPI = None
 
 # Attempting to import the python-mumps library for parallel computation, handling failure gracefully
 try:
@@ -19,6 +27,179 @@ try:
 except ImportError:
     print("PETSC NOT IMPORTED")
     petsc_imported = False
+
+
+def petsc_supports_complex():
+    """
+    Return True when the imported PETSc build uses a complex scalar type.
+    """
+    if not petsc_imported:
+        return False
+    return np.issubdtype(np.dtype(PETSc.ScalarType), np.complexfloating)
+
+
+_mumps_supports_complex = None
+
+
+def mumps_supports_complex():
+    """
+    Return True when the imported python-mumps binding accepts complex matrices.
+    """
+    global _mumps_supports_complex
+    if _mumps_supports_complex is not None:
+        return _mumps_supports_complex
+    if not mumps_imported:
+        _mumps_supports_complex = False
+        return _mumps_supports_complex
+
+    try:
+        A = csr_matrix(
+            np.array(
+                [[2.0 + 1.0j, 0.5 - 0.25j], [1.0j, 3.0 - 0.5j]],
+                dtype=np.complex128,
+            )
+        )
+        inst = mumps.Context()
+        inst.analyze(A, ordering='metis')
+        inst.factor(A)
+        _ = inst.solve(np.array([1.0 + 0.0j, 0.25 - 0.5j], dtype=np.complex128))
+        _mumps_supports_complex = True
+    except Exception:
+        _mumps_supports_complex = False
+    return _mumps_supports_complex
+
+
+def _random_unit_vector(n, dtype, seed=0):
+    """
+    Draw a random unit vector of length n with the requested dtype.
+
+    Parameters:
+    - n: int, vector length
+    - dtype: NumPy dtype
+    - seed: int, random seed
+
+    Returns:
+    - v: 1D NumPy array with ||v||_2 = 1
+    """
+    rng = np.random.default_rng(seed)
+    real_dtype = np.float64 if np.issubdtype(np.dtype(dtype), np.complexfloating) else np.float64
+    v = rng.standard_normal(n).astype(real_dtype, copy=False)
+    if np.issubdtype(np.dtype(dtype), np.complexfloating):
+        v = v.astype(np.complex128, copy=False) + 1j * rng.standard_normal(n)
+    nv = np.linalg.norm(v)
+    if nv == 0:
+        raise ValueError("random unit vector generation failed")
+    return v / nv
+
+
+def estimate_operator_2norm(op, nit=20, seed=0):
+    """
+    Estimate the spectral norm ||A||_2 using power iteration on A^* A.
+
+    This is appropriate for possibly nonnormal operators, since it estimates the
+    largest singular value rather than the spectral radius.
+
+    Parameters:
+    - op: matrix-like object or scipy.sparse.linalg.LinearOperator
+    - nit: int, number of power iterations
+    - seed: int, random seed for the starting vector
+
+    Returns:
+    - float: estimate of ||A||_2
+    """
+    op = aslinearoperator(op)
+    dtype = op.dtype if op.dtype is not None else np.float64
+    v = _random_unit_vector(op.shape[1], dtype=dtype, seed=seed)
+
+    for _ in range(nit):
+        w = op.matvec(v)
+        z = op.rmatvec(w)
+        nz = np.linalg.norm(z)
+        if nz == 0:
+            return 0.0
+        v = z / nz
+
+    return float(np.linalg.norm(op.matvec(v)))
+
+
+def estimate_condition_number(op, op_inv, nit=20, seed=0):
+    """
+    Estimate the 2-norm condition number kappa_2(A) = ||A||_2 ||A^{-1}||_2.
+
+    Parameters:
+    - op: matrix-like object or LinearOperator representing A
+    - op_inv: matrix-like object or LinearOperator representing A^{-1}
+    - nit: int, number of power iterations for each norm estimate
+    - seed: int, random seed for the forward operator
+
+    Returns:
+    - op_norm: float, estimate of ||A||_2
+    - inv_norm: float, estimate of ||A^{-1}||_2
+    - cond_est: float, product op_norm * inv_norm
+    """
+    op_norm = estimate_operator_2norm(op, nit=nit, seed=seed)
+    inv_norm = estimate_operator_2norm(op_inv, nit=nit, seed=seed + 7919)
+    return op_norm, inv_norm, op_norm * inv_norm
+
+
+def estimate_effective_condition_number(op, rhs, solution=None, solve_op=None, op_norm=None, nit=20, seed=0):
+    """
+    Estimate the RHS-dependent effective condition number ||A||_2 ||A^{-1}b||_2 / ||b||_2.
+
+    Parameters:
+    - op: matrix-like object or LinearOperator representing A
+    - rhs: right-hand side b
+    - solution: optional precomputed A^{-1}b
+    - solve_op: optional LinearOperator representing A^{-1}, used if solution is not supplied
+    - op_norm: optional precomputed estimate of ||A||_2
+    - nit: int, number of power iterations if op_norm is not supplied
+    - seed: int, random seed if op_norm is not supplied
+
+    Returns:
+    - float: estimate of ||A||_2 ||A^{-1}b||_2 / ||b||_2
+    """
+    rhs = np.asarray(rhs)
+    rhs_norm = np.linalg.norm(rhs)
+    if rhs_norm == 0:
+        return 0.0
+
+    if solution is None:
+        if solve_op is None:
+            raise ValueError("Either solution or solve_op must be supplied.")
+        solve_op = aslinearoperator(solve_op)
+        solution = solve_op.matvec(rhs) if rhs.ndim == 1 else solve_op.matmat(rhs)
+
+    if op_norm is None:
+        op_norm = estimate_operator_2norm(op, nit=nit, seed=seed)
+
+    return float(op_norm * np.linalg.norm(solution) / rhs_norm)
+
+
+def dense_lu_inverse_operator(A):
+    """
+    Factor a dense matrix once and wrap triangular inverse solves in a LinearOperator.
+
+    This is useful for condition-estimation loops, where A^{-1} and A^{-*} are
+    applied many times to the same dense matrix.
+
+    Parameters:
+    - A: 2D NumPy array
+
+    Returns:
+    - LinearOperator representing A^{-1}
+    """
+    A = np.asarray(A)
+    dtype = np.complex128 if np.iscomplexobj(A) else np.float64
+    lu = lu_factor(A)
+    lu_adj = lu_factor(A.conj().T)
+    return LinearOperator(
+        shape=A.shape,
+        dtype=dtype,
+        matvec=lambda x: lu_solve(lu, x),
+        rmatvec=lambda x: lu_solve(lu_adj, x),
+        matmat=lambda X: lu_solve(lu, X),
+        rmatmat=lambda X: lu_solve(lu_adj, X),
+    )
 
 
 def petscdense_to_nparray(pM):
@@ -93,7 +274,7 @@ def setup_mumps(A):
     A = A.tocsr()
 
     inst = mumps.Context()
-    inst.analyze(A, ordering='pord')
+    inst.analyze(A, ordering='metis')
     inst.factor(A)
 
     return inst
@@ -121,7 +302,7 @@ def get_vecsolve(ksp):
         """
         # Create PETSc vectors from NumPy arrays
         pb = PETSc.Vec().createWithArray(b)
-        px = PETSc.Vec().createWithArray(np.zeros(b.shape))
+        px = PETSc.Vec().createWithArray(np.zeros(b.shape, dtype=b.dtype))
         # Solve in-place: px = A^{-1} pb
         ksp.solve(pb, px)
 
@@ -186,7 +367,7 @@ def get_matsolve(ksp, use_approx):
         - res: 2D NumPy array of same shape, solutions for each column
         """
         vec_solve = get_vecsolve(ksp)
-        res = np.zeros(B.shape)
+        res = np.zeros(B.shape, dtype=B.dtype)
         for j in range(B.shape[-1]):
             res[:, j] = vec_solve(B[:, j])
         return res
@@ -210,30 +391,46 @@ class SparseSolver:
         - use_approx: bool
             If using PETSc, whether to use iterative approximate solves (GMRES+Hypre).
         """
-        # Test if A is symmetric by checking A v ?= A^T v for a random vector v
-        v = np.random.rand(A.shape[0],)
-        self.is_symmetric = np.linalg.norm(A @ v - A.T @ v) < 1e-12
+        # The LinearOperator rmatvec convention is an adjoint action.  For real
+        # matrices this is the transpose, while complex matrices need A^*.
+        v = np.random.rand(A.shape[0],).astype(A.dtype, copy=False)
+        A_adj = A.getH() if np.iscomplexobj(A.data) else A.T
+        self.is_self_adjoint = np.linalg.norm(A @ v - A_adj @ v) < 1e-12
         self.N = A.shape[0]
+        self.dtype = A.dtype
+        self.is_complex = np.iscomplexobj(A.data)
 
-        self.use_mumps = mumps_imported
+        self.mumps_has_complex = mumps_supports_complex()
+        self.use_mumps = mumps_imported and ((not self.is_complex) or self.mumps_has_complex)
         self.use_petsc = petsc_imported
+        self.petsc_has_complex = petsc_supports_complex()
         self.use_approx = use_approx
+        self.backend = None
+        self.ksp_adj = None
+        self.storage_bytes = None
 
+        tic = time()
         if self.use_mumps:
             # Build solver on A
+            self.backend = 'mumps'
             self.ksp = setup_mumps(A)
-            if not self.is_symmetric:
-                # If A is nonsymmetric, build a separate KSP on A^T for transpose solves
-                self.ksp_adj = setup_mumps(A.T)
-        elif self.use_petsc:
+            if not self.is_self_adjoint:
+                self.ksp_adj = setup_mumps(A.getH() if self.is_complex else A.T)
+        elif self.use_petsc and ((not self.is_complex) or self.petsc_has_complex):
             # Build KSP solver on A
+            self.backend = 'petsc'
             self.ksp = setup_ksp(A, use_approx)
-            if not self.is_symmetric:
-                # If A is nonsymmetric, build a separate KSP on A^T for transpose solves
-                self.ksp_adj = setup_ksp(A.T, use_approx)
+            if not self.is_self_adjoint:
+                self.ksp_adj = setup_ksp(A.getH() if self.is_complex else A.T, use_approx)
         else:
             # Fallback to SciPy’s LU decomposition (CSC format for efficiency)
+            self.backend = 'superlu'
             self.ksp = splu(A.tocsc())
+            self.storage_bytes = (
+                self.ksp.L.data.nbytes + self.ksp.L.indices.nbytes + self.ksp.L.indptr.nbytes
+                + self.ksp.U.data.nbytes + self.ksp.U.indices.nbytes + self.ksp.U.indptr.nbytes
+            )
+        self.build_time = time() - tic
 
         # Perform a test solve to gauge performance (solve A x = A v)
         rhs = A @ v
@@ -241,10 +438,38 @@ class SparseSolver:
         _ = self.solve_op.matvec(rhs)
         toc = time() - tic
 
-        if not self.use_mumps and self.use_petsc:
+        if self.backend == 'petsc':
             niter = self.ksp.getIterationNumber()
             # Optionally, print or log timing and iteration counts here
             # print(f"use_approx={use_approx}, solve time={toc:.2e}, relerr={np.linalg.norm(res-v):.2e}, iter={niter}")
+
+    def _solve_mumps(self, solver, rhs):
+        rhs = np.asarray(rhs)
+        if rhs.ndim == 1:
+            return np.asarray(solver.solve(rhs.copy()))
+
+        sol = np.zeros(rhs.shape, dtype=np.result_type(rhs.dtype, self.dtype))
+        for j in range(rhs.shape[-1]):
+            sol[:, j] = np.asarray(solver.solve(rhs[:, j].copy()))
+        return sol
+
+    def _solve_backend(self, rhs, adjoint=False):
+        rhs = np.asarray(rhs)
+        if (not self.is_complex) and np.iscomplexobj(rhs):
+            return self._solve_backend(rhs.real, adjoint=adjoint) + 1j * self._solve_backend(rhs.imag, adjoint=adjoint)
+
+        if self.backend == 'mumps':
+            solver = self.ksp_adj if adjoint and self.ksp_adj is not None else self.ksp
+            return self._solve_mumps(solver, rhs)
+
+        if self.backend == 'petsc':
+            solver = self.ksp_adj if adjoint and self.ksp_adj is not None else self.ksp
+            if rhs.ndim == 1:
+                return get_vecsolve(solver)(rhs)
+            return get_matsolve(solver, self.use_approx)(rhs)
+
+        trans = 'H' if (adjoint and self.is_complex) else ('T' if adjoint else 'N')
+        return self.ksp.solve(rhs, trans=trans)
 
     @property
     def solve_op(self):
@@ -257,72 +482,21 @@ class SparseSolver:
         Returns:
         - LinearOperator of shape (N, N)
         """
-        if not self.use_mumps and self.is_symmetric:
-            # Use SciPy LU for both matvec and rmatvec (direct symmetric solve)
-            return LinearOperator(
-                shape=(self.N, self.N),
-                matvec=lambda x: self.ksp.solve(x),
-                rmatvec=lambda x: self.ksp.solve(x),
-                matmat=lambda X: self.ksp.solve(X),
-                rmatmat=lambda X: self.ksp.solve(X)
-            )
-
-        elif  self.use_mumps and not self.is_symmetric:
-            # SciPy LU for nonsymmetric: use transpose solve for rmatvec
-            return LinearOperator(
-                shape=(self.N, self.N),
-                matvec=lambda x: self.ksp.solve(x),
-                rmatvec=lambda x: self.ksp_adj.solve(x),
-                matmat=lambda X: self.ksp.solve(X),
-                rmatmat=lambda X: self.ksp_adj.solve(X)
-            )
-
-        elif self.use_petsc and self.is_symmetric:
-            # Symmetric case: matvec and rmatvec are same
-            return LinearOperator(
-                shape=(self.N, self.N),
-                matvec=get_vecsolve(self.ksp),
-                rmatvec=get_vecsolve(self.ksp),
-                matmat=get_matsolve(self.ksp, self.use_approx),
-                rmatmat=get_matsolve(self.ksp, self.use_approx)
-            )
-
-        elif self.use_petsc and not self.is_symmetric:
-            # Nonsymmetric: use ksp for matvec, ksp_adj for rmatvec
-            return LinearOperator(
-                shape=(self.N, self.N),
-                matvec=get_vecsolve(self.ksp),
-                rmatvec=get_vecsolve(self.ksp_adj),
-                matmat=get_matsolve(self.ksp, self.use_approx),
-                rmatmat=get_matsolve(self.ksp_adj, self.use_approx)
-            )
-
-        elif not self.use_petsc and self.is_symmetric:
-            # Use SciPy LU for both matvec and rmatvec (direct symmetric solve)
-            return LinearOperator(
-                shape=(self.N, self.N),
-                matvec=lambda x: self.ksp.solve(x),
-                rmatvec=lambda x: self.ksp.solve(x),
-                matmat=lambda X: self.ksp.solve(X),
-                rmatmat=lambda X: self.ksp.solve(X)
-            )
-
-        else:
-            # SciPy LU for nonsymmetric: use transpose solve for rmatvec
-            return LinearOperator(
-                shape=(self.N, self.N),
-                matvec=lambda x: self.ksp.solve(x),
-                rmatvec=lambda x: self.ksp.solve(x, trans='T'),
-                matmat=lambda X: self.ksp.solve(X),
-                rmatmat=lambda X: self.ksp.solve(X, trans='T')
-            )
+        return LinearOperator(
+            shape=(self.N, self.N),
+            dtype=self.dtype,
+            matvec=lambda x: self._solve_backend(x, adjoint=False),
+            rmatvec=lambda x: self._solve_backend(x, adjoint=not self.is_self_adjoint),
+            matmat=lambda X: self._solve_backend(X, adjoint=False),
+            rmatmat=lambda X: self._solve_backend(X, adjoint=not self.is_self_adjoint),
+        )
 
 
 # ------------------------------------------------------------------------------------
 # CSRBuilder: helper to build a CSR matrix by accumulating COO data
 # ------------------------------------------------------------------------------------
 class CSRBuilder:
-    def __init__(self, M, N, nnz):
+    def __init__(self, M, N, nnz, dtype=float):
         """
         Initialize a builder for an M×N sparse matrix with at most nnz nonzeros.
 
@@ -330,13 +504,14 @@ class CSRBuilder:
         - M: int, number of rows
         - N: int, number of columns
         - nnz: int, maximum number of nonzero entries expected
+        - dtype: NumPy dtype for the stored values
         """
         self.M = M
         self.N = N
         # Preallocate arrays to hold row indices, column indices, and values
         self.row = np.zeros(nnz, dtype=int)
         self.col = np.zeros(nnz, dtype=int)
-        self.data = np.zeros(nnz)
+        self.data = np.zeros(nnz, dtype=dtype)
         # Accumulator points to the next free position in the arrays
         self.acc = 0
 
@@ -351,7 +526,7 @@ class CSRBuilder:
         mat = mat.tocoo()
         ndata = mat.row.shape[0]
         # Ensure we don't overflow the preallocated arrays
-        assert self.acc + ndata < self.data.shape[0]
+        assert self.acc + ndata <= self.data.shape[0]
 
         # Copy row indices, col indices, and values into the builder arrays
         self.row[self.acc : self.acc + ndata] = mat.row

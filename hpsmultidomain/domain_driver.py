@@ -1,6 +1,7 @@
 import torch  # Used for tensor operations
 import numpy as np  # For numerical operations, especially those not directly supported by PyTorch
 import sys  # System-specific parameters and functions
+import scipy.sparse as sp
 
 # Importing parent class:
 from hpsmultidomain.abstract_hps_solver import AbstractHPSSolver
@@ -24,14 +25,6 @@ from hpsmultidomain.sparse_utils import SparseSolver
 try:
     import mumps
     mumps_available = True
-except ImportError:
-    mumps_available = False
-    print("python-mumps not available")
-
-# Attempting to import the python-mumps library for parallel computation, handling failure gracefully
-try:
-    import mumps
-    mumps_available = False
 except ImportError:
     mumps_available = False
     print("python-mumps not available")
@@ -90,14 +83,34 @@ def apply_sparse_lowmem(A, I, J, v, transpose=False):
     Returns:
     - The resulting vector after applying A (or A^T if transpose=True) to v, extracting indices I.
     """
-    vec_full = torch.zeros(A.shape[1], v.shape[-1])
-    vec_full[J] = v
+    if isinstance(v, torch.Tensor):
+        v_np = v.detach().cpu().numpy()
+    else:
+        v_np = np.asarray(v)
+
+    if v_np.ndim == 1:
+        v_np = v_np[:, None]
+
+    vec_full = np.zeros((A.shape[1], v_np.shape[-1]), dtype=v_np.dtype)
+    vec_full[J] = v_np
     vec_full = A.T @ vec_full if transpose else A @ vec_full
-    return torch.tensor(vec_full[I])
+    return torch.from_numpy(np.asarray(vec_full[I]))
 
 # Domain_Driver class for setting up and solving the discretized PDE
 class Domain_Driver(AbstractHPSSolver):
-    def __init__(self, box_geom, pdo_op, kh, a, p=12, d=2, periodic_bc=False, statically_condense=True):
+    def __init__(
+        self,
+        box_geom,
+        pdo_op,
+        kh,
+        a,
+        p=12,
+        d=2,
+        periodic_bc=False,
+        statically_condense=True,
+        use_iti_maps=False,
+        impedance_eta=None,
+    ):
         """
         Initializes the domain and discretization for solving a PDE.
         
@@ -109,11 +122,16 @@ class Domain_Driver(AbstractHPSSolver):
         - p: Polynomial degree for HPS discretization (ignored for FD).
         - d: dimension of domain for HPS
         - periodic_bc: Boolean indicating if periodic boundary conditions are applied.
+        - statically_condense: If True, eliminate leaf interiors before assembling the reduced system.
+        - use_iti_maps: If True, assemble Helmholtz leaf maps as incoming-to-outgoing impedance maps.
+        - impedance_eta: Constant impedance parameter eta; defaults to kh for ItI maps.
         """
         self.d = d
         self.kh = kh
         self.periodic_bc  = periodic_bc
         self.statically_condense = statically_condense
+        self.use_iti_maps = use_iti_maps
+        self.impedance_eta = kh if impedance_eta is None else impedance_eta
         self.box_geometry = box_geom # The full BoxGeometry object
         self.box_geom     = self.box_geometry.bounds.T # The array itself
         self.hps_disc(self.box_geom,a,p,d,pdo_op,periodic_bc)
@@ -219,12 +237,23 @@ class Domain_Driver(AbstractHPSSolver):
     # This needs to be interior only for n_int on ff_body... figure out how to reduce it
     # Also need sol_tot to be just interiors (no global bdry or no box boundary?)
     def solve_dir_full(self, uu_dir, ff_body=None):
+        uu_dir_func = uu_dir if callable(uu_dir) else (lambda xx: uu_dir)
+        uu_dir_vec = None if callable(uu_dir) else uu_dir
+        ff_body_func = ff_body if callable(ff_body) else None
+        ff_body_vec = None if callable(ff_body) else ff_body
 
-        sol_tot, _, _, _, _, _, _, _ = self.solve(uu_dir,uu_dir_vec=uu_dir,ff_body_vec=ff_body)
+        sol_tot, _, _, _, _, _, _, _ = self.solve(
+            uu_dir_func,
+            uu_dir_vec=uu_dir_vec,
+            ff_body_func=ff_body_func,
+            ff_body_vec=ff_body_vec,
+        )
 
         return sol_tot
 
     def verify_discretization(self, kh):
+        if self.use_iti_maps:
+            raise NotImplementedError("verify_discretization currently uses the DtN interface solve.")
         if not self.statically_condense:
             raise NotImplementedError("verify_discretization currently uses the condensed interface solve.")
         # 1) Possibly map XX through a parameterization, if geometry defines one
@@ -259,19 +288,23 @@ class Domain_Driver(AbstractHPSSolver):
         - solve_op:   Optionally, a pre‐constructed LinearOperator for Aii^{-1}.
         - use_approx: If True and PETSc is available, use an approximate iterative solver.
         """
-        sparse_solver = SparseSolver(self.Aii, use_approx=use_approx)
         if solve_op is None:
-            # Build a new SparseSolver on Aii; solver_Aii property will wrap it
-            self.solve_op = sparse_solver.solve_op
+            self.sparse_solver = SparseSolver(self.Aii, use_approx=use_approx)
+            self.solve_op = self.sparse_solver.solve_op
         else:
+            self.sparse_solver = None
             self.solve_op = solve_op
 
-        if mumps_available:
-            self.mumps_LU = sparse_solver.ksp
-        elif petsc_available:
-            self.petsc_LU = sparse_solver.ksp
-        else:
-            self.superLU = sparse_solver.ksp
+        self.mumps_LU = None
+        self.petsc_LU = None
+        self.superLU = None
+        if self.sparse_solver is not None:
+            if self.sparse_solver.backend == 'mumps':
+                self.mumps_LU = self.sparse_solver.ksp
+            elif self.sparse_solver.backend == 'petsc':
+                self.petsc_LU = self.sparse_solver.ksp
+            else:
+                self.superLU = self.sparse_solver.ksp
 
     @property
     def solver_Aii(self):
@@ -492,8 +525,289 @@ class Domain_Driver(AbstractHPSSolver):
         I_ext = lift_surface_inds(self.I_Xtot_in_unique.detach().cpu().numpy())
         return I_int, I_copy1, I_copy2, I_ext, nint_leaf, size_ext
 
+    def _require_iti_supported(self):
+        if not self.use_iti_maps:
+            return
+        if not self.statically_condense:
+            raise NotImplementedError("ItI maps are currently supported only with statically_condense=True.")
+        if self.kh == 0:
+            raise NotImplementedError("ItI maps are currently supported only for Helmholtz problems.")
+        if hasattr(self.geom, 'parameter_map'):
+            raise NotImplementedError("ItI maps are currently supported only for non-mapped square/cube geometries.")
+        if self.periodic_bc:
+            raise NotImplementedError("ItI maps are currently unsupported with periodic boundary conditions.")
+        if self.hps.interpolate:
+            raise NotImplementedError("ItI maps are currently supported only for non-interpolating square/cube cases.")
+
+    def _get_surface_device(self):
+        if self.sparse_assembly == 'reduced_gpu':
+            return torch.device('cuda')
+        return torch.device('cpu')
+
+    def _setup_iti_partitions(self):
+        if hasattr(self, 'iti_leaf_data'):
+            return
+
+        self._require_iti_supported()
+
+        size_ext = len(self.hps.H.JJ.Jx)
+        nboxes = int(self.hps.nboxes)
+        total_surface = nboxes * size_ext
+        tol = 0.01 * self.hps.hmin
+        xx_ext = self.hps.xx_ext
+
+        if self.d == 2:
+            is_exterior = (
+                (xx_ext[:, 0] < self.box_geom[0, 0] + tol)
+                | (xx_ext[:, 0] > self.box_geom[0, 1] - tol)
+                | (xx_ext[:, 1] < self.box_geom[1, 0] + tol)
+                | (xx_ext[:, 1] > self.box_geom[1, 1] - tol)
+            )
+        else:
+            is_exterior = (
+                (xx_ext[:, 0] < self.box_geom[0, 0] + tol)
+                | (xx_ext[:, 0] > self.box_geom[0, 1] - tol)
+                | (xx_ext[:, 1] < self.box_geom[1, 0] + tol)
+                | (xx_ext[:, 1] > self.box_geom[1, 1] - tol)
+                | (xx_ext[:, 2] < self.box_geom[2, 0] + tol)
+                | (xx_ext[:, 2] > self.box_geom[2, 1] - tol)
+            )
+
+        I_Xtot_dup = torch.where(is_exterior)[0]
+        I_Ctot_dup = torch.where(~is_exterior)[0]
+
+        expected_exterior = self.I_Xtot_in_unique.detach().cpu()
+        if not torch.equal(torch.sort(I_Xtot_dup).values, torch.sort(expected_exterior).values):
+            raise ValueError("Failed to match duplicated exterior surface nodes for ItI assembly.")
+
+        self.I_Xtot_dup = I_Xtot_dup
+        self.I_Ctot_dup = I_Ctot_dup
+
+        dup_to_int = -np.ones(total_surface, dtype=int)
+        dup_to_int[I_Ctot_dup.detach().cpu().numpy()] = np.arange(len(I_Ctot_dup))
+        dup_to_ext = -np.ones(total_surface, dtype=int)
+        dup_to_ext[self.I_Xtot_in_unique.detach().cpu().numpy()] = np.arange(len(self.I_Xtot))
+
+        local_surface = np.arange(total_surface, dtype=int).reshape(nboxes, size_ext)
+        self.iti_leaf_data = []
+        for box in range(nboxes):
+            dup_inds = local_surface[box]
+            loc_int_mask = dup_to_int[dup_inds] >= 0
+            loc_int = np.flatnonzero(loc_int_mask)
+            loc_ext = np.flatnonzero(~loc_int_mask)
+            self.iti_leaf_data.append(
+                dict(
+                    dup_inds=dup_inds,
+                    local_int=loc_int,
+                    local_ext=loc_ext,
+                    global_int=dup_to_int[dup_inds[loc_int]],
+                    global_ext=dup_to_ext[dup_inds[loc_ext]],
+                )
+            )
+
+        copy1 = self.hps.I_copy1.detach().cpu().numpy()
+        copy2 = self.hps.I_copy2.detach().cpu().numpy()
+        self.iti_copy1 = dup_to_int[copy1]
+        self.iti_copy2 = dup_to_int[copy2]
+        if np.any(self.iti_copy1 < 0) or np.any(self.iti_copy2 < 0):
+            raise ValueError("Failed to identify internal copy indices for ItI assembly.")
+
+        nint = len(I_Ctot_dup)
+        rows = np.concatenate((self.iti_copy1, self.iti_copy2))
+        cols = np.concatenate((self.iti_copy2, self.iti_copy1))
+        data = np.ones(rows.shape[0], dtype=np.complex128)
+        self.iti_swap = sp.csr_matrix((data, (rows, cols)), shape=(nint, nint))
+        self.iti_ndirected = nint
+        self.iti_nphys = len(self.iti_copy1)
+        self.iti_nint = self.iti_ndirected
+        self.iti_size_ext = size_ext
+
+    def _compute_iti_body_flux(self, ff_body_func=None, ff_body_vec=None):
+        if (ff_body_func is None) and (ff_body_vec is None):
+            return None
+
+        device = self._get_surface_device()
+        body_flux = self.hps.get_DtNs(device, mode='reduce_body', ff_body_func=ff_body_func, ff_body_vec=ff_body_vec)
+        body_flux = -body_flux.detach().cpu().numpy().astype(np.complex128)
+        return body_flux
+
+    def _build_iti_system(self, device, verbose):
+        self._setup_iti_partitions()
+        eta = self.impedance_eta
+
+        tic = time()
+        DtN_loc = self.hps.get_DtNs(device, 'build').detach().cpu().numpy().astype(np.complex128)
+        toc_DtN = time() - tic
+
+        dir_blocks = []
+        rows_dir = []
+        cols_dir = []
+        vals_dir = []
+
+        for box, leaf_data in enumerate(self.iti_leaf_data):
+            loc_int = leaf_data['local_int']
+            loc_ext = leaf_data['local_ext']
+            glob_int = leaf_data['global_int']
+            glob_ext = leaf_data['global_ext']
+
+            T = DtN_loc[box]
+            Tcc = T[np.ix_(loc_int, loc_int)]
+            Tcx = T[np.ix_(loc_int, loc_ext)]
+
+            Icc = np.eye(len(loc_int), dtype=np.complex128)
+            # Local ItI convention: for flux = Tcc u_int + Tcx u_ext,
+            # incoming impedance is g = i eta u_int - flux and outgoing
+            # impedance is h = i eta u_int + flux.  Thus R_dir and B_dir
+            # give h = R_dir g + B_dir u_ext on each leaf, and the global
+            # Schur complement enforces incoming data on one side to equal
+            # outgoing data from the neighboring side.
+            M_dir_inv = np.linalg.inv(1j * eta * Icc - Tcc)
+            R_dir = (Tcc + 1j * eta * Icc) @ M_dir_inv
+            B_dir = 2j * eta * (M_dir_inv @ Tcx)
+
+            leaf_data['dir_M_inv'] = M_dir_inv
+            leaf_data['dir_T_cc'] = Tcc
+            leaf_data['dir_T_cx'] = Tcx
+            leaf_data['dir_R'] = R_dir
+            leaf_data['dir_B'] = B_dir
+            leaf_data['dir_body_map'] = 2j * eta * M_dir_inv
+
+            dir_blocks.append(sp.csr_matrix(R_dir))
+
+            if B_dir.size > 0:
+                row_idx, col_idx = np.meshgrid(glob_int, glob_ext, indexing='ij')
+                rows_dir.extend(row_idx.ravel().tolist())
+                cols_dir.extend(col_idx.ravel().tolist())
+                vals_dir.extend(B_dir.ravel().tolist())
+
+        tic = time()
+        ndirected = self.iti_ndirected
+        next_bdry = len(self.I_Xtot)
+        R_dir = sp.block_diag(dir_blocks, format='csr')
+        B_dir = sp.csr_matrix((vals_dir, (rows_dir, cols_dir)), shape=(ndirected, next_bdry), dtype=np.complex128)
+
+        # Directed ItI equations are g = P(R g + B u_ext), where P swaps the
+        # two leaf-side traces on each physical interface.  This is the doubled
+        # sparse HPS formulation: each leaf keeps its own incoming trace copy.
+        self.iti_R_dir = R_dir
+        self.iti_B_dir = B_dir
+
+        Idirected = speye(ndirected, format='csr', dtype=np.complex128)
+        self.A_CC = (Idirected - self.iti_swap @ R_dir).tocsr()
+        self.A_CX = -(self.iti_swap @ B_dir).tocsr()
+        self.A_XC = sp.csr_matrix((next_bdry, ndirected), dtype=np.complex128)
+        self.A_XX = sp.csr_matrix((next_bdry, next_bdry), dtype=np.complex128)
+        toc_sparse = time() - tic
+
+        t_dict = dict()
+        t_dict['toc_DtN'] = toc_DtN
+        t_dict['toc_sparse'] = toc_sparse
+        return t_dict
+
+    def _get_iti_body_local(self, ff_body_func=None, ff_body_vec=None):
+        body_flux = self._compute_iti_body_flux(ff_body_func=ff_body_func, ff_body_vec=ff_body_vec)
+        if body_flux is None:
+            return None
+
+        rhs_local = np.zeros((self.iti_ndirected, body_flux.shape[-1]), dtype=np.complex128)
+        for box, leaf_data in enumerate(self.iti_leaf_data):
+            rows = leaf_data['global_int']
+            loc_int = leaf_data['local_int']
+            rhs_local[rows] = leaf_data['dir_body_map'] @ body_flux[box, loc_int]
+        return rhs_local
+
+    def _get_iti_body_rhs(self, ff_body_func=None, ff_body_vec=None):
+        rhs_local = self._get_iti_body_local(ff_body_func=ff_body_func, ff_body_vec=ff_body_vec)
+        if rhs_local is None:
+            return None
+        return self.iti_swap @ rhs_local
+
+    def _get_rhs_iti(self, uu_dir_func, uu_dir_vec=None, ff_body_func=None, ff_body_vec=None):
+        if uu_dir_vec is None:
+            boundary_data = uu_dir_func(self.XX_active[self.I_Xtot, :])
+        else:
+            boundary_data = uu_dir_vec
+
+        if isinstance(boundary_data, torch.Tensor):
+            boundary_data_np = boundary_data.detach().cpu().numpy()
+        else:
+            boundary_data_np = np.asarray(boundary_data)
+
+        if boundary_data_np.ndim == 1:
+            boundary_data_np = boundary_data_np[:, None]
+        boundary_data_np = boundary_data_np.astype(np.complex128, copy=False)
+
+        ff_body = -self.A_CX @ boundary_data_np
+        body_rhs = self._get_iti_body_rhs(ff_body_func=ff_body_func, ff_body_vec=ff_body_vec)
+        if body_rhs is not None:
+            ff_body += body_rhs
+
+        return ff_body, torch.from_numpy(boundary_data_np)
+
+    def _expand_iti_solution(self, boundary_np, sol_np, body_flux=None):
+        return sol_np
+
+    def _reconstruct_iti_boundary(self, boundary_data, sol, ff_body_func=None, ff_body_vec=None):
+        boundary_np = boundary_data.detach().cpu().numpy().astype(np.complex128, copy=False)
+        sol_np = sol.detach().cpu().numpy().astype(np.complex128, copy=False)
+        body_flux = self._compute_iti_body_flux(ff_body_func=ff_body_func, ff_body_vec=ff_body_vec)
+        sol_dir = self._expand_iti_solution(boundary_np, sol_np, body_flux=body_flux)
+
+        total_surface = int(self.hps.nboxes) * self.iti_size_ext
+        surface_dup = np.zeros((total_surface, boundary_np.shape[-1]), dtype=np.complex128)
+
+        for box, leaf_data in enumerate(self.iti_leaf_data):
+            rows = leaf_data['global_int']
+            cols = leaf_data['global_ext']
+            dup_inds = leaf_data['dup_inds']
+            loc_int = leaf_data['local_int']
+            loc_ext = leaf_data['local_ext']
+
+            x_int = sol_dir[rows]
+            boundary_leaf = boundary_np[cols]
+            body_leaf = None if body_flux is None else body_flux[box]
+
+            rhs = x_int + leaf_data['dir_T_cx'] @ boundary_leaf
+            if body_leaf is not None:
+                rhs += body_leaf[loc_int]
+            # u_int is the recovered Dirichlet trace on the leaf interfaces.
+            # The ItI system solves for incoming impedance data x_int; this
+            # converts it back to boundary values for the existing leaf solve.
+            u_int = leaf_data['dir_M_inv'] @ rhs
+            u_full = np.zeros((self.iti_size_ext, boundary_np.shape[-1]), dtype=np.complex128)
+            u_full[loc_int] = u_int
+            u_full[loc_ext] = boundary_leaf
+
+            surface_dup[dup_inds] = u_full
+
+        surface_unique = surface_dup[self.hps.I_unique.detach().cpu().numpy()]
+        return torch.from_numpy(surface_unique)
+
+    def _solve_helper_iti(self, uu_dir_func, uu_dir_vec=None, ff_body_func=None, ff_body_vec=None):
+        tic = time()
+        ff_body, boundary_data = self._get_rhs_iti(
+            uu_dir_func,
+            uu_dir_vec=uu_dir_vec,
+            ff_body_func=ff_body_func,
+            ff_body_vec=ff_body_vec,
+        )
+
+        sol = self._solve_factorized_system(ff_body)
+        res = self.A_CC @ sol - ff_body
+        if ff_body.size == 0:
+            relerr = 0.0
+        else:
+            ff_norm = np.linalg.norm(ff_body, ord=2)
+            relerr = np.linalg.norm(res, ord=2) / ff_norm if ff_norm > 0 else np.linalg.norm(res, ord=2)
+        print("NORM OF RESIDUAL for solver %5.2e" % relerr)
+
+        toc_solve = time() - tic
+        return torch.from_numpy(np.asarray(sol)), toc_solve, torch.from_numpy(np.asarray(ff_body)), boundary_data
+
     # Builds the sparse matrix that encodes the solutions to boundary points.
     def build_blackboxsolver(self,solvertype,verbose):
+        if self.use_iti_maps:
+            return dict()
         if not self.statically_condense:
             return self.build_blackboxsolver_uncondensed(solvertype, verbose)
 
@@ -550,13 +864,19 @@ class Domain_Driver(AbstractHPSSolver):
 
     def build_factorize(self,solvertype,verbose):
         info_dict = dict()
-        print("Trimmed the unnecessary parts to make A_CC, now assembly with PETSc (or maybe SuperLU)")
-        if mumps_available:
-            info_dict = self.build_mumps(verbose)
-        elif petsc_available:
-            info_dict = self.build_petsc(solvertype,verbose)
-        else:
-            info_dict = self.build_superLU(verbose)
+        if verbose:
+            print("Trimmed the unnecessary parts to make A_CC, now assembly with PETSc (or maybe SuperLU)")
+
+        use_approx = solvertype not in ('superLU', 'mumps')
+        self.setup_solver_Aii(use_approx=use_approx)
+        backend = self.sparse_solver.backend
+
+        info_dict['toc_build_blackbox'] = self.sparse_solver.build_time
+        info_dict['solver_type'] = backend
+        if backend in ('superlu', 'mumps'):
+            info_dict['toc_build_superLU'] = self.sparse_solver.build_time
+        if self.sparse_solver.storage_bytes is not None:
+            info_dict['mem_build_superLU'] = self.sparse_solver.storage_bytes / 1e9
 
         return info_dict
 
@@ -565,7 +885,9 @@ class Domain_Driver(AbstractHPSSolver):
         """
         Assembles the sparse system, then factorizes it using build_blackboxsolver
         """
-        
+        if self.use_iti_maps:
+            self._require_iti_supported()
+
         self.sparse_assembly = sparse_assembly
         self.solver_type     = solver_type
         ########## sparse assembly ##########
@@ -576,7 +898,10 @@ class Domain_Driver(AbstractHPSSolver):
 
         #print("About to build sparse matrix")
         tic = time()
-        if self.statically_condense:
+        if self.use_iti_maps:
+            assembly_time_dict = self._build_iti_system(device,verbose)
+            self.A = self.A_CC
+        elif self.statically_condense:
             self.A,assembly_time_dict = self.hps.sparse_mat(device,verbose)
         else:
             self._require_uncondensed_supported()
@@ -609,14 +934,11 @@ class Domain_Driver(AbstractHPSSolver):
         return info_dict
 
     def _solve_factorized_system(self, ff_body):
-        if mumps_available:
-            return self.mumps_LU.solve(ff_body)
-        if petsc_available:
-            psol = PETSc.Vec().createWithArray(np.ones(ff_body.shape))
-            pb   = PETSc.Vec().createWithArray(ff_body.copy())
-            self.petsc_LU.solve(pb,psol)
-            return psol.getArray().reshape(ff_body.shape)
-        return self.superLU.solve(ff_body)
+        ff_body = np.asarray(ff_body)
+        solver_Aii = self.solver_Aii
+        if ff_body.ndim == 1:
+            return np.asarray(solver_Aii.matvec(ff_body))
+        return np.asarray(solver_Aii.matmat(ff_body))
                 
     def get_rhs(self,uu_dir_func,uu_dir_vec=None,ff_body_func=None,ff_body_vec=None,sum_body_load=True):
         """
@@ -681,7 +1003,11 @@ class Domain_Driver(AbstractHPSSolver):
         sol = self._solve_factorized_system(ff_body)
 
         res     = self.A_CC @ sol - ff_body
-        relerr  = np.linalg.norm(res,ord=2)/np.linalg.norm(ff_body,ord=2)
+        if ff_body.size == 0:
+            relerr = 0.0
+        else:
+            ff_norm = np.linalg.norm(ff_body,ord=2)
+            relerr  = np.linalg.norm(res,ord=2)/ff_norm if ff_norm > 0 else np.linalg.norm(res,ord=2)
         print("NORM OF RESIDUAL for solver %5.2e" % relerr)
 
         sol       = torch.tensor(sol); ff_body = torch.tensor(ff_body)
@@ -704,7 +1030,11 @@ class Domain_Driver(AbstractHPSSolver):
         sol = self._solve_factorized_system(ff_body)
 
         res = self.A_CC @ sol - ff_body
-        relerr = np.linalg.norm(res, ord=2) / np.linalg.norm(ff_body, ord=2)
+        if ff_body.size == 0:
+            relerr = 0.0
+        else:
+            ff_norm = np.linalg.norm(ff_body, ord=2)
+            relerr = np.linalg.norm(res, ord=2) / ff_norm if ff_norm > 0 else np.linalg.norm(res, ord=2)
         print("NORM OF RESIDUAL for solver %5.2e" % relerr)
 
         toc_solve = time() - tic
@@ -720,7 +1050,7 @@ class Domain_Driver(AbstractHPSSolver):
         nrhs = sol.shape[-1]
         Jc = torch.tensor(self.hps.H.JJ.Jc).to(device)
 
-        surface_sol = torch.zeros((len(self.hps.I_unique), nrhs), device=device)
+        surface_sol = torch.zeros((len(self.hps.I_unique), nrhs), device=device, dtype=sol.dtype)
         surface_sol[self.I_Ctot] = sol[self.uncondensed_nint_total:].to(device)
         if uu_dir_vec is None:
             surface_sol[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot]).to(device)
@@ -742,6 +1072,13 @@ class Domain_Driver(AbstractHPSSolver):
         """
         if (self.solver_type == 'slabLU'):
             raise ValueError("not included in this version")
+        elif self.use_iti_maps:
+            sol,toc_system_solve, ff_body, boundary_data = self._solve_helper_iti(
+                uu_dir_func,
+                uu_dir_vec=uu_dir_vec,
+                ff_body_func=ff_body_func,
+                ff_body_vec=ff_body_vec,
+            )
         elif not self.statically_condense:
             sol,toc_system_solve, ff_body, uu_dir = self.solve_helper_uncondensed(
                 uu_dir_func, uu_dir_vec=uu_dir_vec, ff_body_func=ff_body_func, ff_body_vec=ff_body_vec
@@ -749,7 +1086,24 @@ class Domain_Driver(AbstractHPSSolver):
         else:
             sol,toc_system_solve, ff_body = self.solve_helper_blackbox(uu_dir_func,uu_dir_vec=uu_dir_vec,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
 
-        if not self.statically_condense:
+        if self.use_iti_maps:
+            rel_err = float('nan')
+            forward_bdry_error = float('nan')
+            reverse_bdry_error = float('nan')
+            device = self._get_surface_device()
+
+            surface_sol = self._reconstruct_iti_boundary(
+                boundary_data,
+                sol,
+                ff_body_func=ff_body_func,
+                ff_body_vec=ff_body_vec,
+            ).to(device)
+
+            tic = time()
+            sol_tot,resloc_hps = self.hps.solve(device,surface_sol,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,uu_true=None)
+            toc_leaf_solve = time() - tic
+            sol_tot = sol_tot.cpu()
+        elif not self.statically_condense:
             interior_coords = self.hps.grid_xx[:, self.hps.H.JJ.Jc, :].reshape(-1, self.d)
             if uu_dir_vec is None:
                 true_int_sol = uu_dir_func(interior_coords)
@@ -773,7 +1127,7 @@ class Domain_Driver(AbstractHPSSolver):
             toc_leaf_solve = 0.0
         else:
             # We set the solution on the subdomain boundaries to the result of our sparse system.
-            sol_tot = torch.zeros(len(self.hps.I_unique),1)
+            sol_tot = torch.zeros((len(self.hps.I_unique), sol.shape[-1]), dtype=sol.dtype)
             sol_tot[self.I_Ctot] = sol
 
             # Here we set the true exterior to the given data:

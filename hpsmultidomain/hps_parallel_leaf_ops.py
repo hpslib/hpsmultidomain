@@ -138,19 +138,30 @@ def form_DtNs(p,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,
     # This one doesn't require Aloc
     if (mode == 'reduce_body'):
         nrhs = 1 # Assuming 1 RHS for now
-        f_body  = torch.zeros((box_end-box_start),np.prod(p-2),nrhs,device=device)
+        body_dtype = ff_body_vec.dtype if ff_body_vec is not None else Acc.dtype
+        f_body  = torch.zeros((box_end-box_start),np.prod(p-2),nrhs,device=device,dtype=body_dtype)
         if ff_body_func is not None:
             xx_flat = xxloc[box_start:box_end,Jc].reshape((box_end-box_start)*np.prod(p-2),d)
             tmp = ff_body_func(xx_flat)
-            f_body += tmp.reshape(box_end-box_start,np.prod(p-2),nrhs)
+            tmp = tmp.reshape(box_end-box_start,np.prod(p-2),nrhs)
+            if f_body.dtype != tmp.dtype:
+                f_body = f_body.to(tmp.dtype)
+            f_body += tmp
         if ff_body_vec is not None:
             f_body_vec_part = ff_body_vec[box_start*np.prod(p):box_end*np.prod(p)].reshape(box_end-box_start,np.prod(p),nrhs)
+            if f_body.dtype != f_body_vec_part.dtype:
+                f_body = f_body.to(f_body_vec_part.dtype)
             f_body += f_body_vec_part[:,Jc,:]
 
+        if Acc.dtype != f_body.dtype:
+            Acc = Acc.to(f_body.dtype)
+        Nx_mode = Nx.to(f_body.dtype)
+        Nxc_mode = Nxc.to(f_body.dtype)
+
         if interpolate == False:
-            return -Nx[:,Jc].unsqueeze(0) @ torch.linalg.solve(Acc,f_body)
+            return -Nx_mode[:,Jc].unsqueeze(0) @ torch.linalg.solve(Acc,f_body)
         else:
-            return -Intmap_rev.unsqueeze(0) @ Nxc[:,Jc].unsqueeze(0) @ torch.linalg.solve(Acc,f_body)
+            return -Intmap_rev.to(f_body.dtype).unsqueeze(0) @ Nxc_mode[:,Jc].unsqueeze(0) @ torch.linalg.solve(Acc,f_body)
 
     elif (mode == 'build'):
         nrhs = data.shape[-1]
@@ -176,19 +187,22 @@ def form_DtNs(p,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,
     
     # Solve for the subdomain interiors:
     elif (mode == 'solve'):
+        solve_dtype = data.dtype
+        if Acc.dtype != solve_dtype:
+            Aloc = Aloc.to(solve_dtype)
+            Acc = Acc.to(solve_dtype)
 
         # First we may need to compute the RHS if it has a body load:
         nrhs   = data.shape[-1]
-        f_body = torch.zeros(box_end-box_start,Jc.shape[0],nrhs,device=device)
+        f_body = torch.zeros(box_end-box_start,Jc.shape[0],nrhs,device=device,dtype=solve_dtype)
         if (ff_body_func is not None):
             xx_flat = xxloc[box_start:box_end,Jc].reshape((box_end-box_start)*np.prod(p-2),d)
-            f_body += ff_body_func(xx_flat).reshape(box_end-box_start,np.prod(p-2),nrhs)
+            f_body += ff_body_func(xx_flat).reshape(box_end-box_start,np.prod(p-2),nrhs).to(solve_dtype)
         if (ff_body_vec is not None):
-            f_body_vec_part = ff_body_vec[box_start*np.prod(p):box_end*np.prod(p)].reshape(box_end-box_start,np.prod(p),nrhs)
+            f_body_vec_part = ff_body_vec[box_start*np.prod(p):box_end*np.prod(p)].reshape(box_end-box_start,np.prod(p),nrhs).to(solve_dtype)
             f_body         += f_body_vec_part[:,Jc]
         
-
-        uu_sol = torch.zeros(box_end-box_start,np.prod(p),2*nrhs,device=device)
+        uu_sol = torch.zeros(box_end-box_start,np.prod(p),2*nrhs,device=device,dtype=solve_dtype)
         
         # We use different indexing schemes for dropped corners and Gaussian:
         if interpolate == False:
@@ -249,9 +263,12 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Int
     if (mode == 'build'):
         DtNs = torch.zeros(nboxes,size_surface,size_surface,device=device)
     elif (mode == 'solve'):
-        DtNs = torch.zeros(nboxes,np.prod(p),2*data.shape[-1],device=device)
+        DtNs = torch.zeros(nboxes,np.prod(p),2*data.shape[-1],device=device,dtype=data.dtype)
     elif (mode == 'reduce_body'):
-        DtNs = torch.zeros(nboxes,size_surface,1,device=device)
+        rhs_dtype = torch.cdouble
+        if ff_body_vec is not None:
+            rhs_dtype = ff_body_vec.dtype
+        DtNs = torch.zeros(nboxes,size_surface,1,device=device,dtype=rhs_dtype)
     #print("Built zero arrays in helper")
     chunk_size = chunk_init
     args = p,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo

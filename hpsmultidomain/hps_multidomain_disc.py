@@ -421,9 +421,12 @@ class HPS_Multidomain:
             DtNs = torch.zeros(nboxes, size_ext, size_ext)
             data = torch.zeros(nboxes, size_ext, 1)
         elif (mode == 'solve'):
-            DtNs = torch.zeros(nboxes,np.prod(p),2*data.shape[-1])
+            DtNs = torch.zeros(nboxes,np.prod(p),2*data.shape[-1], dtype=data.dtype)
         elif (mode == 'reduce_body'):
-            DtNs = torch.zeros(nboxes, size_ext, 1)
+            rhs_dtype = torch.cdouble
+            if ff_body_vec is not None:
+                rhs_dtype = ff_body_vec.dtype
+            DtNs = torch.zeros(nboxes, size_ext, 1, dtype=rhs_dtype)
         
         xxloc = self.grid_xx.to(device)
         Nx    = torch.tensor(self.H.Nx).to(device)
@@ -521,7 +524,7 @@ class HPS_Multidomain:
 
         nboxes = int(torch.prod(self.n))
         uu_sol = uu_sol.to(device)
-        uu_sol_bnd = torch.zeros(nboxes*size_ext, nrhs, device=device)
+        uu_sol_bnd = torch.zeros(nboxes*size_ext, nrhs, device=device, dtype=uu_sol.dtype)
         uu_sol_bnd[self.I_unique] = uu_sol
         uu_sol_bnd[self.I_copy2] = uu_sol_bnd[self.I_copy1]
         return uu_sol_bnd.reshape(nboxes, size_ext, nrhs)
@@ -537,7 +540,7 @@ class HPS_Multidomain:
         nrhs = uu_sol_bnd.shape[-1]
         Jx = torch.tensor(self.H.JJ.Jx).to(device)
         Jxun = torch.tensor(self.H.JJ.Jxunique).to(device)
-        Intmap_unq = torch.tensor(self.H.Interp_mat_unique).to(device)
+        Intmap_unq = torch.tensor(self.H.Interp_mat_unique).to(device=device, dtype=uu_sol_bnd.dtype)
         uu_sol_tot[:, Jxun, :nrhs] = Intmap_unq.unsqueeze(0) @ uu_sol_bnd
         uu_sol_tot[:, Jx, :nrhs] = uu_sol_bnd
         return uu_sol_tot
