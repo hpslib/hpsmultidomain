@@ -44,25 +44,57 @@ The Hierarchical Poincaré-Steklov (HPS) Solver is a high-performance computing 
 - [SciPy](https://scipy.org/): For sparse matrix operations and linear algebra.
 - [petsc4py](https://petsc.org/release/petsc4py/) (Optional): To use PETSc for sparse matrix operations. The solver can fall back to SciPy if petsc4py is not available. However, PETSc (particularly using the MUMPS direct solver) makes the code much faster.
 
-## Installation:
-1. Download the repository to your machine.
-2. (Recommended) create a clean Conda environment. Alternatively switch to the environment you wish to incorporate `hpsmultidomain` into.
-3. Navigate to the repository directory and run `pip install .`. This will download hpsmultidomain itself as well as its dependencies.
-4. (Optional but recommended) Install `mpi4py` and `petsc4py` through either Conda or pip, since they generally give better performance than SuperLU.
+## Installation
 
-### (Optional but recommended) MUMPS via petsc4py:
+Clone the repository, then run the remaining commands from its root directory:
 
-1. Install fortran into your environment if it's not there already: `conda install -c conda-forge gfortran`
-2. Set the proper petsc configure options:
-```export PETSC_CONFIGURE_OPTIONS="--with-64-bit-indices --download-mumps --with-debugging=0 --with-mpi=0 --with-mumps-serial --with-fortran-bindings=0 --download-metis --download-scotch --download-bison --download-flex"```
-This downloads `MUMPS` as well as `metis` for improved pivoting. This configuration does not provide MPI support (but still offers OpenMP, which is adequate for many workstations). It removes debugging and fortran bindings (but not compiled fortran) for performance.
-3. Install PETSc: `python -m pip install -v --no-binary=:all: --no-cache-dir petsc`
-4. Install petsc4py: `python -m pip install -v --no-build-isolation --no-binary=:all: --no-cache-dir petsc4py`
+```bash
+git clone https://github.com/hpslib/hpsmultidomain.git
+cd hpsmultidomain
+```
 
-YMMV depending on your machine. You may need to restrict the versions of pip and setuptools:
-`pip install -U "pip<26" "setuptools<75" wheel`
-and/or update cython:
-`python -m pip install --upgrade cython`
+A clean environment is recommended; this example uses Python 3.11 and names
+the environment `petscenv`:
+
+```bash
+conda create -n petscenv python=3.11 -y
+conda activate petscenv
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -e .
+```
+
+If you use a different environment name, substitute it for `petscenv` in the
+commands below.
+
+The editable install includes the core Python dependencies. Without PETSc or
+`python-mumps`, sparse direct solves fall back to SciPy SuperLU.
+
+### PETSc with MUMPS
+
+The tutorials request `solver_type="mumps"`. If your system or cluster already
+provides PETSc, `petsc4py`, and MUMPS, activate that environment and verify it:
+
+```bash
+python -c "from petsc4py import PETSc; assert PETSc.Sys.hasExternalPackage('mumps'), 'PETSc was built without MUMPS'; print('PETSc + MUMPS available')"
+```
+
+Having `petsc4py` alone is not sufficient: its PETSc library must have been
+configured with MUMPS.
+
+For a serial workstation build, install a Fortran compiler and build PETSc with
+MUMPS enabled:
+
+```bash
+conda install -c conda-forge gfortran
+python -m pip install --upgrade "pip<26" "setuptools<75" wheel cython
+export PETSC_CONFIGURE_OPTIONS="--with-64-bit-indices=1 --with-debugging=0 --with-mpi=0 --with-fortran-bindings=0 --download-mumps --download-metis --download-ptscotch"
+python -m pip install -v --no-binary=petsc --no-cache-dir petsc
+python -m pip install -v --no-build-isolation --no-binary=petsc4py --no-cache-dir petsc4py
+```
+
+Run the verification command again after installation. PETSc builds are
+platform-dependent; the [official PETSc installation guide](https://petsc.org/release/install/)
+documents MPI and package-manager alternatives.
 
 ## Example usage
 For a 2D problem:
@@ -73,6 +105,21 @@ And for a 3D problem:
 ```
 python hpsmultidomain/argparse_driver.py --pde poisson --domain square --bc log_dist --n 50 --p 12 --d 3 --solver MUMPS
 ```
+
+## Tutorials
+
+For a direct, non-driver example of a constant-coefficient Helmholtz problem,
+see:
+
+- [`tutorials/constant_coefficient_2d.ipynb`](tutorials/constant_coefficient_2d.ipynb)
+- [`tutorials/constant_coefficient_2d.py`](tutorials/constant_coefficient_2d.py)
+- [`tutorials/helmholtz_known_solution_2d.py`](tutorials/helmholtz_known_solution_2d.py)
+- [`tutorials/helmholtz_known_solution_3d.py`](tutorials/helmholtz_known_solution_3d.py)
+
+The notebook and matching script solve an unknown boundary-value problem and
+interpolate the HPS solution onto a uniform plotting grid. The two short
+known-solution scripts use exterior Helmholtz Green's functions to report 2D
+and 3D errors. All examples request MUMPS directly.
 
 You can also test on preconfigured basic problems by calling `python test/test_multidomain.py` and `python test/test_multidomain_curved.py`
 
