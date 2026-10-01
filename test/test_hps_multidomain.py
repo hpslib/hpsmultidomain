@@ -76,3 +76,8 @@ def test_hps_3d():
 	relerr = get_discretization_relerr(a,p,kh,ndim)
 	print(f"Relative error for 3D Helmholtz with kh={kh} is {relerr}")
 	assert relerr < 5e-8
+
+
+test_hps_2d_elongated()
+test_hps_2d()
+test_hps_3d()

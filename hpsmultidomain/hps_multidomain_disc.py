@@ -32,7 +32,7 @@ def batched_meshgrid(b, npoints, I, J):
 # HPS Multidomain class for handling multidomain discretizations and solutions
 class HPS_Multidomain:
     
-    def __init__(self, pdo, domain, a, p, d, periodic_bc=False):
+    def __init__(self, pdo, domain, a, p, d, periodic_bc=False, neumann_faces=()):
         """
         Initializes the HPS multidomain solver with domain information and discretization parameters.
         
@@ -42,6 +42,9 @@ class HPS_Multidomain:
         - a (float): Characteristic length scale for the domain.
         - p (int): Polynomial degree for spectral methods or discretization parameter.
         - d (int): Spatial dimension of the problem and corresponding discretization
+        - periodic_bc (bool): If True, the left/right (x) domain faces are glued together.
+        - neumann_faces (tuple of str): 2D only. Domain faces ('x_lo', 'x_hi', 'y_lo', 'y_hi')
+          whose points are unknowns held by a single leaf; see I_single in get_unique_inds.
         """
         self.pdo    = pdo
         self.domain = domain
@@ -50,10 +53,17 @@ class HPS_Multidomain:
         self.d      = d
 
         self.periodic_bc = periodic_bc
+        self.neumann_faces = tuple(neumann_faces)
+        if self.neumann_faces and d != 2:
+            raise NotImplementedError("neumann_faces is currently supported only for d=2.")
+        if set(self.neumann_faces) - {'x_lo', 'x_hi', 'y_lo', 'y_hi'}:
+            raise ValueError("unknown face in neumann_faces: %s" % (self.neumann_faces,))
+        if periodic_bc and {'x_lo', 'x_hi'} & set(self.neumann_faces):
+            raise ValueError("the x faces cannot be both periodic and Neumann.")
 
         # For interpolation:
         self.interpolate = True
-        self.q = self.p - 2
+        self.q = self.p - 1
 
         
         if d==2:
@@ -99,7 +109,7 @@ class HPS_Multidomain:
         self.grid_ext = self.grid_xx[:,Jxreorder,:].flatten(start_dim=0,end_dim=-2)
         self.gauss_xx = self.get_gaussian_nodes()
         self.gauss_xx = self.gauss_xx.flatten(start_dim=0,end_dim=-2)
-        self.I_unique, self.I_copy1, self.I_copy2 = self.get_unique_inds()
+        self.I_unique, self.I_copy1, self.I_copy2, self.I_single = self.get_unique_inds()
 
         # We want xx_ext to be based on Gaussian nodes unless there are no mixed terms:
         self.xx_ext = self.gauss_xx
@@ -267,8 +277,15 @@ class HPS_Multidomain:
         """
         Identifies unique and duplicated indices for handling boundary conditions and overlaps between subdomains.
         
+        Every leaf face point ("box" index) is one of: the first or second copy of an
+        interior pair (I_copy1 / I_copy2, aligned so entry k of both is the same physical
+        point), a single copy on a Neumann face (I_single), or a single copy on a
+        Dirichlet face (eliminated; the rest of I_unique, picked out by Domain_Driver).
+
         Returns:
         - I_unique, I_copy1, I_copy2 (torch.Tensor): Tensors representing unique and duplicated grid indices.
+        - I_single (torch.Tensor): box indices of the points on neumann_faces, ascending; each
+          is held by one leaf, so it is in I_unique but has no copy2 partner. Empty in 3D.
         """
         if self.d==2:
             # Assuming gaussian nodes with pxp nodes total
@@ -329,6 +346,19 @@ class HPS_Multidomain:
             I_copy2[:,0,2*size_face1:2*size_face1 + size_face2] = -1 # Eliminate down faces on down edge
             I_copy2 = I_copy2.flatten()
             I_copy2 = I_copy2[I_copy2 > -1]
+
+            # Single copies: the faces of the edge boxes that lie on a Neumann face of the domain.
+            # Like the Dirichlet faces they are in I_unique but in neither I_copy1 nor I_copy2;
+            # unlike them they are unknowns.
+            face_slots = {'x_lo': (0,  slice(None), slice(0, size_face1)),
+                          'x_hi': (-1, slice(None), slice(size_face1, 2*size_face1)),
+                          'y_lo': (slice(None), 0,  slice(2*size_face1, 2*size_face1 + size_face2)),
+                          'y_hi': (slice(None), -1, slice(2*size_face1 + size_face2, 2*size_face1 + 2*size_face2))}
+            I_single = torch.full_like(box_ind, -1)
+            for face in self.neumann_faces:
+                I_single[face_slots[face]] = box_ind[face_slots[face]]
+            I_single = I_single.flatten()
+            I_single = I_single[I_single > -1]
         else:
             # Assuming gaussian nodes with pxp nodes total
             # FOR NOW we're assuming Chebyshev
@@ -397,7 +427,9 @@ class HPS_Multidomain:
             I_copy2 = I_copy2.flatten()
             I_copy2 = I_copy2[I_copy2 > -1]
 
-        return I_unique,I_copy1,I_copy2
+            I_single = torch.zeros(0, dtype=box_ind.dtype) # no Neumann faces in 3D yet
+
+        return I_unique,I_copy1,I_copy2,I_single
     
     
     ########################################## DtN multidomain build and solve ###################################

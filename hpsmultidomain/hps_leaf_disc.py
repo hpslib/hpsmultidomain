@@ -511,7 +511,7 @@ class HPS_Disc:
         
         if self.d==2:
             tic = time()
-            l = p
+            l = p - 1
             Interp_loc_GtC_1,Interp_loc_CtG_1,err,cond = get_loc_interp_2d(p[1], q[1], l[1])
             Interp_loc_GtC_2,Interp_loc_CtG_2,err,cond = get_loc_interp_2d(p[0], q[0], l[0])
             self.Interp_mat         = scipy.linalg.block_diag(*np.repeat(np.expand_dims(Interp_loc_GtC_1,0),2,axis=0),*np.repeat(np.expand_dims(Interp_loc_GtC_2,0),2,axis=0))
@@ -542,12 +542,12 @@ class HPS_Disc:
             self.Interp_mat_unique = self.Interp_mat[self.JJ.unique_in_reorder,:] # without redundant corners
 
             toc = time() - tic
-            print ("--Interp_mat has GtC condition number %5.5f, CtG condition number %5.5e, and time to calculate %12.5f"\
-                % (cond,err,toc))
+            #print ("--Interp_mat has GtC condition number %5.5f, CtG condition number %5.5e, and time to calculate %12.5f"\
+            #    % (cond,err,toc))
 
         else:
             tic = time()
-            l = p #min(p,q) + 10
+            l = p - 1 #min(p,q) + 10
             Interp_loc_GtC1,Interp_loc_CtG1,err,cond = get_loc_interp_3d([p[1], p[2]], [q[1], q[2]], [l[1], l[2]])
             Interp_loc_GtC2,Interp_loc_CtG2,err,cond = get_loc_interp_3d([p[0], p[2]], [q[0], q[2]], [l[0], l[2]])
             Interp_loc_GtC3,Interp_loc_CtG3,err,cond = get_loc_interp_3d([p[0], p[1]], [q[0], q[1]], [l[0], l[1]])
@@ -589,7 +589,7 @@ class HPS_Disc:
                 # Now set the new row to two entries, and zero out one of the entries in the first corner row:
                 B[-1, where[0]] = 1
                 B[-1, where[2]] = 1
-                B[index, where[1]] = 0
+                B[index, where[2]] = 0
 
             # And lastly... convert the second nonzero of every row to -1 so it makes sense:
             for index in range(B.shape[0]):
@@ -606,5 +606,5 @@ class HPS_Disc:
             self.Interp_mat_unique = self.Interp_mat[self.JJ.unique_in_reorder,:] # without redundant corners
 
             toc = time() - tic
-            print ("--Interp_mat has GtC condition number %5.5f, CtG condition number %5.5e, and time to calculate %12.5f"\
-                % (cond,err,toc))
+            #print ("--Interp_mat has GtC condition number %5.5f, CtG condition number %5.5e, and time to calculate %12.5f"\
+            #    % (cond,err,toc))

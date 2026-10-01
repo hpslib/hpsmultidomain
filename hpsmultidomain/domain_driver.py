@@ -96,6 +96,73 @@ def apply_sparse_lowmem(A, I, J, v, transpose=False):
     vec_full = A.T @ vec_full if transpose else A @ vec_full
     return torch.from_numpy(np.asarray(vec_full[I]))
 
+# ---------------------------------------------------------------------------
+# Boundary-condition types (2D)
+# ---------------------------------------------------------------------------
+# Faces are named by axis and side: x_lo / x_hi (left / right) and y_lo / y_hi
+# (down / up). The x faces may be 'dirichlet', 'neumann' or 'periodic'
+# (periodic must be set on both x faces); the y faces 'dirichlet' or 'neumann'.
+#
+# 'neumann' data is the OUTWARD normal derivative du/dn -- the plain
+# derivative, not the conormal c11 du/dn. That is exactly the quantity a leaf
+# DtN row returns (Nx = -D1, +D1, -D2, +D2 on the L, R, D, U faces), with the
+# leaf body load entering as  du/dn = DtN g - h,  h = the 'reduce_body' term;
+# see test/test_dtn_sign_convention.py. It is passed to get_rhs / solve as
+# uu_neu_func or uu_neu_vec (solve_dir_full: uu_neu) at XX_active[I_Ntot],
+# whose outward unit normals are normals_Ntot; with no data, du/dn = 0.
+BC_FACES_2D = ('x_lo', 'x_hi', 'y_lo', 'y_hi')
+BC_ALLOWED_2D = {'x_lo': ('dirichlet', 'neumann', 'periodic'),
+                 'x_hi': ('dirichlet', 'neumann', 'periodic'),
+                 'y_lo': ('dirichlet', 'neumann'),
+                 'y_hi': ('dirichlet', 'neumann')}
+
+
+def resolve_bc_types(d, periodic_bc=False, bc_types=None):
+    """
+    Normalizes a boundary-condition specification to one type per face.
+
+    - bc_types: None (all Dirichlet), or a dict giving a type per axis
+      ('x', 'y') and/or per face ('x_lo', 'x_hi', 'y_lo', 'y_hi'); face
+      entries override axis entries.
+    - periodic_bc=True is the legacy spelling of bc_types={'x': 'periodic'}.
+
+    Returns a dict face -> type for d=2, and None for d=3, where only the
+    legacy periodic_bc flag is supported for now.
+    """
+    if d != 2:
+        if bc_types is not None:
+            raise NotImplementedError("bc_types is currently supported only for d=2; "
+                                      "use periodic_bc in 3D.")
+        return None
+
+    spec = {str(k): str(v).lower() for k, v in (bc_types or {}).items()}
+    if periodic_bc:
+        x_types = {spec[k] for k in ('x', 'x_lo', 'x_hi') if k in spec}
+        if x_types - {'periodic'}:
+            raise ValueError("periodic_bc=True conflicts with bc_types for the x faces: %s" % spec)
+        spec.setdefault('x', 'periodic')
+
+    faces = {f: 'dirichlet' for f in BC_FACES_2D}
+    for key in sorted(spec, key=lambda k: k in BC_FACES_2D):    # axis keys first
+        if key in ('x', 'y'):
+            targets = (key + '_lo', key + '_hi')
+        elif key in BC_FACES_2D:
+            targets = (key,)
+        else:
+            raise ValueError("unknown boundary face %r; expected one of %s or 'x', 'y'"
+                             % (key, BC_FACES_2D))
+        for face in targets:
+            if spec[key] not in BC_ALLOWED_2D[face]:
+                raise ValueError("boundary type %r is not allowed on face %s (allowed: %s)"
+                                 % (spec[key], face, BC_ALLOWED_2D[face]))
+            faces[face] = spec[key]
+
+    if (faces['x_lo'] == 'periodic') != (faces['x_hi'] == 'periodic'):
+        raise ValueError("periodic must be set on both x faces, got x_lo=%r, x_hi=%r"
+                         % (faces['x_lo'], faces['x_hi']))
+    return faces
+
+
 # Domain_Driver class for setting up and solving the discretized PDE
 class Domain_Driver(AbstractHPSSolver):
     def __init__(
@@ -110,6 +177,7 @@ class Domain_Driver(AbstractHPSSolver):
         statically_condense=True,
         use_iti_maps=False,
         impedance_eta=None,
+        bc_types=None,
     ):
         """
         Initializes the domain and discretization for solving a PDE.
@@ -125,9 +193,18 @@ class Domain_Driver(AbstractHPSSolver):
         - statically_condense: If True, eliminate leaf interiors before assembling the reduced system.
         - use_iti_maps: If True, assemble Helmholtz leaf maps as incoming-to-outgoing impedance maps.
         - impedance_eta: Constant impedance parameter eta; defaults to kh for ItI maps.
+        - bc_types: 2D only. Boundary type per axis ('x', 'y') or per face ('x_lo', 'x_hi',
+          'y_lo', 'y_hi'): x faces 'dirichlet' | 'neumann' | 'periodic', y faces
+          'dirichlet' | 'neumann'. Default all Dirichlet; periodic_bc=True is the same as
+          {'x': 'periodic'}. Neumann faces (statically condensed path only) take the outward
+          normal derivative du/dn as data, uu_neu_func / uu_neu_vec in get_rhs and solve
+          (uu_neu in solve_dir_full); without data, du/dn = 0. See _assemble_neumann_blocks.
         """
         self.d = d
         self.kh = kh
+        self.bc_types = resolve_bc_types(d, periodic_bc, bc_types)
+        if self.bc_types is not None:
+            periodic_bc = (self.bc_types['x_lo'] == 'periodic')
         self.periodic_bc  = periodic_bc
         self.statically_condense = statically_condense
         self.use_iti_maps = use_iti_maps
@@ -176,9 +253,10 @@ class Domain_Driver(AbstractHPSSolver):
     @property
     def Ji(self):
         """
-        Index array for interior (duplicated interface) points in the global boundary ordering.
+        Index array for the unknowns of Aii in the global boundary ordering: unknown k is
+        XX[Ji[k]]. The interior (duplicated interface) points come first, then the Neumann points.
         """
-        return self._Ji # aka self.I_Ctot
+        return self._Ji # aka torch.cat((self.I_Ctot, self.I_Ntot))
 
     @property
     def Jx(self):
@@ -205,7 +283,8 @@ class Domain_Driver(AbstractHPSSolver):
     @property
     def Aii(self):
         """
-        Sparse matrix block coupling interior‐interior (duplicated interface) degrees of freedom.
+        Sparse matrix block coupling interior‐interior (duplicated interface) degrees of freedom,
+        bordered by the Neumann points when there are Neumann faces (unknown order: Ji).
         """
         return self.A_CC
 
@@ -236,17 +315,22 @@ class Domain_Driver(AbstractHPSSolver):
 
     # This needs to be interior only for n_int on ff_body... figure out how to reduce it
     # Also need sol_tot to be just interiors (no global bdry or no box boundary?)
-    def solve_dir_full(self, uu_dir, ff_body=None):
+    def solve_dir_full(self, uu_dir, ff_body=None, uu_neu=None):
         uu_dir_func = uu_dir if callable(uu_dir) else (lambda xx: uu_dir)
         uu_dir_vec = None if callable(uu_dir) else uu_dir
         ff_body_func = ff_body if callable(ff_body) else None
         ff_body_vec = None if callable(ff_body) else ff_body
+        # Neumann data (outward du/dn); None means du/dn = 0 on the Neumann faces
+        uu_neu_func = uu_neu if callable(uu_neu) else None
+        uu_neu_vec = None if callable(uu_neu) else uu_neu
 
         sol_tot, _, _, _, _, _, _, _ = self.solve(
             uu_dir_func,
             uu_dir_vec=uu_dir_vec,
             ff_body_func=ff_body_func,
             ff_body_vec=ff_body_vec,
+            uu_neu_func=uu_neu_func,
+            uu_neu_vec=uu_neu_vec,
         )
 
         return sol_tot
@@ -256,6 +340,9 @@ class Domain_Driver(AbstractHPSSolver):
             raise NotImplementedError("verify_discretization currently uses the DtN interface solve.")
         if not self.statically_condense:
             raise NotImplementedError("verify_discretization currently uses the condensed interface solve.")
+        if self.has_neumann:
+            raise NotImplementedError("verify_discretization takes Dirichlet data from a Green's function "
+                                      "and has no Neumann data for the Neumann faces.")
         # 1) Possibly map XX through a parameterization, if geometry defines one
         if hasattr(self.geom, 'parameter_map'):
             XX_mapped = self.geom.parameter_map(self.XX)
@@ -289,6 +376,7 @@ class Domain_Driver(AbstractHPSSolver):
         - use_approx: If True and PETSc is available, use an approximate iterative solver.
         """
         if solve_op is None:
+            self._require_neumann_faces_factorizable()
             self.sparse_solver = SparseSolver(self.Aii, use_approx=use_approx)
             self.solve_op = self.sparse_solver.solve_op
         else:
@@ -330,7 +418,10 @@ class Domain_Driver(AbstractHPSSolver):
 
         assert p.all() > 0
 
-        HPS_multi = hpsmultidomain.hps_multidomain_disc.HPS_Multidomain(pdo_op,box_geom,a,p,d, periodic_bc=periodic_bc)
+        neumann_faces = () if self.bc_types is None else \
+            tuple(face for face, kind in self.bc_types.items() if kind == 'neumann')
+        HPS_multi = hpsmultidomain.hps_multidomain_disc.HPS_Multidomain(pdo_op,box_geom,a,p,d, periodic_bc=periodic_bc,
+                                                                        neumann_faces=neumann_faces)
 
         self.hps = HPS_multi
 
@@ -339,24 +430,40 @@ class Domain_Driver(AbstractHPSSolver):
         tol             = 0.01 * self.hps.hmin # Adding a tolerance to avoid potential numerical error
 
         if d==2:
-            if periodic_bc:
-                I_dir = torch.where((self.XX_active[:,1] < self.box_geom[1,0] + tol)
-                                | (self.XX_active[:,1] > self.box_geom[1,1] - tol))[0]
+            # One rule per face (see BC_FACES_2D / resolve_bc_types):
+            #   dirichlet -> I_Xtot: eliminated, value given
+            #   neumann   -> I_Ntot: an unknown whose equation is its single
+            #                leaf's DtN row (outward du/dn); see
+            #                _assemble_neumann_blocks
+            #   periodic  -> the x faces are interior skeleton. x_hi copies x_lo
+            #                (hps.I_unique already omits it); it is excluded here
+            #                as before, as a guard.
+            # A point on two faces (a corner) would go to I_Xtot first; the
+            # Chebyshev / Gauss face nodes used here contain no corners.
+            on_face = {
+                'x_lo': self.XX_active[:,0] < self.box_geom[0,0] + tol,
+                'x_hi': self.XX_active[:,0] > self.box_geom[0,1] - tol,
+                'y_lo': self.XX_active[:,1] < self.box_geom[1,0] + tol,
+                'y_hi': self.XX_active[:,1] > self.box_geom[1,1] - tol,
+            }
+            is_dir = torch.zeros(self.ntot, dtype=torch.bool)
+            is_neu = torch.zeros(self.ntot, dtype=torch.bool)
+            is_dup = torch.zeros(self.ntot, dtype=torch.bool)
+            for face, kind in self.bc_types.items():
+                if kind == 'dirichlet':
+                    is_dir |= on_face[face]
+                elif kind == 'neumann':
+                    is_neu |= on_face[face]
+                elif face == 'x_hi':            # periodic
+                    is_dup |= on_face[face]
+            is_neu &= ~is_dir
 
-                I_dir2 = torch.where((self.XX_active[:,0] > self.box_geom[0,1] - tol)
-                                | (self.XX_active[:,1] < self.box_geom[1,0] + tol)
-                                | (self.XX_active[:,1] > self.box_geom[1,1] - tol))[0]
-
-                self.I_Xtot = I_dir
-                self.I_Ctot = torch.sort(torch_setdiff1d(torch.arange(self.ntot), I_dir2))[0]
-            else:
-                I_dir = torch.where((self.XX_active[:,0] < self.box_geom[0,0] + tol)
-                                | (self.XX_active[:,0] > self.box_geom[0,1] - tol)
-                                | (self.XX_active[:,1] < self.box_geom[1,0] + tol)
-                                | (self.XX_active[:,1] > self.box_geom[1,1] - tol))[0]
-            
-                self.I_Xtot = I_dir
-                self.I_Ctot = torch.sort(torch_setdiff1d(torch.arange(self.ntot), self.I_Xtot))[0]
+            self.I_Xtot = torch.where(is_dir)[0]
+            self.I_Ntot = torch.where(is_neu)[0]
+            self.I_Ctot = torch.where(~(is_dir | is_neu | is_dup))[0]
+            # Outward unit normal at each Neumann point, for turning a gradient into du/dn data
+            self.normals_Ntot = torch.stack((on_face['x_hi'].double() - on_face['x_lo'].double(),
+                                             on_face['y_hi'].double() - on_face['y_lo'].double()), 1)[self.I_Ntot]
 
         else: # d==3
             if periodic_bc:
@@ -384,13 +491,24 @@ class Domain_Driver(AbstractHPSSolver):
                 self.I_Xtot = I_dir
                 self.I_Ctot = torch.sort(torch_setdiff1d(torch.arange(self.ntot), self.I_Xtot))[0]
 
+        if d == 3:
+            self.I_Ntot = torch.zeros(0, dtype=self.I_Xtot.dtype)   # no Neumann in 3D yet
+            self.normals_Ntot = torch.zeros(0, 3)
         self.I_Xtot_in_unique = self.hps.I_unique[self.I_Xtot]
+        # Neumann points in leaf-face ("box") indexing: each is held by exactly
+        # one leaf, so unlike the interior skeleton it has no I_copy2 partner
+        self.I_Ntot_in_unique = self.hps.I_unique[self.I_Ntot]
+        # The same points found from the leaf-face slots (both lists ascending)
+        if not torch.equal(self.I_Ntot_in_unique, self.hps.I_single):
+            raise ValueError("Neumann points found from face coordinates (I_Ntot) and from "
+                             "leaf-face slots (hps.I_single) disagree.")
         # Note that I_Xtot and I_Ctot are both out of all XX, not just the unique
         # boundaries.
 
         self._XXfull = torch.reshape(self.hps.grid_xx, (self.hps.grid_xx.shape[0] * self.hps.grid_xx.shape[1], -1))
 
-        self._Ji = self.I_Ctot
+        # Unknowns of A_CC (= Aii), in this order: interior skeleton, then Neumann points
+        self._Ji = torch.cat((self.I_Ctot, self.I_Ntot))
         self._Jx = self.I_Xtot
             
     
@@ -496,7 +614,45 @@ class Domain_Driver(AbstractHPSSolver):
             print("python-mumps had an error.")
         return info_dict
 
+    @property
+    def has_neumann(self):
+        """True if any boundary face is Neumann (I_Ntot non-empty)."""
+        return len(self.I_Ntot) > 0
+
+    def _require_neumann_faces_factorizable(self):
+        """Refuses to factorize an A_CC that is singular because no face is Dirichlet
+        (Neumann and periodic faces only):
+        - No zeroth-order term (pdo.c absent or zero): every constant solves the
+          homogeneous problem, so constants are a null vector of A_CC.
+        - Gauss faces (interpolate) whose leaf map from face data to the Chebyshev
+          boundary has a kernel -- as with q = p - 1 Gauss nodes per face and averaged
+          corners: every leaf DtN shares it, and the same face data on every leaf is a
+          null vector of A_CC.
+        Other singular cases (e.g. Helmholtz at a resonance) are not detected."""
+        if not (self.has_neumann and len(self.I_Xtot) == 0):
+            return
+        c = self.hps.pdo.c
+        if c is None or not torch.any(torch.as_tensor(c(self.hps.xx_tot)) != 0):
+            raise ValueError(
+                "This problem configuration is singular, so A_CC cannot be factorized: there is no "
+                "Dirichlet face (only Neumann and periodic faces) and no zeroth-order term (pdo.c is "
+                "absent or zero), so every constant solves the homogeneous problem and the solution "
+                "is only determined up to an additive constant. Make at least one face Dirichlet, "
+                "or give the operator a nonzero zeroth-order term c.")
+        if self.hps.interpolate:
+            G = np.asarray(self.hps.H.Interp_mat_unique)
+            rank = np.linalg.matrix_rank(G)
+            if rank < G.shape[1]:
+                raise NotImplementedError(
+                    "This discretization is singular, so A_CC cannot be factorized: with Gauss faces "
+                    "(interpolate=True) the leaf map from face data to the Chebyshev boundary has a "
+                    "kernel (rank %d of %d), and with no Dirichlet face nothing pins it. Make at least "
+                    "one face Dirichlet, or use Chebyshev faces." % (rank, G.shape[1]))
+
     def _require_uncondensed_supported(self):
+        if self.has_neumann:
+            raise NotImplementedError("Neumann faces are planned for the statically condensed "
+                                      "DtN path only (statically_condense=True).")
         if self.hps.interpolate:
             raise NotImplementedError(
                 "statically_condense=False is currently supported only for non-interpolating square/cube cases."
@@ -536,6 +692,9 @@ class Domain_Driver(AbstractHPSSolver):
             raise NotImplementedError("ItI maps are currently supported only for non-mapped square/cube geometries.")
         if self.periodic_bc:
             raise NotImplementedError("ItI maps are currently unsupported with periodic boundary conditions.")
+        if self.has_neumann:
+            raise NotImplementedError("ItI maps are currently unsupported with Neumann faces; Neumann "
+                                      "is planned for the statically condensed DtN path only.")
         if self.hps.interpolate:
             raise NotImplementedError("ItI maps are currently supported only for non-interpolating square/cube cases.")
 
@@ -805,6 +964,65 @@ class Domain_Driver(AbstractHPSSolver):
         return torch.from_numpy(np.asarray(sol)), toc_solve, torch.from_numpy(np.asarray(ff_body)), boundary_data
 
     # Builds the sparse matrix that encodes the solutions to boundary points.
+    def _assemble_neumann_blocks(self, A_CC, A_CX, A_XC):
+        """
+        Borders the interior-skeleton blocks with the Neumann points, on the
+        statically condensed DtN path (2D). Called by build_blackboxsolver.
+
+        A is block-diagonal in the leaf DtN maps, one copy of every leaf face
+        point per leaf ("box" indexing). A DtN row gives the OUTWARD du/dn of
+        its leaf, and a leaf body load enters as  du/dn = DtN g - h  with h the
+        'reduce_body' term (test/test_dtn_sign_convention.py).
+
+        Unknowns: the interior skeleton (I_Ctot; box pairs hps.I_copy1 /
+        hps.I_copy2) plus the Neumann points (I_Ntot; box indices
+        hps.I_single, each held by ONE leaf, so no copy2).
+
+        Rows:
+          interior point  (A[c1] + A[c2]) u = h[c1] + h[c2]  flux continuity
+          Neumann point    A[n] u = g_N + h[n]               g_N = prescribed
+                                                            outward du/dn
+        Columns: an interior unknown enters as A[:, c1] + A[:, c2], a Neumann
+        unknown as the single column A[:, n]. So, in block form,
+
+          A_CC = [ (A[c1]+A[c2])[:, c1]+[:, c2]   (A[c1]+A[c2])[:, n] ]
+                 [  A[n][:, c1]+[:, c2]             A[n][:, n]         ]
+          A_CX = [ (A[c1]+A[c2])[:, ext] ;  A[n][:, ext] ]
+          A_XC = [  A[ext][:, c1]+[:, c2]   A[ext][:, n] ]
+
+        with ext = I_Xtot_in_unique (Dirichlet); A_XX is unchanged. Unknown
+        order: I_Ctot, then I_Ntot (= Ji).
+
+        Right-hand side (get_rhs): Neumann rows get  g_N(XX_active[I_Ntot])
+        + reduce_body(...)[I_Ntot] - A[n][:, ext] u_D, with g_N from uu_neu_func /
+        uu_neu_vec (zero if neither is given). reduce_body already returns the
+        lone copy for a boundary point, so no extra bookkeeping.
+
+        Solution (solve): sol is ordered as Ji, so sol_tot[Ji] = sol. The leaf
+        reconstruction is unchanged -- hps.solve / expand_boundary_data place
+        face data by I_unique.
+
+        Well-posedness: with no Dirichlet face (Neumann and periodic only), no
+        zeroth-order term (c = 0) leaves constants in the null space; screened
+        operators (c != 0) are fine. Gauss faces whose face map has a kernel
+        also make A_CC singular when no face is Dirichlet. setup_solver_Aii
+        refuses both (_require_neumann_faces_factorizable).
+
+        Out of scope: the uncondensed and ItI paths and 3D (they refuse
+        Neumann explicitly).
+        """
+        I_copy1 = self.hps.I_copy1.detach().cpu().numpy()
+        I_copy2 = self.hps.I_copy2.detach().cpu().numpy()
+        I_neu   = self.hps.I_single.detach().cpu().numpy()
+        I_ext   = self.I_Xtot_in_unique.detach().cpu().numpy()
+        A_N  = self.A[I_neu]                                  # single-copy rows
+        A_CN = (self.A[I_copy1] + self.A[I_copy2])[:,I_neu]   # single-copy columns
+        A_NC = A_N[:,I_copy1] + A_N[:,I_copy2]
+        A_CC = sp.bmat([[A_CC, A_CN], [A_NC, A_N[:,I_neu]]], format='csr')
+        A_CX = sp_vstack((A_CX, A_N[:,I_ext]), format='csr')
+        A_XC = sp_hstack((A_XC, self.A[I_ext][:,I_neu]), format='csr')
+        return A_CC, A_CX, A_XC
+
     def build_blackboxsolver(self,solvertype,verbose):
         if self.use_iti_maps:
             return dict()
@@ -823,6 +1041,8 @@ class Domain_Driver(AbstractHPSSolver):
         A_XC = self.A[I_ext]
         A_XC = A_XC[:,I_copy1] + A_XC[:,I_copy2]
         A_XX = self.A[I_ext][:,I_ext]
+        if self.has_neumann:
+            A_CC, A_CX, A_XC = self._assemble_neumann_blocks(A_CC, A_CX, A_XC)
 
         self.A_CC = A_CC
         self.A_CX = A_CX
@@ -940,11 +1160,31 @@ class Domain_Driver(AbstractHPSSolver):
             return np.asarray(solver_Aii.matvec(ff_body))
         return np.asarray(solver_Aii.matmat(ff_body))
                 
-    def get_rhs(self,uu_dir_func,uu_dir_vec=None,ff_body_func=None,ff_body_vec=None,sum_body_load=True):
+    def _get_neumann_data(self, uu_neu_func, uu_neu_vec, nrhs):
         """
-        Obtains the right-hand-side of a solve based on body loads and Dirichlet BCs.
+        Neumann data, the outward du/dn at XX_active[I_Ntot], as a (len(I_Ntot), 1 or nrhs)
+        tensor. Like uu_dir_vec / uu_dir_func: uu_neu_vec gives the values in I_Ntot order and
+        wins over uu_neu_func, which is evaluated at the points. With neither, du/dn = 0.
         """
-        I_Ctot   = self.I_Ctot
+        if (uu_neu_vec is None) and (uu_neu_func is None):
+            return torch.zeros(len(self.I_Ntot), 1)
+        g = uu_neu_vec if uu_neu_vec is not None else uu_neu_func(self.XX_active[self.I_Ntot])
+        g = torch.as_tensor(g)
+        if g.ndim == 1:
+            g = g.unsqueeze(-1)
+        if g.ndim != 2 or g.shape[0] != len(self.I_Ntot) or g.shape[1] not in (1, nrhs):
+            raise ValueError("Neumann data has shape %s; expected (%d, 1) or (%d, %d): one row per "
+                             "Neumann point (I_Ntot), one column or one per right-hand side"
+                             % (tuple(g.shape), len(self.I_Ntot), len(self.I_Ntot), nrhs))
+        return g
+
+    def get_rhs(self,uu_dir_func,uu_dir_vec=None,ff_body_func=None,ff_body_vec=None,sum_body_load=True,
+                uu_neu_func=None,uu_neu_vec=None):
+        """
+        Obtains the right-hand-side of a solve based on body loads, Dirichlet BCs and Neumann data
+        (the outward du/dn at XX_active[I_Ntot]; see _get_neumann_data). The rows are in the unknown
+        order Ji: interior skeleton (I_Ctot), then Neumann points (I_Ntot).
+        """
         I_Xtot   = self.I_Xtot
         nrhs = 1
             
@@ -956,12 +1196,18 @@ class Domain_Driver(AbstractHPSSolver):
         else:
             uu_dir = uu_dir_vec
 
-        # body load on I_Ctot
+        # interior rows (I_Ctot): the Dirichlet lift of both copies
         I_copy1  = self.hps.I_copy1
         I_copy2  = self.hps.I_copy2
 
         ff_body  = -apply_sparse_lowmem(self.A,I_copy1,self.I_Xtot_in_unique,uu_dir)
         ff_body  = ff_body - apply_sparse_lowmem(self.A,I_copy2,self.I_Xtot_in_unique,uu_dir)
+
+        # Neumann rows: the single leaf's outward flux, A[n] u = g_N + h[n], minus the Dirichlet lift
+        g_N = self._get_neumann_data(uu_neu_func, uu_neu_vec, ff_body.shape[-1])
+        if self.has_neumann:
+            ff_neu  = -apply_sparse_lowmem(self.A,self.hps.I_single,self.I_Xtot_in_unique,uu_dir) + g_N
+            ff_body = torch.cat((ff_body, ff_neu))
 
         if (ff_body_func is not None) or (ff_body_vec is not None):    # THIS NEEDS TO CHANGE FOR C-N
 
@@ -969,11 +1215,12 @@ class Domain_Driver(AbstractHPSSolver):
                 device = torch.device('cuda')
             elif (self.sparse_assembly == 'reduced_cpu'):
                 device = torch.device('cpu')
-            
+
+            # h[c1] + h[c2] on the interior rows, the single copy h[n] on the Neumann rows
             if self.d==2:
-                ff_body += self.hps.reduce_body(device,ff_body_func,ff_body_vec)[I_Ctot]
+                ff_body += self.hps.reduce_body(device,ff_body_func,ff_body_vec)[self.Ji]
             elif self.d==3:
-                ff_body += self.hps.reduce_body(device,ff_body_func,ff_body_vec)[I_Ctot]
+                ff_body += self.hps.reduce_body(device,ff_body_func,ff_body_vec)[self.Ji]
         
         return ff_body
     
@@ -991,13 +1238,15 @@ class Domain_Driver(AbstractHPSSolver):
 
         return res
     
-    def solve_helper_blackbox(self,uu_dir_func,uu_dir_vec=None,ff_body_func=None,ff_body_vec=None):
+    def solve_helper_blackbox(self,uu_dir_func,uu_dir_vec=None,ff_body_func=None,ff_body_vec=None,
+                              uu_neu_func=None,uu_neu_vec=None):
         """
         This solves for the box boundaries using either superLU or PETSC.
         """
         
         tic = time()
-        ff_body = self.get_rhs(uu_dir_func,uu_dir_vec=uu_dir_vec,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
+        ff_body = self.get_rhs(uu_dir_func,uu_dir_vec=uu_dir_vec,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,
+                               uu_neu_func=uu_neu_func,uu_neu_vec=uu_neu_vec)
         ff_body = np.array(ff_body)
 
         sol = self._solve_factorized_system(ff_body)
@@ -1066,9 +1315,12 @@ class Domain_Driver(AbstractHPSSolver):
         return uu_sol_tot.flatten(start_dim=0, end_dim=-2).cpu()
         
 
-    def solve(self,uu_dir_func,uu_dir_vec=None,ff_body_func=None,ff_body_vec=None,known_sol=False):
+    def solve(self,uu_dir_func,uu_dir_vec=None,ff_body_func=None,ff_body_vec=None,known_sol=False,
+              uu_neu_func=None,uu_neu_vec=None):
         """
         The main function that solves the sparse system and leaf interiors.
+        Neumann data (uu_neu_func / uu_neu_vec, the outward du/dn; zero if neither is given) is
+        used on the statically condensed DtN path, the only one that supports Neumann faces.
         """
         if (self.solver_type == 'slabLU'):
             raise ValueError("not included in this version")
@@ -1084,7 +1336,8 @@ class Domain_Driver(AbstractHPSSolver):
                 uu_dir_func, uu_dir_vec=uu_dir_vec, ff_body_func=ff_body_func, ff_body_vec=ff_body_vec
             )
         else:
-            sol,toc_system_solve, ff_body = self.solve_helper_blackbox(uu_dir_func,uu_dir_vec=uu_dir_vec,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec)
+            sol,toc_system_solve, ff_body = self.solve_helper_blackbox(uu_dir_func,uu_dir_vec=uu_dir_vec,ff_body_func=ff_body_func,ff_body_vec=ff_body_vec,
+                                                                      uu_neu_func=uu_neu_func,uu_neu_vec=uu_neu_vec)
 
         if self.use_iti_maps:
             rel_err = float('nan')
@@ -1109,7 +1362,7 @@ class Domain_Driver(AbstractHPSSolver):
                 true_int_sol = uu_dir_func(interior_coords)
                 true_c_sol = torch.vstack((true_int_sol, uu_dir_func(self.hps.xx_active[self.I_Ctot])))
             else:
-                print("We don't have a function for subdomain boundaries, so we're just assessing stability")
+                #print("We don't have a function for subdomain boundaries, so we're just assessing stability")
                 true_c_sol = sol
 
             res = np.linalg.norm(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body)
@@ -1128,14 +1381,15 @@ class Domain_Driver(AbstractHPSSolver):
         else:
             # We set the solution on the subdomain boundaries to the result of our sparse system.
             sol_tot = torch.zeros((len(self.hps.I_unique), sol.shape[-1]), dtype=sol.dtype)
-            sol_tot[self.I_Ctot] = sol
+            # sol is ordered as Ji: interior skeleton (I_Ctot), then Neumann points (I_Ntot)
+            sol_tot[self.Ji] = sol
 
             # Here we set the true exterior to the given data:
             if uu_dir_vec is None:
-                true_c_sol = uu_dir_func(self.hps.xx_active[self.I_Ctot])
+                true_c_sol = uu_dir_func(self.hps.xx_active[self.Ji])
                 sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
             else:
-                print("We don't have a function for subdomain boundaries, so we're just assessing stability")
+                #print("We don't have a function for subdomain boundaries, so we're just assessing stability")
                 true_c_sol = sol
                 sol_tot[self.I_Xtot] = uu_dir_vec
 
