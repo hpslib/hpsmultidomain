@@ -43,12 +43,13 @@ def solve(p):
     # Neumann data: outward du/dn at the Neumann points
     walls = solver.XX[solver.I_Ntot]
     dudn = (exact_gradient(walls) * solver.normals_Ntot).sum(1, keepdim=True)
-    # body load f = -Lap u + u = pi^2 u, given on the full grid (see below)
-    body = torch.pi**2 * exact_solution(solver.XXfull)
+    # body load f = -Lap u + u = pi^2 u, as a callable (a vector on
+    # solver.XXfull works too)
+    def body(xx):
+        return torch.pi**2 * exact_solution(xx)
 
     # No face is Dirichlet, so the Dirichlet data is never evaluated; any
-    # callable works. The body load is passed as a grid vector: a callable
-    # body load currently fails for real-valued problems.
+    # callable works.
     solution = solver.solve_dir_full(exact_solution, body, uu_neu=dudn)
     return relative_solution_error(solver, solution, exact_solution)
 

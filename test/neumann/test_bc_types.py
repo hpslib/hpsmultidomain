@@ -286,7 +286,6 @@ def test_dirichlet_build_and_solve_unaffected():
         # u = sin(pi x) e^y is periodic over the box width 2;  -Lap u + u = pi^2 u
         u = lambda xx: (torch.sin(torch.pi * xx[:, 0]) * torch.exp(xx[:, 1])).unsqueeze(-1)
         f = lambda xx: torch.pi**2 * u(xx)
-        # body load as a grid vector: a callable takes reduce_body's complex
-        # default and fails in get_rhs for real problems (pre-existing)
+        # body load as a grid vector (callable loads: test/test_body_loads.py)
         sol = dd.solve_dir_full(u, f(dd.XXfull))
     assert rel_err_off_corners(dd, sol, u) < 1e-6

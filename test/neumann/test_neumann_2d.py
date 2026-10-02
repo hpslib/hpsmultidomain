@@ -13,8 +13,8 @@ import numpy as np
 import pytest
 import torch
 
-from bc_helpers import (SOLVABLE, curved_geometry, factorized, grad_exact, leaf_gradient, manufactured,
-                        rel_err_off_corners, u_exact, wall_nodes)
+from bc_helpers import (SOLVABLE, body_load, curved_geometry, factorized, grad_exact, leaf_gradient,
+                        manufactured, rel_err_off_corners, u_exact, wall_nodes)
 from hpsmultidomain.domain_driver import Domain_Driver
 from hpsmultidomain.pdo import PDO_2d, const
 
@@ -35,13 +35,17 @@ def _solve_error(dd, u, f, g):
 
 # ---- manufactured solutions ---------------------------------------------------------
 
+@pytest.mark.parametrize("load", ["vector", "callable"])
 @pytest.mark.parametrize("interpolate, bc_types", SOLVABLE)
-def test_neumann_solve_recovers_manufactured_solution(interpolate, bc_types):
-    """known_sol=True also compares the skeleton values with u(XX[Ji])."""
+def test_neumann_solve_recovers_manufactured_solution(interpolate, bc_types, load):
+    """The body load as a grid vector or a callable. known_sol=True also compares
+    the skeleton values with u(XX[Ji])."""
     dd = factorized(interpolate, bc_types=bc_types)
     u, f, g = manufactured(dd)
-    out = _quiet(dd.solve, u, ff_body_vec=f, uu_neu_vec=g, known_sol=True)
+    body = dict(ff_body_vec=f) if load == "vector" else dict(ff_body_func=body_load())
+    out = _quiet(dd.solve, u, uu_neu_vec=g, known_sol=True, **body)
     true_err, reverse_bdry_error = out[2], out[7]
+    assert out[0].dtype == torch.float64
     assert true_err < 1e-5 and reverse_bdry_error < 1e-5
 
 

@@ -90,5 +90,4 @@ Boundary types are set per axis or per face with `bc_types`, e.g.
   otherwise the problem is singular and factorizing it raises an error.
 - Gauss faces (operators with a `c12` term) whose face map has a kernel also
   need at least one Dirichlet face.
-- Pass body loads as grid vectors (on `solver.XXfull`) for real-valued
-  problems; a callable body load currently fails there.
+- A body load can be a callable or a vector on `solver.XXfull`.

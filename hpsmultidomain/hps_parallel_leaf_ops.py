@@ -248,6 +248,22 @@ def get_DtN_chunksize(p,d,device,mode):
     return np.max([chunk_max, 1])
 
 
+def store_chunk(buf, nrows, start, chunk, device):
+    """
+    Writes chunk into rows start: of buf. buf is allocated on first use (nrows rows, the
+    chunk's trailing shape and dtype) and widened if a later chunk needs a wider dtype, so
+    the result is real unless what was computed is complex. Used for the body-load
+    reduction, whose dtype is only known once a chunk has been computed: form_DtNs
+    combines the operator's dtype with the body load's.
+    """
+    if buf is None:
+        buf = torch.zeros((nrows,) + tuple(chunk.shape[1:]), device=device, dtype=chunk.dtype)
+    elif buf.dtype != chunk.dtype:
+        buf = buf.to(torch.promote_types(buf.dtype, chunk.dtype))
+    buf[start:start + chunk.shape[0]] = chunk
+    return buf
+
+
 def get_DtNs_helper(p,q,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo,\
                     box_start,box_end,chunk_init,device,mode,interpolate,data,ff_body_func,ff_body_vec,uu_true):
     """
@@ -265,10 +281,7 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Int
     elif (mode == 'solve'):
         DtNs = torch.zeros(nboxes,np.prod(p),2*data.shape[-1],device=device,dtype=data.dtype)
     elif (mode == 'reduce_body'):
-        rhs_dtype = torch.cdouble
-        if ff_body_vec is not None:
-            rhs_dtype = ff_body_vec.dtype
-        DtNs = torch.zeros(nboxes,size_surface,1,device=device,dtype=rhs_dtype)
+        DtNs = None # allocated from the first chunk (store_chunk): real unless the body load is complex
     #print("Built zero arrays in helper")
     chunk_size = chunk_init
     args = p,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,pdo
@@ -281,7 +294,10 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Int
 
         tmp = form_DtNs(*args,b1,b2,device,mode,interpolate,data,ff_body_func,ff_body_vec,uu_true)
         
-        DtNs[box_curr:box_curr + chunk_size] = tmp
+        if mode == 'reduce_body':
+            DtNs = store_chunk(DtNs,nboxes,box_curr,tmp,device)
+        else:
+            DtNs[box_curr:box_curr + chunk_size] = tmp
         box_curr += chunk_size
 
         chunk_size = get_DtN_chunksize(p,d,device,mode) #np.max([get_DtN_chunksize(p,d,device),chunk_init])

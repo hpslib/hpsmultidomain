@@ -71,14 +71,20 @@ def grad_exact(xx):
     return torch.stack((torch.pi * torch.cos(torch.pi * xx[:, 0]) * e, torch.sin(torch.pi * xx[:, 0]) * e), 1)
 
 
-def manufactured(dd, D=None, c=1.0):
-    """u_exact as an (N, 1) callable, the body load f = -D Lap u + c u on the grid
-    (XXfull), and the outward du/dn at the Neumann points (I_Ntot order).
+def body_load(D=None, c=1.0):
+    """The body load f = -D Lap u_exact + c u_exact as an (N, 1) callable.
     Lap u = (1 - pi^2) u; D = 1 unless given."""
-    Dv = torch.ones(dd.XXfull.shape[0]) if D is None else D(dd.XXfull)
-    f = ((torch.pi**2 - 1) * Dv + c).unsqueeze(-1) * u_exact(dd.XXfull)
+    def f(xx):
+        Dv = torch.ones(xx.shape[0]) if D is None else D(xx)
+        return ((torch.pi**2 - 1) * Dv + c).unsqueeze(-1) * u_exact(xx)
+    return f
+
+
+def manufactured(dd, D=None, c=1.0):
+    """u_exact as an (N, 1) callable, the body load (body_load) on the grid
+    (XXfull), and the outward du/dn at the Neumann points (I_Ntot order)."""
     xx = dd.XX_active[dd.I_Ntot]
-    return u_exact, f, (grad_exact(xx) * dd.normals_Ntot).sum(1, keepdim=True)
+    return u_exact, body_load(D, c)(dd.XXfull), (grad_exact(xx) * dd.normals_Ntot).sum(1, keepdim=True)
 
 
 def hand_rhs(dd, u, f, g):

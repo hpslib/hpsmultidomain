@@ -1232,11 +1232,12 @@ class Domain_Driver(AbstractHPSSolver):
             elif (self.sparse_assembly == 'reduced_cpu'):
                 device = torch.device('cpu')
 
-            # h[c1] + h[c2] on the interior rows, the single copy h[n] on the Neumann rows
+            # h[c1] + h[c2] on the interior rows, the single copy h[n] on the Neumann rows.
+            # Out of place, so a complex body load promotes a real right-hand side.
             if self.d==2:
-                ff_body += self.hps.reduce_body(device,ff_body_func,ff_body_vec)[self.Ji]
+                ff_body = ff_body + self.hps.reduce_body(device,ff_body_func,ff_body_vec)[self.Ji]
             elif self.d==3:
-                ff_body += self.hps.reduce_body(device,ff_body_func,ff_body_vec)[self.Ji]
+                ff_body = ff_body + self.hps.reduce_body(device,ff_body_func,ff_body_vec)[self.Ji]
         
         return ff_body
     
@@ -1400,14 +1401,15 @@ class Domain_Driver(AbstractHPSSolver):
             # sol is ordered as Ji: interior skeleton (I_Ctot), then Neumann points (I_Ntot)
             sol_tot[self.Ji] = sol
 
-            # Here we set the true exterior to the given data:
+            # Here we set the true exterior to the given data (cast: real Dirichlet data
+            # with a complex body load gives a complex sol_tot):
             if uu_dir_vec is None:
                 true_c_sol = uu_dir_func(self.hps.xx_active[self.Ji])
-                sol_tot[self.I_Xtot] = uu_dir_func(self.hps.xx_active[self.I_Xtot])
+                sol_tot[self.I_Xtot] = torch.as_tensor(uu_dir_func(self.hps.xx_active[self.I_Xtot])).to(sol_tot.dtype)
             else:
                 #print("We don't have a function for subdomain boundaries, so we're just assessing stability")
                 true_c_sol = sol
-                sol_tot[self.I_Xtot] = uu_dir_vec
+                sol_tot[self.I_Xtot] = torch.as_tensor(uu_dir_vec).to(sol_tot.dtype)
 
             res = np.linalg.norm(self.A_CC @ true_c_sol.cpu().detach().numpy() - ff_body.cpu().detach().numpy()) / torch.linalg.norm(ff_body)
             forward_bdry_error = res

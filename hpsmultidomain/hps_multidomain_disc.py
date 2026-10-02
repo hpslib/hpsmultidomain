@@ -455,10 +455,7 @@ class HPS_Multidomain:
         elif (mode == 'solve'):
             DtNs = torch.zeros(nboxes,np.prod(p),2*data.shape[-1], dtype=data.dtype)
         elif (mode == 'reduce_body'):
-            rhs_dtype = torch.cdouble
-            if ff_body_vec is not None:
-                rhs_dtype = ff_body_vec.dtype
-            DtNs = torch.zeros(nboxes, size_ext, 1, dtype=rhs_dtype)
+            DtNs = None # allocated from the first chunk (leaf_ops.store_chunk): real unless the body load is complex
         
         xxloc = self.grid_xx.to(device)
         Nx    = torch.tensor(self.H.Nx).to(device)
@@ -498,9 +495,13 @@ class HPS_Multidomain:
         while j < nboxes:
             chunk_size = min(chunk_max, nboxes - j)
 
-            DtNs[j:j+chunk_size],Aloc_chunklist = \
+            out,Aloc_chunklist = \
             leaf_ops.get_DtNs_helper(*args,j,j+chunk_size, Aloc_chunkinit,device,\
                                     mode,self.interpolate,data,ff_body_func,ff_body_vec,uu_true)
+            if mode == 'reduce_body':
+                DtNs = leaf_ops.store_chunk(DtNs,int(nboxes),j,out,out.device)
+            else:
+                DtNs[j:j+chunk_size] = out
 
             #print("Did chunk " + str(j))
             Aloc_chunkinit = int(Aloc_chunklist[0])
