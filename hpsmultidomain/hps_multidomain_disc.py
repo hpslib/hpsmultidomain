@@ -547,6 +547,9 @@ class HPS_Multidomain:
     def expand_boundary_data(self, device, uu_sol):
         """
         Expands unique surface data to one reduced boundary trace per box.
+        Every slot is set through I_unique, then the second copy of each interior pair
+        from its first; single copies (I_single, Neumann faces) and Dirichlet points
+        keep their one value.
         """
         nrhs = uu_sol.shape[-1]
         if self.d == 2:

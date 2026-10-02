@@ -107,9 +107,17 @@ def apply_sparse_lowmem(A, I, J, v, transpose=False):
 # derivative, not the conormal c11 du/dn. That is exactly the quantity a leaf
 # DtN row returns (Nx = -D1, +D1, -D2, +D2 on the L, R, D, U faces), with the
 # leaf body load entering as  du/dn = DtN g - h,  h = the 'reduce_body' term;
-# see test/test_dtn_sign_convention.py. It is passed to get_rhs / solve as
+# see test/neumann/test_dtn_sign_convention.py. It is passed to get_rhs / solve as
 # uu_neu_func or uu_neu_vec (solve_dir_full: uu_neu) at XX_active[I_Ntot],
 # whose outward unit normals are normals_Ntot; with no data, du/dn = 0.
+#
+# The data is the plain du/dn whatever the coefficients (c11, c22, c12, c1,
+# c2, c): for a divergence-form operator with conormal data k du/dn, divide by
+# k first. Neumann faces are supported on box geometries only: on a mapped
+# geometry (parameter_map) a DtN row gives the derivative normal to the
+# reference face, not the physical du/dn, so Domain_Driver refuses them. With
+# Chebyshev faces the leaf corners are not unknowns and are extrapolated in
+# the reconstructed solution, on Neumann walls as on Dirichlet ones.
 BC_FACES_2D = ('x_lo', 'x_hi', 'y_lo', 'y_hi')
 BC_ALLOWED_2D = {'x_lo': ('dirichlet', 'neumann', 'periodic'),
                  'x_hi': ('dirichlet', 'neumann', 'periodic'),
@@ -198,13 +206,21 @@ class Domain_Driver(AbstractHPSSolver):
           'dirichlet' | 'neumann'. Default all Dirichlet; periodic_bc=True is the same as
           {'x': 'periodic'}. Neumann faces (statically condensed path only) take the outward
           normal derivative du/dn as data, uu_neu_func / uu_neu_vec in get_rhs and solve
-          (uu_neu in solve_dir_full); without data, du/dn = 0. See _assemble_neumann_blocks.
+          (uu_neu in solve_dir_full); without data, du/dn = 0. Box geometries only (not
+          mapped ones). See the boundary-condition notes at the top of this module and
+          _assemble_neumann_blocks.
         """
         self.d = d
         self.kh = kh
         self.bc_types = resolve_bc_types(d, periodic_bc, bc_types)
         if self.bc_types is not None:
             periodic_bc = (self.bc_types['x_lo'] == 'periodic')
+            if 'neumann' in self.bc_types.values() and hasattr(box_geom, 'parameter_map'):
+                raise NotImplementedError(
+                    "Neumann faces on a mapped geometry (parameter_map) are not supported: the leaf "
+                    "DtN rows give the derivative normal to the reference face, d(u o phi)/d xi_n, not "
+                    "the physical du/dn, which also needs the map's metric terms (and, on a curved "
+                    "wall, the tangential derivative).")
         self.periodic_bc  = periodic_bc
         self.statically_condense = statically_condense
         self.use_iti_maps = use_iti_maps
@@ -972,7 +988,7 @@ class Domain_Driver(AbstractHPSSolver):
         A is block-diagonal in the leaf DtN maps, one copy of every leaf face
         point per leaf ("box" indexing). A DtN row gives the OUTWARD du/dn of
         its leaf, and a leaf body load enters as  du/dn = DtN g - h  with h the
-        'reduce_body' term (test/test_dtn_sign_convention.py).
+        'reduce_body' term (test/neumann/test_dtn_sign_convention.py).
 
         Unknowns: the interior skeleton (I_Ctot; box pairs hps.I_copy1 /
         hps.I_copy2) plus the Neumann points (I_Ntot; box indices

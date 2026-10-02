@@ -65,3 +65,30 @@ print the relative solution error:
 python -m tutorials.helmholtz_known_solution_2d
 python -m tutorials.helmholtz_known_solution_3d
 ```
+
+## Neumann boundary conditions
+
+`neumann_known_solution_2d.py` solves a periodic channel (periodic in x,
+Neumann on the walls in y) with a known solution and prints the error as `p`
+grows:
+
+```bash
+python -m tutorials.neumann_known_solution_2d
+```
+
+Boundary types are set per axis or per face with `bc_types`, e.g.
+`{"x": "periodic", "y": "neumann"}` or
+`{"x_lo": "dirichlet", "x_hi": "neumann", "y": "neumann"}`. Things to know:
+
+- Neumann data is the outward normal derivative du/dn (the plain derivative,
+  whatever the coefficients), given at the Neumann points `solver.XX[solver.I_Ntot]`
+  through `uu_neu` in `solve_dir_full` (`uu_neu_func` / `uu_neu_vec` in
+  `solve`). `solver.normals_Ntot` holds their outward unit normals. Without
+  data, du/dn = 0.
+- 2D, box geometries and the statically condensed solver only.
+- With no Dirichlet face, the operator needs a zeroth-order term `c`;
+  otherwise the problem is singular and factorizing it raises an error.
+- Gauss faces (operators with a `c12` term) whose face map has a kernel also
+  need at least one Dirichlet face.
+- Pass body loads as grid vectors (on `solver.XXfull`) for real-valued
+  problems; a callable body load currently fails there.
