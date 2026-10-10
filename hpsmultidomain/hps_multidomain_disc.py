@@ -573,6 +573,9 @@ class HPS_Multidomain:
         if self.interpolate:
             return uu_sol_tot
 
+        # get_DtNs(mode='solve') stages its output on the host, so lift there
+        device = uu_sol_tot.device
+        uu_sol_bnd = uu_sol_bnd.to(device)
         nrhs = uu_sol_bnd.shape[-1]
         Jx = torch.tensor(self.H.JJ.Jx).to(device)
         Jxun = torch.tensor(self.H.JJ.Jxunique).to(device)
