@@ -1,3 +1,4 @@
+import os
 import torch  # Used for tensor operations with GPU support
 import numpy as np  # For numerical operations, especially those related to array manipulation
 
@@ -223,6 +224,17 @@ def form_DtNs(p,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Intmap_unq,
             uu_sol[:,Jc,nrhs:] = Aloc[:,Jc] @ uu_true[box_start:box_end] - f_body
         return uu_sol
     
+# GPU chunk sizing (get_DtN_chunksize): HPS_CHUNK_MEM=reserved (default) sizes
+# a chunk from the caching allocator's idle pool, memory_reserved -
+# memory_allocated, so it depends on what the process allocated before;
+# HPS_CHUNK_MEM=free also counts the device's free memory (mem_get_info).
+# HPS_CHUNK_LOG=1 records every chunk size get_DtNs_helper uses in CHUNK_LOG.
+CHUNK_MEM = os.environ.get("HPS_CHUNK_MEM", "reserved").lower()
+if CHUNK_MEM not in ("reserved", "free"):
+    raise ValueError("HPS_CHUNK_MEM must be 'reserved' or 'free', got %r" % CHUNK_MEM)
+CHUNK_LOG = [] if os.environ.get("HPS_CHUNK_LOG", "0") != "0" else None
+
+
 def get_DtN_chunksize(p,d,device,mode):
     """
     Computing leaf solves or DtNs requires significant memory overhead beyond the cost of storing
@@ -233,7 +245,11 @@ def get_DtN_chunksize(p,d,device,mode):
     if (device == torch.device('cuda')):
         r = torch.cuda.memory_reserved(0)
         a = torch.cuda.memory_allocated(0)
-        f = r-a # in bytes
+        f = r-a # in bytes: the caching allocator's idle pool only
+        if CHUNK_MEM == 'free':
+            # device free memory plus that idle pool (PyTorch can reuse both),
+            # with a margin for the per-box estimate below
+            f = 0.8 * (torch.cuda.mem_get_info(0)[0] + f)
         #print(f"Available memory for next chunk: {r} - {a} = {f}")
     else:
         f = 10e9 # 10 GB in bytes
@@ -302,5 +318,7 @@ def get_DtNs_helper(p,q,d,xxloc,Nx,Nxc,Jx,Jc,Jxreo,Jxun,Ds,Intmap,Intmap_rev,Int
 
         chunk_size = get_DtN_chunksize(p,d,device,mode) #np.max([get_DtN_chunksize(p,d,device),chunk_init])
         chunk_list[nchunks] = b2-b1
+        if CHUNK_LOG is not None:
+            CHUNK_LOG.append((mode, int(b2-b1)))
         nchunks += 1
     return DtNs.cpu(),chunk_list[:nchunks]
